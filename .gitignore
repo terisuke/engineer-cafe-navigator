@@ -1,0 +1,41 @@
+# Node modules
+node_modules/
+
+# dotenv files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Log files
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Next.js build output
+.next/
+out/
+
+# TypeScript build output
+dist/
+build/
+*.tsbuildinfo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+
+# Test coverage
+coverage/
+
+# GCP specific (service account keys are often .json, but ignoring all .json is dangerous)
+# It's safer to ignore the .env file which contains the path, or explicitly ignore the known key file name if it's fixed.
+# Assuming the service account key path is stored in .env, ignoring .env is sufficient.
+# If you have a specific service account key file name like 'service-account.json' at the root, uncomment the line below:
+# service-account.json
