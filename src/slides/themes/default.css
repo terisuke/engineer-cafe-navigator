@@ -1,0 +1,373 @@
+/*
+ * Default Marp Theme for Engineer Cafe Navigator
+ * Simple and clean design for technical presentations
+ */
+
+:root {
+  --default-primary: #333;
+  --default-secondary: #666;
+  --default-accent: #007acc;
+  --default-background: #ffffff;
+  --default-surface: #f8f9fa;
+  --default-border: #e9ecef;
+}
+
+/* Base styles */
+section {
+  background: var(--default-background);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--default-primary);
+  padding: 70px;
+  font-size: 30px;
+  line-height: 1.5;
+  justify-content: flex-start;
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0 0 0.5em 0;
+  color: var(--default-primary);
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 2.5em;
+  border-bottom: 3px solid var(--default-accent);
+  padding-bottom: 0.3em;
+  margin-bottom: 0.8em;
+}
+
+h2 {
+  font-size: 2em;
+  color: var(--default-accent);
+  margin-bottom: 0.6em;
+}
+
+h3 {
+  font-size: 1.5em;
+  color: var(--default-secondary);
+  margin-bottom: 0.4em;
+}
+
+/* Paragraphs */
+p {
+  margin: 0 0 1em 0;
+}
+
+/* Lists */
+ul, ol {
+  margin: 1em 0;
+  padding-left: 1.5em;
+}
+
+li {
+  margin: 0.3em 0;
+}
+
+/* Links */
+a {
+  color: var(--default-accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s ease;
+}
+
+a:hover {
+  border-bottom-color: var(--default-accent);
+}
+
+/* Images */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1em auto;
+}
+
+/* Code */
+code {
+  background: var(--default-surface);
+  color: var(--default-accent);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-family: 'Courier New', Monaco, monospace;
+}
+
+pre {
+  background: var(--default-surface);
+  border: 1px solid var(--default-border);
+  border-radius: 5px;
+  padding: 1em;
+  overflow-x: auto;
+}
+
+pre code {
+  background: none;
+  color: var(--default-primary);
+  padding: 0;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+
+th, td {
+  padding: 0.7em;
+  text-align: left;
+  border-bottom: 1px solid var(--default-border);
+}
+
+th {
+  background: var(--default-surface);
+  font-weight: 600;
+  color: var(--default-primary);
+}
+
+/* Blockquotes */
+blockquote {
+  border-left: 4px solid var(--default-accent);
+  margin: 1em 0;
+  padding: 0.5em 1em;
+  background: var(--default-surface);
+  font-style: italic;
+}
+
+/* Strong and emphasis */
+strong {
+  font-weight: 700;
+  color: var(--default-primary);
+}
+
+em {
+  font-style: italic;
+  color: var(--default-secondary);
+}
+
+/* Horizontal rule */
+hr {
+  border: none;
+  border-top: 2px solid var(--default-border);
+  margin: 2em 0;
+}
+
+/* Header and footer */
+header, footer {
+  background: var(--default-surface);
+  padding: 20px 40px;
+  font-size: 0.8em;
+  color: var(--default-secondary);
+}
+
+header {
+  border-bottom: 1px solid var(--default-border);
+}
+
+footer {
+  border-top: 1px solid var(--default-border);
+}
+
+/* Pagination */
+section::after {
+  position: absolute;
+  bottom: 70px;
+  right: 70px;
+  color: var(--default-secondary);
+  font-size: 0.6em;
+}
+
+/* Lead slide (cover slide) */
+section.lead {
+  background: linear-gradient(135deg, var(--default-accent) 0%, #005994 100%);
+  color: white;
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+}
+
+section.lead h1 {
+  font-size: 3em;
+  border: none;
+  color: white;
+  margin-bottom: 0.5em;
+}
+
+section.lead p {
+  font-size: 1.2em;
+  opacity: 0.9;
+}
+
+/* Invert slide */
+section.invert {
+  background: var(--default-primary);
+  color: white;
+}
+
+section.invert h1,
+section.invert h2,
+section.invert h3 {
+  color: white;
+}
+
+section.invert h1 {
+  border-bottom-color: white;
+}
+
+section.invert h2 {
+  color: #ffffff;
+}
+
+/* Gaia theme compatibility */
+section.gaia {
+  background: var(--default-background);
+  color: var(--default-primary);
+}
+
+/* Background image support */
+section[data-background-color] {
+  background-color: var(--background-color, var(--default-background));
+}
+
+section[data-background-image] {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Two-column layout */
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2em;
+  height: 100%;
+  align-items: start;
+}
+
+.columns > div {
+  height: 100%;
+}
+
+/* Utility classes */
+.text-center {
+  text-align: center;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.small {
+  font-size: 0.8em;
+}
+
+.large {
+  font-size: 1.2em;
+}
+
+.muted {
+  color: var(--default-secondary);
+}
+
+.highlight {
+  background: #ffeb3b;
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  section {
+    padding: 50px;
+    font-size: 28px;
+  }
+  
+  h1 {
+    font-size: 2.2em;
+  }
+  
+  h2 {
+    font-size: 1.8em;
+  }
+}
+
+@media (max-width: 768px) {
+  section {
+    padding: 30px;
+    font-size: 24px;
+  }
+  
+  h1 {
+    font-size: 2em;
+  }
+  
+  h2 {
+    font-size: 1.6em;
+  }
+  
+  .columns {
+    grid-template-columns: 1fr;
+    gap: 1em;
+  }
+}
+
+/* Print styles */
+@media print {
+  section {
+    page-break-inside: avoid;
+    background: white !important;
+    color: black !important;
+  }
+  
+  a {
+    color: black;
+    border-bottom: 1px solid black;
+  }
+  
+  pre, code {
+    background: #f5f5f5 !important;
+    border: 1px solid #ccc !important;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  section:not(.lead):not(.invert) {
+    background: #1a1a1a;
+    color: #e0e0e0;
+  }
+  
+  section:not(.lead):not(.invert) h1,
+  section:not(.lead):not(.invert) h2,
+  section:not(.lead):not(.invert) h3 {
+    color: #ffffff;
+  }
+  
+  section:not(.lead):not(.invert) h1 {
+    border-bottom-color: var(--default-accent);
+  }
+  
+  section:not(.lead):not(.invert) pre,
+  section:not(.lead):not(.invert) code {
+    background: #2d2d2d;
+    color: #e0e0e0;
+  }
+  
+  section:not(.lead):not(.invert) th {
+    background: #2d2d2d;
+    color: #e0e0e0;
+  }
+  
+  section:not(.lead):not(.invert) blockquote {
+    background: #2d2d2d;
+    color: #e0e0e0;
+  }
+}
