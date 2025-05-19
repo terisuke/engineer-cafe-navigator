@@ -1,0 +1,791 @@
+{
+  "animations": [
+    {
+      "name": "greeting",
+      "duration": 2000,
+      "description": "Friendly greeting animation",
+      "keyframes": [
+        {
+          "time": 0,
+          "bones": {
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "rightLowerArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "happy": 0,
+            "neutral": 1
+          }
+        },
+        {
+          "time": 300,
+          "bones": {
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": -0.5 }
+            },
+            "rightLowerArm": {
+              "rotation": { "x": -0.8, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.1, "y": 0.05, "z": 0 }
+            }
+          },
+          "expressions": {
+            "happy": 0.7,
+            "neutral": 0.3
+          }
+        },
+        {
+          "time": 600,
+          "bones": {
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": -0.7 }
+            },
+            "rightLowerArm": {
+              "rotation": { "x": -1.2, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.1, "y": -0.05, "z": 0 }
+            }
+          },
+          "expressions": {
+            "happy": 1,
+            "neutral": 0
+          }
+        },
+        {
+          "time": 900,
+          "bones": {
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": -0.5 }
+            },
+            "rightLowerArm": {
+              "rotation": { "x": -0.8, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.1, "y": 0.05, "z": 0 }
+            }
+          },
+          "expressions": {
+            "happy": 0.8,
+            "neutral": 0.2
+          }
+        },
+        {
+          "time": 1200,
+          "bones": {
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": -0.7 }
+            },
+            "rightLowerArm": {
+              "rotation": { "x": -1.2, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.1, "y": -0.05, "z": 0 }
+            }
+          },
+          "expressions": {
+            "happy": 1,
+            "neutral": 0
+          }
+        },
+        {
+          "time": 1800,
+          "bones": {
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": -0.2 }
+            },
+            "rightLowerArm": {
+              "rotation": { "x": -0.3, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.05, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "happy": 0.5,
+            "neutral": 0.5
+          }
+        },
+        {
+          "time": 2000,
+          "bones": {
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "rightLowerArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "happy": 0,
+            "neutral": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "explaining",
+      "duration": 3000,
+      "description": "Presentation/explaining gesture",
+      "keyframes": [
+        {
+          "time": 0,
+          "bones": {
+            "leftUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "chest": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "speaking": 0
+          }
+        },
+        {
+          "time": 500,
+          "bones": {
+            "leftUpperArm": {
+              "rotation": { "x": -0.3, "y": 0.2, "z": 0.5 }
+            },
+            "rightUpperArm": {
+              "rotation": { "x": -0.3, "y": -0.2, "z": -0.5 }
+            },
+            "chest": {
+              "rotation": { "x": 0.1, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.3,
+            "speaking": 0.7
+          }
+        },
+        {
+          "time": 1500,
+          "bones": {
+            "leftUpperArm": {
+              "rotation": { "x": -0.5, "y": 0.3, "z": 0.8 }
+            },
+            "rightUpperArm": {
+              "rotation": { "x": -0.5, "y": -0.3, "z": -0.8 }
+            },
+            "chest": {
+              "rotation": { "x": 0.05, "y": 0.1, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0,
+            "speaking": 1
+          }
+        },
+        {
+          "time": 2500,
+          "bones": {
+            "leftUpperArm": {
+              "rotation": { "x": -0.2, "y": 0.1, "z": 0.3 }
+            },
+            "rightUpperArm": {
+              "rotation": { "x": -0.2, "y": -0.1, "z": -0.3 }
+            },
+            "chest": {
+              "rotation": { "x": 0.05, "y": -0.05, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.5,
+            "speaking": 0.5
+          }
+        },
+        {
+          "time": 3000,
+          "bones": {
+            "leftUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "chest": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "speaking": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "thinking",
+      "duration": 2500,
+      "description": "Thoughtful/considering gesture",
+      "keyframes": [
+        {
+          "time": 0,
+          "bones": {
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "rightLowerArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "thinking": 0
+          }
+        },
+        {
+          "time": 800,
+          "bones": {
+            "rightUpperArm": {
+              "rotation": { "x": -1.2, "y": 0.3, "z": -0.5 }
+            },
+            "rightLowerArm": {
+              "rotation": { "x": -2.0, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.2, "y": -0.1, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0,
+            "thinking": 1
+          }
+        },
+        {
+          "time": 2000,
+          "bones": {
+            "rightUpperArm": {
+              "rotation": { "x": -1.2, "y": 0.3, "z": -0.5 }
+            },
+            "rightLowerArm": {
+              "rotation": { "x": -2.0, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.2, "y": 0.1, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.2,
+            "thinking": 0.8
+          }
+        },
+        {
+          "time": 2500,
+          "bones": {
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "rightLowerArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "thinking": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "presenting",
+      "duration": 4000,
+      "description": "Formal presentation gesture",
+      "keyframes": [
+        {
+          "time": 0,
+          "bones": {
+            "leftUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "spine": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1
+          }
+        },
+        {
+          "time": 1000,
+          "bones": {
+            "leftUpperArm": {
+              "rotation": { "x": -0.8, "y": 0.5, "z": 1.0 }
+            },
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "spine": {
+              "rotation": { "x": 0.1, "y": 0.1, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.7,
+            "speaking": 0.3
+          }
+        },
+        {
+          "time": 2000,
+          "bones": {
+            "leftUpperArm": {
+              "rotation": { "x": -0.8, "y": 0.5, "z": 1.0 }
+            },
+            "rightUpperArm": {
+              "rotation": { "x": -0.5, "y": -0.3, "z": -0.5 }
+            },
+            "spine": {
+              "rotation": { "x": 0.1, "y": -0.1, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.5,
+            "speaking": 0.5
+          }
+        },
+        {
+          "time": 3000,
+          "bones": {
+            "leftUpperArm": {
+              "rotation": { "x": -0.3, "y": 0.2, "z": 0.5 }
+            },
+            "rightUpperArm": {
+              "rotation": { "x": -0.8, "y": -0.5, "z": -1.0 }
+            },
+            "spine": {
+              "rotation": { "x": 0.1, "y": 0.1, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.7,
+            "speaking": 0.3
+          }
+        },
+        {
+          "time": 4000,
+          "bones": {
+            "leftUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "rightUpperArm": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "spine": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "speaking": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "bowing",
+      "duration": 2000,
+      "description": "Polite bowing gesture",
+      "keyframes": [
+        {
+          "time": 0,
+          "bones": {
+            "spine": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "chest": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1
+          }
+        },
+        {
+          "time": 600,
+          "bones": {
+            "spine": {
+              "rotation": { "x": 0.6, "y": 0, "z": 0 }
+            },
+            "chest": {
+              "rotation": { "x": 0.4, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.3, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.7,
+            "respectful": 0.3
+          }
+        },
+        {
+          "time": 1200,
+          "bones": {
+            "spine": {
+              "rotation": { "x": 0.6, "y": 0, "z": 0 }
+            },
+            "chest": {
+              "rotation": { "x": 0.4, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.3, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.5,
+            "respectful": 0.5
+          }
+        },
+        {
+          "time": 2000,
+          "bones": {
+            "spine": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "chest": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "respectful": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "idle",
+      "duration": 10000,
+      "description": "Natural idle animation with breathing",
+      "loop": true,
+      "keyframes": [
+        {
+          "time": 0,
+          "bones": {
+            "chest": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "blink": 0
+          }
+        },
+        {
+          "time": 2000,
+          "bones": {
+            "chest": {
+              "rotation": { "x": 0.05, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.02, "y": 0.01, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "blink": 0
+          }
+        },
+        {
+          "time": 3500,
+          "bones": {
+            "chest": {
+              "rotation": { "x": 0.05, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.02, "y": 0.01, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0,
+            "blink": 1
+          }
+        },
+        {
+          "time": 3700,
+          "bones": {
+            "chest": {
+              "rotation": { "x": 0.05, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.02, "y": 0.01, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "blink": 0
+          }
+        },
+        {
+          "time": 5000,
+          "bones": {
+            "chest": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0, "y": -0.01, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "blink": 0
+          }
+        },
+        {
+          "time": 7000,
+          "bones": {
+            "chest": {
+              "rotation": { "x": 0.03, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.01, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "blink": 0
+          }
+        },
+        {
+          "time": 9000,
+          "bones": {
+            "chest": {
+              "rotation": { "x": 0.03, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.01, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0,
+            "blink": 1
+          }
+        },
+        {
+          "time": 9200,
+          "bones": {
+            "chest": {
+              "rotation": { "x": 0.03, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0.01, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "blink": 0
+          }
+        },
+        {
+          "time": 10000,
+          "bones": {
+            "chest": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            },
+            "head": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "blink": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "nodding",
+      "duration": 1500,
+      "description": "Agreement nodding gesture",
+      "keyframes": [
+        {
+          "time": 0,
+          "bones": {
+            "head": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1
+          }
+        },
+        {
+          "time": 300,
+          "bones": {
+            "head": {
+              "rotation": { "x": 0.3, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.8,
+            "agreeing": 0.2
+          }
+        },
+        {
+          "time": 600,
+          "bones": {
+            "head": {
+              "rotation": { "x": -0.1, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.7,
+            "agreeing": 0.3
+          }
+        },
+        {
+          "time": 900,
+          "bones": {
+            "head": {
+              "rotation": { "x": 0.3, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.8,
+            "agreeing": 0.2
+          }
+        },
+        {
+          "time": 1200,
+          "bones": {
+            "head": {
+              "rotation": { "x": -0.1, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.9,
+            "agreeing": 0.1
+          }
+        },
+        {
+          "time": 1500,
+          "bones": {
+            "head": {
+              "rotation": { "x": 0, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 1,
+            "agreeing": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "listening",
+      "duration": 5000,
+      "description": "Attentive listening pose",
+      "loop": true,
+      "keyframes": [
+        {
+          "time": 0,
+          "bones": {
+            "head": {
+              "rotation": { "x": 0.1, "y": 0.05, "z": 0 }
+            },
+            "chest": {
+              "rotation": { "x": 0.05, "y": 0.02, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.8,
+            "interested": 0.2
+          }
+        },
+        {
+          "time": 1500,
+          "bones": {
+            "head": {
+              "rotation": { "x": 0.1, "y": -0.02, "z": 0 }
+            },
+            "chest": {
+              "rotation": { "x": 0.05, "y": -0.01, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.7,
+            "interested": 0.3
+          }
+        },
+        {
+          "time": 3000,
+          "bones": {
+            "head": {
+              "rotation": { "x": 0.12, "y": 0.03, "z": 0 }
+            },
+            "chest": {
+              "rotation": { "x": 0.05, "y": 0.01, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.8,
+            "interested": 0.2
+          }
+        },
+        {
+          "time": 4500,
+          "bones": {
+            "head": {
+              "rotation": { "x": 0.08, "y": -0.01, "z": 0 }
+            },
+            "chest": {
+              "rotation": { "x": 0.05, "y": 0, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.9,
+            "interested": 0.1
+          }
+        },
+        {
+          "time": 5000,
+          "bones": {
+            "head": {
+              "rotation": { "x": 0.1, "y": 0.05, "z": 0 }
+            },
+            "chest": {
+              "rotation": { "x": 0.05, "y": 0.02, "z": 0 }
+            }
+          },
+          "expressions": {
+            "neutral": 0.8,
+            "interested": 0.2
+          }
+        }
+      ]
+    }
+  ]
+}

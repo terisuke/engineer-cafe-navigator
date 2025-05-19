@@ -35,18 +35,6 @@ importers:
       '@pixiv/three-vrm':
         specifier: ^3.4.0
         version: 3.4.0(three@0.176.0)
-      '@types/react':
-        specifier: ^19.1.4
-        version: 19.1.4
-      '@types/react-dom':
-        specifier: ^19.1.5
-        version: 19.1.5(@types/react@19.1.4)
-      '@types/three':
-        specifier: ^0.176.0
-        version: 0.176.0
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
@@ -68,18 +56,31 @@ importers:
       three:
         specifier: ^0.176.0
         version: 0.176.0
-      tsx:
-        specifier: ^4.19.4
-        version: 4.19.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.8.3
       ws:
         specifier: ^8.18.2
         version: 8.18.2
       zod:
         specifier: ^3.24.4
         version: 3.24.4
+    devDependencies:
+      '@types/react':
+        specifier: ^19.1.4
+        version: 19.1.4
+      '@types/react-dom':
+        specifier: ^19.1.5
+        version: 19.1.5(@types/react@19.1.4)
+      '@types/three':
+        specifier: ^0.176.0
+        version: 0.176.0
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      tsx:
+        specifier: ^4.19.4
+        version: 4.19.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
 
 packages:
 

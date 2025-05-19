@@ -1,0 +1,222 @@
+{
+  "metadata": {
+    "title": "Engineer Cafe Service Introduction",
+    "language": "en",
+    "speaker": "en-US-Neural2-F",
+    "version": "1.0"
+  },
+  "slides": [
+    {
+      "slideNumber": 1,
+      "narration": {
+        "auto": "Welcome to Engineer Cafe! We provide the best coworking experience in Fukuoka. This is a special space where engineers and creators can work comfortably and productively.",
+        "onEnter": "Welcome to Engineer Cafe. This is our service introduction presentation.",
+        "onDemand": {
+          "more details": "Engineer Cafe opened in 2020 in Tenjin, Fukuoka, as a coworking space specifically designed for IT engineers. We provide an innovative environment and community.",
+          "features": "24-hour access, high-speed internet, and comfortable working environment are our main features.",
+          "location": "We're located in the heart of Tenjin, Fukuoka, just 3 minutes walk from Tenjin subway station."
+        }
+      },
+      "transitions": {
+        "next": "Let me introduce you to our comprehensive services in detail.",
+        "previous": null
+      }
+    },
+    {
+      "slideNumber": 2,
+      "narration": {
+        "auto": "At Engineer Cafe, we provide comprehensive services to maximize your productivity. These include 24-hour accessible workspace, ultra-high-speed internet environment, and vibrant community events. Everything you need is here.",
+        "onEnter": "Here you can see our main services overview.",
+        "onDemand": {
+          "24-hour": "Our space is available 24/7, 365 days a year. You can enter anytime with your security card, even late at night or early morning.",
+          "internet": "We provide ultra-high-speed internet with 1Gbps fiber connection. With Wi-Fi 6 support, you can comfortably use multiple devices.",
+          "meeting rooms": "We have 3 meeting rooms that can accommodate 2 to 8 people, equipped with projectors, whiteboards, and online meeting facilities.",
+          "coffee": "We serve delicious coffee from our professional espresso machine using carefully selected coffee beans. Basic drinks are complimentary.",
+          "events": "We host various community events including technical study sessions twice a month, networking events, and hackathons."
+        }
+      },
+      "transitions": {
+        "next": "First, let me explain in detail about our 24-hour accessible workspace.",
+        "previous": "Going back to the opening slide."
+      }
+    },
+    {
+      "slideNumber": 3,
+      "narration": {
+        "auto": "One of our main features is the workspace available 24 hours a day. We understand that engineers have various working styles, and you can work at your own pace anytime. With secure access management through security cards, you can safely use our space even late at night or early morning.",
+        "onEnter": "Let me explain about our 24-hour accessible workspace.",
+        "onDemand": {
+          "security": "Our access control system uses security cards, so only members can enter. We also have security cameras installed in each area.",
+          "cleanliness": "Our cleaning staff cleans daily to maintain a clean and comfortable environment at all times. Air purifiers are also provided.",
+          "seating": "We offer 20 personal desks and 30 open space seats. You can choose based on your needs.",
+          "quiet": "We have proper soundproofing so you can concentrate on your work. There are also dedicated phone booths for calls."
+        }
+      },
+      "transitions": {
+        "next": "Next, let me introduce our high-speed internet and power environment.",
+        "previous": "Going back to the services overview."
+      }
+    },
+    {
+      "slideNumber": 4,
+      "narration": {
+        "auto": "The most important thing for engineers is a stable internet environment. We have introduced 1Gbps ultra-high-speed fiber connection and support Wi-Fi 6. All seats are equipped with power outlets, and we also offer monitor rental service. Large data downloads and video conferences are comfortable.",
+        "onEnter": "About our high-speed internet and power environment.",
+        "onDemand": {
+          "speed": "We maintain an average of over 800Mbps actual speed. Even when multiple people use it simultaneously, the speed doesn't drop.",
+          "stability": "With redundant network configuration, you can continue using the internet even in case of failure.",
+          "power": "Each seat has power strips, so you never have to worry about charging your laptops or mobile devices.",
+          "monitors": "We lend 24-inch 4K monitors for free. Improve your productivity with a dual monitor setup.",
+          "network": "We separate secure guest Wi-Fi and work Wi-Fi for security considerations."
+        }
+      },
+      "transitions": {
+        "next": "Now, let me introduce our meeting rooms and event space.",
+        "previous": "Going back to workspace details."
+      }
+    },
+    {
+      "slideNumber": 5,
+      "narration": {
+        "auto": "For team work or meetings with external parties, please use our dedicated meeting rooms. We have 3 meeting rooms for 2 to 8 people, equipped with projectors, whiteboards, and online meeting facilities. Our event space can accommodate up to 50 people for seminars and workshops.",
+        "onEnter": "Details about our meeting rooms and event space.",
+        "onDemand": {
+          "meeting rooms": "We have small (2-4 people), medium (4-6 people), and large (6-8 people) meeting rooms. All are soundproofed.",
+          "equipment": "Each meeting room is equipped with projectors, whiteboards, and flip charts. HDMI and USB-C cables are also provided.",
+          "online": "Compatible with Zoom, Teams, Meet and other online meeting platforms. Crystal clear video and audio with dedicated cameras and microphones.",
+          "booking": "Easy booking through our dedicated system. You can use them even at short notice if available.",
+          "events": "The event space also has projectors and microphone systems for professional presentations."
+        }
+      },
+      "transitions": {
+        "next": "Let me talk about our coffee and light meal service.",
+        "previous": "Going back to internet environment details."
+      }
+    },
+    {
+      "slideNumber": 6,
+      "narration": {
+        "auto": "Proper breaks and delicious coffee are essential for long working sessions. We have a professional espresso machine and serve freshly brewed, aromatic coffee from carefully selected beans. Basic drinks are complimentary, and we also have a full selection of light meals and snacks. Please enjoy them as fuel to maintain your concentration.",
+        "onEnter": "About our coffee and light meal service.",
+        "onDemand": {
+          "coffee": "We use specialty coffee and change the beans selected by our barista weekly. You can enjoy various styles like espresso, cappuccino, and latte.",
+          "complimentary": "Basic coffee, tea, green tea, and water are all free for members. Please feel free to use them anytime.",
+          "light meals": "We offer sandwiches, salads, rice balls, and bread. The refrigerator also has healthy drinks.",
+          "quality": "We partner with excellent local food suppliers in Fukuoka to provide fresh and delicious light meals.",
+          "hours": "Coffee service is available 24 hours, light meal service from 7:00 to 20:00."
+        }
+      },
+      "transitions": {
+        "next": "Let me also introduce our community events.",
+        "previous": "Going back to meeting room details."
+      }
+    },
+    {
+      "slideNumber": 7,
+      "narration": {
+        "auto": "Engineer Cafe is not just a workspace. We regularly host community events that foster connections among engineers. These include technical study sessions twice a month, networking events, hackathons and contests, and skill-up workshops. We provide abundant opportunities for learning and networking.",
+        "onEnter": "About our community events.",
+        "onDemand": {
+          "study sessions": "We hold technical study sessions every 2nd and 4th Friday of the month, covering trending technologies like React, Python, and AWS.",
+          "networking": "Monthly networking events where you can connect with engineers from various fields. These often lead to new projects and job opportunities.",
+          "hackathons": "Quarterly hackathons with prizes and awards, providing opportunities to test your skills and realize new ideas.",
+          "workshops": "We offer workshops on soft skills beyond technology, such as design thinking, project management, and presentation skills.",
+          "community": "We also run online communities on Slack and Discord where you can ask questions and exchange information anytime."
+        }
+      },
+      "transitions": {
+        "next": "Now let me explain our pricing plans.",
+        "previous": "Going back to coffee service details."
+      }
+    },
+    {
+      "slideNumber": 8,
+      "narration": {
+        "auto": "Engineer Cafe offers three pricing plans to suit different usage styles. The Basic plan is weekday daytime only for 8,000 yen per month, the Standard plan is 24-hour access with free drinks for 15,000 yen per month, and the Premium plan includes meeting room access for 25,000 yen per month. All plans promise high-quality service.",
+        "onEnter": "Details about our pricing plans.",
+        "onDemand": {
+          "basic": "Available weekdays 9 AM to 6 PM. Includes basic Wi-Fi and power services. Recommended for side work or remote work.",
+          "standard": "Available 24 hours with free drinks. Perfect for full-time remote workers or freelancers.",
+          "premium": "Our top plan with access to all services. Includes meeting room usage and priority event participation benefits.",
+          "payment": "Payment by credit card, bank transfer, or cash is available. 10% discount for annual payment.",
+          "changes": "Plan changes are always possible. You can flexibly adjust according to your lifestyle."
+        }
+      },
+      "transitions": {
+        "next": "Let me guide you about access and business hours.",
+        "previous": "Going back to community events details."
+      }
+    },
+    {
+      "slideNumber": 9,
+      "narration": {
+        "auto": "Engineer Cafe is conveniently located in Tenjin, Chuo-ku, Fukuoka City. It's just a 3-minute walk from Tenjin subway station with excellent accessibility. We operate 24 hours, 365 days a year, with reception hours from 9 AM to 6 PM on weekdays. Please feel free to visit us.",
+        "onEnter": "About access and business hours.",
+        "onDemand": {
+          "address": "5th floor of Chuo Tenjin Building, 2-3-10 Tenjin, Chuo-ku, Fukuoka City. There's a convenience store on the 1st floor for shopping.",
+          "access": "3 minutes walk from Tenjin Station exits 2 on Subway Airport/Hakozaki Lines, 5 minutes from Nishitetsu Fukuoka Tenjin Station.",
+          "hours": "Members can use the facility 24/7, 365 days a year. Access is managed by security cards.",
+          "reception": "Reception staff are available weekdays 9 AM to 6 PM for tours and various procedures.",
+          "surroundings": "Being in the center of Tenjin, you won't have trouble with lunch, dinner, or shopping. Banks and cafes are within walking distance."
+        }
+      },
+      "transitions": {
+        "next": "Let me explain the process to start using our service.",
+        "previous": "Going back to pricing details."
+      }
+    },
+    {
+      "slideNumber": 10,
+      "narration": {
+        "auto": "Getting started with Engineer Cafe is very simple. First, take a free tour to see the space, choose your preferred plan and apply, then receive your security card and you can start immediately. Free tours can be booked by phone or online. Please feel free to visit us.",
+        "onEnter": "Here are the simple 3 steps to get started.",
+        "onDemand": {
+          "tour": "During the free tour, you can see all the actual workspace, meeting rooms, and facilities. Our staff will guide you in detail.",
+          "application": "If you like a plan, you can apply on the spot. Only ID is required for documentation.",
+          "card": "Security cards are issued immediately. You can start using right after completing the application.",
+          "phone": "To book a tour, call 092-123-4567. We accept calls weekdays 9 AM to 6 PM.",
+          "online": "You can also book tours 24/7 from our website engineer-cafe.fukuoka.jp."
+        }
+      },
+      "transitions": {
+        "next": "We'll now conclude our presentation.",
+        "previous": "Going back to access details."
+      }
+    },
+    {
+      "slideNumber": 11,
+      "narration": {
+        "auto": "Thank you for your attention. How did you find Engineer Cafe's service introduction? If you have any questions or need clarification on anything, please feel free to ask. Our staff will answer you politely and thoroughly.",
+        "onEnter": "This is the conclusion screen of our presentation.",
+        "onDemand": {
+          "questions": "Please feel free to ask any questions. We can answer anything about pricing, facilities, events, anything at all.",
+          "tour": "We can give you a tour of the facility right now. Please take a look at our actual space.",
+          "application": "You can also apply on the spot. We may have special campaign offers available.",
+          "contact": "If you'd like to contact us later, please let us know your name and contact information.",
+          "materials": "We also have detailed materials and brochures available. Please take them with you."
+        }
+      },
+      "transitions": {
+        "next": "Would you like to see our frequently asked questions?",
+        "previous": "Going back to getting started steps."
+      }
+    },
+    {
+      "slideNumber": 12,
+      "narration": {
+        "auto": "This page summarizes frequently asked questions we receive. For initial registration, please bring identification and the first month's fee. We also offer partner parking at discounted rates. Wi-Fi passwords are provided at reception and are changed regularly for security.",
+        "onEnter": "This is our frequently asked questions page.",
+        "onDemand": {
+          "registration": "For initial registration, please bring identification (driver's license, passport, etc.) and first month's fee. Credit card payment is also available.",
+          "parking": "Partner parking is available at 30% off regular rates. Please show your parking ticket at reception.",
+          "wifi": "Wi-Fi passwords are changed monthly. New passwords can be checked at reception or through the member app.",
+          "other": "If you have other questions, please feel free to ask at reception or by phone. FAQs are also available on our website."
+        }
+      },
+      "transitions": {
+        "next": null,
+        "previous": "Going back to the conclusion screen."
+      }
+    }
+  ]
+}

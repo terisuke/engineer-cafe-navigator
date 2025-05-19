@@ -1,0 +1,430 @@
+/*
+ * Engineer Cafe Custom Marp Theme
+ * Optimized for Engineer Cafe Navigator presentation
+ */
+
+/* Theme definition */
+@import 'default';
+
+:root {
+  --engineer-primary: #2c5aa0;
+  --engineer-secondary: #4a90c2;
+  --engineer-accent: #f39c12;
+  --engineer-success: #27ae60;
+  --engineer-warning: #f39c12;
+  --engineer-danger: #e74c3c;
+  --engineer-light: #f8f9fa;
+  --engineer-dark: #2c3e50;
+  --engineer-gray: #6c757d;
+}
+
+/* Base styles */
+section {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--engineer-dark);
+  padding: 60px 80px;
+  font-size: 28px;
+  line-height: 1.6;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  color: var(--engineer-primary);
+  margin-bottom: 0.5em;
+}
+
+h1 {
+  font-size: 3.5em;
+  text-align: center;
+  border-bottom: 4px solid var(--engineer-primary);
+  padding-bottom: 0.3em;
+  margin-bottom: 0.8em;
+  background: linear-gradient(45deg, var(--engineer-primary), var(--engineer-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+h2 {
+  font-size: 2.5em;
+  border-left: 8px solid var(--engineer-accent);
+  padding-left: 0.5em;
+  margin-bottom: 0.6em;
+}
+
+h3 {
+  font-size: 1.8em;
+  color: var(--engineer-secondary);
+  border-bottom: 2px solid var(--engineer-secondary);
+  padding-bottom: 0.2em;
+}
+
+/* Lead slide */
+section.lead {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  background: linear-gradient(135deg, var(--engineer-primary) 0%, var(--engineer-secondary) 100%);
+  color: white;
+}
+
+section.lead h1 {
+  font-size: 4em;
+  border: none;
+  color: white;
+  -webkit-text-fill-color: white;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+section.lead p {
+  font-size: 1.5em;
+  font-weight: 300;
+  margin-top: 1em;
+  opacity: 0.9;
+}
+
+/* Lists */
+ul, ol {
+  padding-left: 1.5em;
+  margin: 1em 0;
+}
+
+li {
+  margin: 0.5em 0;
+  padding-left: 0.5em;
+}
+
+ul li::before {
+  content: '▶';
+  color: var(--engineer-accent);
+  font-weight: bold;
+  position: absolute;
+  margin-left: -1em;
+}
+
+/* Strong text */
+strong {
+  color: var(--engineer-primary);
+  font-weight: 700;
+}
+
+/* Links */
+a {
+  color: var(--engineer-secondary);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.3s ease;
+}
+
+a:hover {
+  border-bottom-color: var(--engineer-secondary);
+}
+
+/* Code */
+code {
+  background: var(--engineer-light);
+  color: var(--engineer-primary);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-family: 'Fira Code', 'Monaco', 'Menlo', monospace;
+  font-size: 0.9em;
+}
+
+pre {
+  background: var(--engineer-dark);
+  color: var(--engineer-light);
+  padding: 1em;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.8em;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+th, td {
+  padding: 1em;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+th {
+  background: var(--engineer-primary);
+  color: white;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+tr:hover {
+  background-color: var(--engineer-light);
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+/* Images */
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Blockquotes */
+blockquote {
+  border-left: 4px solid var(--engineer-accent);
+  background: rgba(255,255,255,0.9);
+  padding: 1em 2em;
+  margin: 1.5em 0;
+  border-radius: 0 8px 8px 0;
+  font-style: italic;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Special classes */
+.service-detail {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border: 3px solid var(--engineer-primary);
+  border-radius: 12px;
+}
+
+.service-detail h2 {
+  background: var(--engineer-primary);
+  color: white;
+  margin: -60px -80px 40px -80px;
+  padding: 40px 80px;
+  border-radius: 12px 12px 0 0;
+  border-left: none;
+}
+
+.pricing {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.pricing table th {
+  background: var(--engineer-success);
+}
+
+.community {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+}
+
+.community h2 {
+  color: #d68910;
+  border-left-color: var(--engineer-accent);
+}
+
+.cta {
+  background: linear-gradient(135deg, var(--engineer-success) 0%, #27ae60 100%);
+  color: white;
+  text-align: center;
+}
+
+.cta h2 {
+  color: white;
+  border-left: none;
+  border-bottom: 3px solid white;
+  padding-bottom: 0.3em;
+}
+
+.cta a {
+  color: #fff3cd;
+  border-bottom-color: #fff3cd;
+}
+
+.ending {
+  background: linear-gradient(135deg, var(--engineer-primary) 0%, var(--engineer-secondary) 100%);
+  color: white;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.ending h2 {
+  color: white;
+  border: none;
+  font-size: 3em;
+}
+
+.appendix {
+  background: var(--engineer-light);
+  font-size: 0.9em;
+}
+
+.appendix h2 {
+  color: var(--engineer-gray);
+  font-size: 2em;
+}
+
+/* Footer and header */
+header, footer {
+  background: rgba(44, 90, 160, 0.1);
+  color: var(--engineer-primary);
+  padding: 10px 20px;
+  font-size: 0.8em;
+  font-weight: 500;
+}
+
+header {
+  border-bottom: 2px solid var(--engineer-primary);
+}
+
+footer {
+  border-top: 2px solid var(--engineer-primary);
+}
+
+/* Pagination */
+section::after {
+  color: var(--engineer-primary);
+  font-weight: 600;
+  background: white;
+  padding: 5px 15px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Background images */
+section[data-background-size="contain"] {
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* Custom elements */
+.highlight-box {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border: 2px solid var(--engineer-accent);
+  border-radius: 8px;
+  padding: 1.5em;
+  margin: 1em 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.info-card {
+  background: white;
+  border-radius: 12px;
+  padding: 2em;
+  margin: 1em 0;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  border-left: 6px solid var(--engineer-secondary);
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2em;
+  margin: 2em 0;
+}
+
+.feature-item {
+  background: white;
+  padding: 1.5em;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+/* Icons */
+.icon {
+  font-size: 2em;
+  color: var(--engineer-accent);
+  margin-bottom: 0.5em;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  section {
+    padding: 40px 30px;
+    font-size: 24px;
+  }
+  
+  h1 {
+    font-size: 2.5em;
+  }
+  
+  h2 {
+    font-size: 2em;
+  }
+  
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Animations */
+@keyframes slideInFromLeft {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Add animation classes */
+.slide-in {
+  animation: slideInFromLeft 0.8s ease-out;
+}
+
+.fade-in {
+  animation: fadeIn 1s ease-in;
+}
+
+/* Engineer Cafe logo space */
+.logo-space {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 80px;
+  height: 80px;
+  background: url('./assets/images/engineer-cafe-logo.png') no-repeat center;
+  background-size: contain;
+  opacity: 0.7;
+}
+
+/* Print styles */
+@media print {
+  section {
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+  }
+  
+  .ending, .lead {
+    background: white !important;
+    color: black !important;
+  }
+}
