@@ -1,0 +1,2 @@
+// Slide Narrator: スライドナレーター
+export { };
