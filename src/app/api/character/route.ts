@@ -21,9 +21,9 @@ const config: Config = {
     url: process.env.NEXTAUTH_URL!,
     secret: process.env.NEXTAUTH_SECRET!,
   },
-  vercel: {
+  vercel: process.env.VERCEL_URL ? {
     url: process.env.VERCEL_URL,
-  },
+  } : undefined,
   external: {
     websocketUrl: process.env.WEBSOCKET_URL,
     receptionApiUrl: process.env.RECEPTION_API_URL,
@@ -114,15 +114,17 @@ export async function GET(request: NextRequest) {
         });
 
       case 'preload_animations':
-        const { animations } = await request.json();
+        // For GET requests, animations should be passed as query parameters
+        const animationsParam = searchParams.get('animations');
         
-        if (!animations || !Array.isArray(animations)) {
+        if (!animationsParam) {
           return NextResponse.json(
-            { error: 'animations array required' },
+            { error: 'animations parameter required' },
             { status: 400 }
           );
         }
-
+        
+        const animations = animationsParam.split(',');
         const preloadResult = await characterTool.preloadAnimations(animations);
         
         return NextResponse.json({

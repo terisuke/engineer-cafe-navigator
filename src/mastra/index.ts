@@ -5,6 +5,7 @@ import { WelcomeAgent } from './agents/welcome-agent';
 import { QAAgent } from './agents/qa-agent';
 import { RealtimeAgent } from './agents/realtime-agent';
 import { SlideNarrator } from './agents/slide-narrator';
+import { SupabaseMemoryAdapter } from '@/lib/supabase-memory';
 
 // Import tools
 import { SlideControlTool } from './tools/slide-control';
@@ -20,6 +21,7 @@ export class EngineerCafeNavigator {
   private config: Config;
   private agents: Map<string, any> = new Map();
   private tools: Map<string, any> = new Map();
+  private voiceService: GoogleCloudVoiceService;
 
   constructor(config: Config) {
     this.config = config;
@@ -27,10 +29,8 @@ export class EngineerCafeNavigator {
       name: 'Engineer Cafe Navigator',
       version: '1.0.0',
       description: 'Multi-language voice AI agent for Engineer Cafe',
-      memory: {
-        type: 'postgres',
-        url: config.database.url,
-      },
+      // Disable built-in memory for now to avoid SQLite issues
+      // We'll use our custom SupabaseMemoryAdapter instead
       observability: {
         enabled: true,
         trace: true,
@@ -45,8 +45,7 @@ export class EngineerCafeNavigator {
 
   private initializeServices() {
     // Initialize Google Cloud Voice Service
-    const voiceService = new GoogleCloudVoiceService(this.config.googleCloud);
-    this.mastra.addService('voice', voiceService);
+    this.voiceService = new GoogleCloudVoiceService(this.config.googleCloud);
   }
 
   private initializeAgents() {
@@ -100,6 +99,10 @@ export class EngineerCafeNavigator {
 
   public getMastra() {
     return this.mastra;
+  }
+
+  public getVoiceService() {
+    return this.voiceService;
   }
 }
 

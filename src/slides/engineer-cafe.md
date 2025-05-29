@@ -16,7 +16,7 @@ backgroundColor: "#f8f9fa"
 
 福岡で最高のコワーキング体験を
 
-![bg right:40%](./assets/images/cafe-hero.jpg)
+![bg right:40%](./assets/images/placeholder.svg)
 
 <!--
 スライド1のスピーカーノート：
@@ -28,7 +28,7 @@ backgroundColor: "#f8f9fa"
 
 ## 私たちのサービス
 
-![bg left:30%](./assets/images/services-overview.jpg)
+![bg left:30%](./assets/images/placeholder.svg)
 
 - **24時間アクセス可能**なワークスペース
 - **高速インターネット・電源完備**
@@ -48,7 +48,7 @@ backgroundColor: "#f8f9fa"
 
 ## 24時間利用可能なワークスペース
 
-![bg right:50%](./assets/images/workspace-24h.jpg)
+![bg right:50%](./assets/images/placeholder.svg)
 
 ### いつでも、あなたのペースで
 
@@ -67,7 +67,7 @@ backgroundColor: "#f8f9fa"
 
 ## 高速インターネット・電源環境
 
-![bg left:40%](./assets/images/internet-setup.jpg)
+![bg left:40%](./assets/images/placeholder.svg)
 
 ### 最適な開発環境
 
@@ -88,7 +88,7 @@ backgroundColor: "#f8f9fa"
 
 ## 会議室・イベントスペース
 
-![bg right:45%](./assets/images/meeting-rooms.jpg)
+![bg right:45%](./assets/images/placeholder.svg)
 
 ### チームワークを支援
 
@@ -107,7 +107,7 @@ backgroundColor: "#f8f9fa"
 
 ## コーヒー・軽食サービス
 
-![bg left:35%](./assets/images/coffee-service.jpg)
+![bg left:35%](./assets/images/placeholder.svg)
 
 ### 集中力を維持する燃料
 
@@ -128,7 +128,7 @@ backgroundColor: "#f8f9fa"
 
 ## コミュニティイベント
 
-![bg right:40%](./assets/images/community-events.jpg)
+![bg right:40%](./assets/images/placeholder.svg)
 
 ### つながりを育むイベント
 
@@ -149,7 +149,7 @@ backgroundColor: "#f8f9fa"
 
 <!-- _class: pricing -->
 
-![bg left:30%](./assets/images/pricing-plans.jpg)
+![bg left:30%](./assets/images/placeholder.svg)
 
 | プラン | 月額料金 | 利用時間 | 特典 |
 |--------|----------|----------|------|
@@ -169,7 +169,7 @@ backgroundColor: "#f8f9fa"
 
 ## アクセス・営業時間
 
-![bg right:45%](./assets/images/access-map.jpg)
+![bg right:45%](./assets/images/placeholder.svg)
 
 ### 便利な立地
 
@@ -190,7 +190,7 @@ backgroundColor: "#f8f9fa"
 
 ## 今すぐ始めませんか？
 
-![bg left:40%](./assets/images/getting-started.jpg)
+![bg left:40%](./assets/images/placeholder.svg)
 
 ### 簡単3ステップで利用開始
 
@@ -213,7 +213,7 @@ backgroundColor: "#f8f9fa"
 
 ## ありがとうございました
 
-![bg](./assets/images/thank-you-bg.jpg)
+![bg](./assets/images/placeholder.svg)
 
 **ご質問はございませんか？**
 

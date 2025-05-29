@@ -21,9 +21,9 @@ const config: Config = {
     url: process.env.NEXTAUTH_URL!,
     secret: process.env.NEXTAUTH_SECRET!,
   },
-  vercel: {
+  vercel: process.env.VERCEL_URL ? {
     url: process.env.VERCEL_URL,
-  },
+  } : undefined,
   external: {
     websocketUrl: process.env.WEBSOCKET_URL,
     receptionApiUrl: process.env.RECEPTION_API_URL,

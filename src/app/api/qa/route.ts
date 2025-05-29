@@ -21,9 +21,9 @@ const config: Config = {
     url: process.env.NEXTAUTH_URL!,
     secret: process.env.NEXTAUTH_SECRET!,
   },
-  vercel: {
+  vercel: process.env.VERCEL_URL ? {
     url: process.env.VERCEL_URL,
-  },
+  } : undefined,
   external: {
     websocketUrl: process.env.WEBSOCKET_URL,
     receptionApiUrl: process.env.RECEPTION_API_URL,
@@ -42,7 +42,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { action, question, sessionId, language } = await request.json();
+    const body = await request.json();
+    const { action, question, sessionId, language, text, fromLanguage, toLanguage } = body;
 
     switch (action) {
       case 'ask_question':
@@ -131,7 +132,6 @@ export async function POST(request: NextRequest) {
         });
 
       case 'translate_question':
-        const { text, fromLanguage, toLanguage } = await request.json();
         
         const languageTool = navigator.getTool('languageSwitch');
         if (!languageTool) {
@@ -276,11 +276,11 @@ export async function GET(request: NextRequest) {
       case 'conversation_summary':
         // Get conversation summary from memory
         const conversationHistory = await qaAgent.memory.get('conversationHistory') || [];
-        const language = await qaAgent.memory.get('language') || 'ja';
+        const storedLanguage = await qaAgent.memory.get('language') || 'ja';
         
         const summary = conversationHistory.length > 0
           ? `Conversation with ${conversationHistory.length} exchanges`
-          : language === 'ja' ? 'まだ会話がありません' : 'No conversation yet';
+          : storedLanguage === 'ja' ? 'まだ会話がありません' : 'No conversation yet';
         
         return NextResponse.json({
           success: true,

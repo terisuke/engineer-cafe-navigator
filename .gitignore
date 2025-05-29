@@ -39,3 +39,11 @@ coverage/
 # Assuming the service account key path is stored in .env, ignoring .env is sufficient.
 # If you have a specific service account key file name like 'service-account.json' at the root, uncomment the line below:
 # service-account.json
+
+# Config directory (contains sensitive files like service account keys)
+*service-account-key.json
+*.vrm
+
+# Supabase CLI artifacts
+supabase/.temp/
+supabase/.branches/

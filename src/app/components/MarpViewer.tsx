@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Play, Pause, RotateCcw, ExternalLink, MessageCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Pause, RotateCcw, ExternalLink, MessageCircle, Keyboard } from 'lucide-react';
+import { useKeyboardControls } from '@/app/hooks/useKeyboardControls';
+import SlideDebugPanel from './SlideDebugPanel';
 
 interface SlideData {
   slideNumber: number;
@@ -58,6 +60,7 @@ export default function MarpViewer({
   const [showNotes, setShowNotes] = useState(false);
   const [questionMode, setQuestionMode] = useState(false);
   const [questionText, setQuestionText] = useState('');
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -78,17 +81,40 @@ export default function MarpViewer({
     return () => stopAutoPlay();
   }, [isPlaying, currentSlide, totalSlides, playbackSpeed]);
 
-  // Handle iframe messages
+  // Handle iframe messages and slide visibility
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'slide-control') {
-        handleSlideNavigation(event.data.action);
+        if (event.data.action === 'next') {
+          nextSlide();
+        } else if (event.data.action === 'previous') {
+          previousSlide();
+        }
+      } else if (event.data.type === 'marp-ready') {
+        console.log('Marp ready with', event.data.slideCount, 'slides');
+        // Delay to ensure rendering is complete
+        setTimeout(() => {
+          updateIframeSlide(currentSlide);
+        }, 300);
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [currentSlide, totalSlides]);
+
+  // Update slide visibility when currentSlide changes
+  useEffect(() => {
+    if (renderedHtml && iframeRef.current && currentSlide > 0) {
+      // Add a small delay to ensure iframe is ready
+      const timer = setTimeout(() => {
+        updateIframeSlide(currentSlide);
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentSlide, renderedHtml]);
+
 
   const loadSlideData = async () => {
     try {
@@ -106,6 +132,13 @@ export default function MarpViewer({
           slideFile,
           theme: 'engineer-cafe',
           outputFormat: 'both',
+          options: {
+            // Ensure proper Marp rendering options
+            html: true,
+            markdown: {
+              breaks: true,
+            },
+          },
         }),
       });
 
@@ -115,6 +148,11 @@ export default function MarpViewer({
         if (result.slideData && result.slideData.slides) {
           setSlides(result.slideData.slides);
           setTotalSlides(result.slideData.slides.length);
+          console.log(`Loaded ${result.slideData.slides.length} slides from slideData`);
+        } else if (result.slideCount) {
+          // Fallback to slideCount if slideData is not available
+          setTotalSlides(result.slideCount);
+          console.log(`Set total slides to ${result.slideCount} from slideCount`);
         }
 
         if (result.narrationData) {
@@ -122,10 +160,82 @@ export default function MarpViewer({
         }
 
         if (result.html) {
-          setRenderedHtml(result.html);
+          // Inject CSS for proper Marp slide display
+          const enhancedHtml = result.html.replace(
+            '</head>',
+            `<style>
+              /* Reset and base styles */
+              html, body {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background: white;
+              }
+              
+              /* Marp container styles */
+              .marpit {
+                width: 100%;
+                height: 100vh;
+                position: relative;
+              }
+              
+              /* Handle both SVG and section-based slides */
+              .marpit > svg,
+              section[data-marpit-fragment],
+              [data-marpit-svg] {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                display: none;
+              }
+              
+              /* Show visible slides */
+              .marpit > svg[style*="display: block"],
+              section[style*="display: block"] {
+                display: block !important;
+              }
+              
+              /* Ensure content is visible */
+              * {
+                visibility: visible !important;
+              }
+            </style>
+            </head>`
+          );
+          
+          // Also ensure script execution
+          const scriptEnhancedHtml = enhancedHtml.replace(
+            '</body>',
+            `<script>
+              // Wait for Marp to finish rendering
+              window.addEventListener('DOMContentLoaded', function() {
+                console.log('DOM loaded, checking for slides...');
+                const checkSlides = setInterval(() => {
+                  const slides = document.querySelectorAll('.marpit > svg, section[data-marpit-fragment]');
+                  if (slides.length > 0) {
+                    console.log('Slides found:', slides.length);
+                    clearInterval(checkSlides);
+                    // Notify parent
+                    window.parent.postMessage({ type: 'marp-ready', slideCount: slides.length }, '*');
+                  }
+                }, 100);
+              });
+            </script>
+            </body>`
+          );
+          
+          setRenderedHtml(scriptEnhancedHtml);
         }
 
-        setCurrentSlide(1);
+        // Give iframe time to render, then show first slide
+        setTimeout(() => {
+          setCurrentSlide(1);
+          updateIframeSlide(1);
+        }, 1000);
       } else {
         setError(result.error || 'Failed to load slides');
       }
@@ -155,6 +265,15 @@ export default function MarpViewer({
 
   const handleSlideNavigation = async (action: string, targetSlide?: number) => {
     try {
+      // For local navigation without API call when slide data is already loaded
+      if (action === 'goto' && targetSlide !== undefined) {
+        if (targetSlide >= 1 && targetSlide <= totalSlides) {
+          setCurrentSlide(targetSlide);
+          onSlideChange?.(targetSlide);
+          return;
+        }
+      }
+      
       const response = await fetch('/api/slides', {
         method: 'POST',
         headers: {
@@ -162,7 +281,7 @@ export default function MarpViewer({
         },
         body: JSON.stringify({
           action,
-          slideNumber: targetSlide,
+          slideNumber: targetSlide || currentSlide,
           slideFile,
           language,
         }),
@@ -170,17 +289,17 @@ export default function MarpViewer({
 
       const result = await response.json();
 
-      if (result.success) {
-        setCurrentSlide(result.slideNumber);
-        onSlideChange?.(result.slideNumber);
+      if (result.success && result.slideNumber) {
+        // Only update if we got a valid slide number
+        if (result.slideNumber !== currentSlide) {
+          setCurrentSlide(result.slideNumber);
+          onSlideChange?.(result.slideNumber);
+        }
 
         // Play narration audio if available
         if (result.audioResponse) {
           playNarrationAudio(result.audioResponse);
         }
-
-        // Update iframe content
-        updateIframeSlide(result.slideNumber);
       } else if (result.transitionMessage) {
         // Handle end of presentation or other transition messages
         console.log('Transition message:', result.transitionMessage);
@@ -191,16 +310,61 @@ export default function MarpViewer({
   };
 
   const nextSlide = () => {
-    handleSlideNavigation('next');
+    if (currentSlide < totalSlides) {
+      const newSlide = currentSlide + 1;
+      setCurrentSlide(newSlide);
+      onSlideChange?.(newSlide);
+      handleSlideNavigation('next');
+    }
   };
 
   const previousSlide = () => {
-    handleSlideNavigation('previous');
+    if (currentSlide > 1) {
+      const newSlide = currentSlide - 1;
+      setCurrentSlide(newSlide);
+      onSlideChange?.(newSlide);
+      handleSlideNavigation('previous');
+    }
   };
 
   const gotoSlide = (slideNumber: number) => {
-    handleSlideNavigation('goto', slideNumber);
+    if (slideNumber >= 1 && slideNumber <= totalSlides) {
+      setCurrentSlide(slideNumber);
+      onSlideChange?.(slideNumber);
+      handleSlideNavigation('goto', slideNumber);
+    }
   };
+
+  const toggleFullscreen = () => {
+    if (!iframeRef.current) return;
+    
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      iframeRef.current.requestFullscreen();
+    }
+  };
+
+  const toggleAutoPlay = () => {
+    setIsPlaying(!isPlaying);
+  };
+
+  // Use keyboard controls
+  const { shortcuts } = useKeyboardControls({
+    onNext: nextSlide,
+    onPrevious: previousSlide,
+    onReset: () => gotoSlide(1),
+    onTogglePlay: toggleAutoPlay,
+    onToggleNotes: () => setShowNotes(!showNotes),
+    onToggleFullscreen: toggleFullscreen,
+    onQuestionMode: () => setQuestionMode(!questionMode),
+    onEscape: () => {
+      setQuestionMode(false);
+      setShowKeyboardHelp(false);
+    },
+    onNumberKey: (num) => gotoSlide(num),
+    enabled: !questionMode // Disable shortcuts when typing a question
+  });
 
   const playNarrationAudio = (audioBase64: string) => {
     try {
@@ -219,17 +383,98 @@ export default function MarpViewer({
     }
   };
 
-  const updateIframeSlide = (slideNumber: number) => {
-    if (iframeRef.current && iframeRef.current.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({
-        type: 'goto-slide',
-        slideNumber,
-      }, '*');
+  const debugSlideStructure = () => {
+    if (!iframeRef.current?.contentDocument) {
+      console.log('=== Slide Debug Info ===');
+      console.log('No iframe document available');
+      return;
+    }
+
+    try {
+      const doc = iframeRef.current.contentDocument;
+      console.log('=== Slide Debug Info ===');
+      console.log('Document ready state:', doc.readyState);
+      console.log('Document body:', !!doc.body);
+      console.log('Marpit container:', doc.querySelector('.marpit'));
+      console.log('All SVGs:', doc.querySelectorAll('svg').length);
+      console.log('Slide SVGs (id*="slide"):', doc.querySelectorAll('svg[id*="slide"]').length);
+      console.log('Slide SVGs (id^="slide-"):', doc.querySelectorAll('svg[id^="slide-"]').length);
+      console.log('Sections:', doc.querySelectorAll('section').length);
+      console.log('First SVG:', doc.querySelector('svg'));
+      console.log('First SVG id:', doc.querySelector('svg')?.id);
+      
+      // Log all SVG IDs for debugging
+      const allSvgs = doc.querySelectorAll('svg');
+      if (allSvgs.length > 0) {
+        console.log('All SVG IDs:', Array.from(allSvgs).map(svg => svg.id).filter(id => id));
+      }
+    } catch (error) {
+      console.error('Error in debugSlideStructure:', error);
     }
   };
 
-  const toggleAutoPlay = () => {
-    setIsPlaying(!isPlaying);
+  const updateIframeSlide = (slideNumber: number, retryCount = 0) => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        const iframeDoc = iframeRef.current.contentDocument || iframeRef.current.contentWindow.document;
+        
+        // Try multiple selectors for better compatibility
+        let slides = iframeDoc.querySelectorAll('section[data-marpit-fragment]');
+        
+        if (slides.length === 0) {
+          slides = iframeDoc.querySelectorAll('.marpit > svg');
+        }
+        
+        if (slides.length === 0) {
+          slides = iframeDoc.querySelectorAll('[data-marpit-svg]');
+        }
+        
+        if (slides.length === 0) {
+          slides = iframeDoc.querySelectorAll('div.marpit > svg');
+        }
+        
+        // If still no slides and haven't retried too many times, retry after delay
+        if (slides.length === 0 && retryCount < 10) {
+          console.log(`Retrying slide detection (attempt ${retryCount + 1})`);
+          setTimeout(() => {
+            updateIframeSlide(slideNumber, retryCount + 1);
+          }, 200);
+          return;
+        }
+        
+        if (slides.length === 0) {
+          console.error('No slides found after multiple attempts');
+          return;
+        }
+        
+        console.log(`Found ${slides.length} slides, showing slide ${slideNumber}`);
+        
+        // Hide all slides
+        slides.forEach((slide) => {
+          const el = slide as HTMLElement;
+          el.style.display = 'none';
+          el.style.visibility = 'hidden';
+        });
+        
+        // Show only the current slide
+        if (slides[slideNumber - 1]) {
+          const currentSlide = slides[slideNumber - 1] as HTMLElement;
+          currentSlide.style.display = 'block';
+          currentSlide.style.visibility = 'visible';
+          currentSlide.style.position = 'relative';
+          currentSlide.style.width = '100%';
+          currentSlide.style.height = '100%';
+        }
+        
+        // Update counter
+        const slideCounter = iframeDoc.getElementById('slideCounter');
+        if (slideCounter) {
+          slideCounter.textContent = `Slide ${slideNumber} of ${slides.length}`;
+        }
+      } catch (error) {
+        console.error('Error updating slide visibility:', error);
+      }
+    }
   };
 
   const handleQuestionSubmit = async () => {
@@ -377,6 +622,17 @@ export default function MarpViewer({
           >
             {language === 'ja' ? 'ノート' : 'Notes'}
           </button>
+
+          {/* Keyboard shortcuts help */}
+          <button
+            onClick={() => setShowKeyboardHelp(!showKeyboardHelp)}
+            className={`p-2 rounded transition-colors ${
+              showKeyboardHelp ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+            title={language === 'ja' ? 'キーボードショートカット' : 'Keyboard Shortcuts'}
+          >
+            <Keyboard className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -413,6 +669,42 @@ export default function MarpViewer({
               srcDoc={renderedHtml}
               className="w-full h-full border-0"
               title="Slide presentation"
+              onLoad={() => {
+                setTimeout(() => {
+                  debugSlideStructure();
+                  
+                  if (iframeRef.current?.contentDocument) {
+                    const doc = iframeRef.current.contentDocument;
+                    
+                    // Correct way to count Marp slides
+                    let slideCount = 0;
+                    
+                    // Marp generates SVG elements with specific pattern
+                    const svgSlides = doc.querySelectorAll('.marpit > svg[id*="slide"]');
+                    console.log('SVG slides found:', svgSlides.length);
+                    
+                    if (svgSlides.length > 0) {
+                      slideCount = svgSlides.length;
+                    } else {
+                      // Fallback: count sections
+                      const sections = doc.querySelectorAll('section[id*="slide"]');
+                      if (sections.length > 0) {
+                        slideCount = sections.length;
+                      }
+                    }
+                    
+                    console.log(`Correctly detected ${slideCount} slides in iframe`);
+                    
+                    // Only update if count is reasonable (between 1 and 100)
+                    if (slideCount > 0 && slideCount <= 100 && slideCount !== totalSlides) {
+                      setTotalSlides(slideCount);
+                    }
+                    
+                    // Initialize the first slide display
+                    updateIframeSlide(currentSlide || 1);
+                  }
+                }, 500);
+              }}
             />
           ) : (
             <div className="flex items-center justify-center h-full bg-gray-100">
@@ -490,6 +782,35 @@ export default function MarpViewer({
         )}
       </div>
 
+      {/* Keyboard shortcuts help modal */}
+      {showKeyboardHelp && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+            <h3 className="font-bold text-lg mb-4">
+              {language === 'ja' ? 'キーボードショートカット' : 'Keyboard Shortcuts'}
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              {shortcuts.map((shortcut) => (
+                <div key={shortcut.key} className="flex justify-between">
+                  <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-sm font-mono">
+                    {shortcut.key}
+                  </kbd>
+                  <span className="text-sm text-gray-600 ml-2">
+                    {shortcut.description}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowKeyboardHelp(false)}
+              className="mt-4 w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            >
+              {language === 'ja' ? '閉じる' : 'Close'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Progress bar */}
       <div className="h-1 bg-gray-200">
         <div
@@ -497,6 +818,20 @@ export default function MarpViewer({
           style={{ width: `${(currentSlide / totalSlides) * 100}%` }}
         />
       </div>
+
+      {/* Debug Panel - only in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <SlideDebugPanel
+          iframeRef={iframeRef}
+          currentSlide={currentSlide}
+          totalSlides={totalSlides}
+          onRefresh={() => {
+            if (iframeRef.current) {
+              iframeRef.current.src = iframeRef.current.src;
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
