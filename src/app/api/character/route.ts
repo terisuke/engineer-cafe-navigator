@@ -12,7 +12,7 @@ const config: Config = {
   },
   gemini: {
     apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY!,
-    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-preview-04-17',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-preview-05-20',
   },
   database: {
     url: process.env.POSTGRES_URL!,

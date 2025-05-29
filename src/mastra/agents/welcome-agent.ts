@@ -17,7 +17,7 @@ export class WelcomeAgent extends Agent {
         Always maintain a professional yet welcoming tone.
         Be concise but informative in your responses.
         Use the slide control tools to navigate presentations effectively.`,
-      model: 'gemini-2.5-flash-preview-04-17',
+      model: 'gemini-2.5-flash-preview-05-20',
       tools: [],
       memory: mastra.memory,
     });

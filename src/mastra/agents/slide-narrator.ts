@@ -23,7 +23,7 @@ export class SlideNarrator extends Agent {
         Deliver narrations in a clear, engaging manner.
         Respond to navigation commands promptly.
         Provide informative answers to content questions.`,
-      model: 'gemini-2.5-flash-preview-04-17',
+      model: 'gemini-2.5-flash-preview-05-20',
       tools: [],
     });
     

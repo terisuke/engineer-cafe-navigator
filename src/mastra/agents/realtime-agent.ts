@@ -20,7 +20,7 @@ export class RealtimeAgent extends Agent {
         Keep responses conversational and natural.
         Handle interruptions gracefully.
         Maintain context across conversation turns.`,
-      model: 'gemini-2.5-flash-preview-04-17',
+      model: 'gemini-2.5-flash-preview-05-20',
       tools: [],
       memory: mastra.memory,
     });

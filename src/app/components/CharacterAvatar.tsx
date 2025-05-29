@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
-import { VRM, VRMLoaderPlugin } from '@pixiv/three-vrm';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { Settings, RotateCcw, Maximize2, Download } from 'lucide-react';
 import { VRMUtils } from '@/lib/vrm-utils';
+import { VRM, VRMLoaderPlugin } from '@pixiv/three-vrm';
+import { Download, Maximize2, RotateCcw, Settings } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 interface CharacterState {
   expression: string;
@@ -73,17 +73,18 @@ export default function CharacterAvatar({
   const [availableAnimations, setAvailableAnimations] = useState<string[]>([]);
 
   // Initialize Three.js scene
-  useEffect(() => {
-    if (!containerRef.current) return;
+// useEffect 内
+useEffect(() => {
+  if (!containerRef.current) return;
 
-    initializeScene();
-    loadCharacter();
+ const disposeScene = initializeScene();
 
-    return () => {
-      cleanup();
-    };
-  }, []);
-
+  loadCharacter();
+  return () => {
+     cleanup();
+    disposeScene?.();   // ← 追加
+  };
+}, []);
   // Handle model path changes
   useEffect(() => {
     if (characterState.model !== modelPath) {
