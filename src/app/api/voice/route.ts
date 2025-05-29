@@ -21,9 +21,9 @@ const config: Config = {
     url: process.env.NEXTAUTH_URL!,
     secret: process.env.NEXTAUTH_SECRET!,
   },
-  vercel: {
+  vercel: process.env.VERCEL_URL ? {
     url: process.env.VERCEL_URL,
-  },
+  } : undefined,
   external: {
     websocketUrl: process.env.WEBSOCKET_URL,
     receptionApiUrl: process.env.RECEPTION_API_URL,
@@ -42,7 +42,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { action, audioData, sessionId } = await request.json();
+    const body = await request.json();
+    const { action, audioData, sessionId, language, text } = body;
 
     switch (action) {
       case 'process_voice':
@@ -64,7 +65,6 @@ export async function POST(request: NextRequest) {
         });
 
       case 'set_language':
-        const { language } = await request.json();
         const languageTool = navigator.getTool('languageSwitch');
         
         if (languageTool) {
@@ -113,7 +113,6 @@ export async function POST(request: NextRequest) {
         });
 
       case 'detect_language':
-        const { text } = await request.json();
         const languageSwitch = navigator.getTool('languageSwitch');
         
         if (languageSwitch) {

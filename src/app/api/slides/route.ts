@@ -21,9 +21,9 @@ const config: Config = {
     url: process.env.NEXTAUTH_URL!,
     secret: process.env.NEXTAUTH_SECRET!,
   },
-  vercel: {
+  vercel: process.env.VERCEL_URL ? {
     url: process.env.VERCEL_URL,
-  },
+  } : undefined,
   external: {
     websocketUrl: process.env.WEBSOCKET_URL,
     receptionApiUrl: process.env.RECEPTION_API_URL,
@@ -43,7 +43,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { action, slideNumber, slideFile, language } = await request.json();
+    const body = await request.json();
+    const { action, slideNumber, slideFile, language, question, enabled, interval } = body;
 
     switch (action) {
       case 'next':
@@ -140,7 +141,6 @@ export async function POST(request: NextRequest) {
         });
 
       case 'answer_question':
-        const { question } = await request.json();
         if (!question) {
           return NextResponse.json(
             { error: 'Question text required' },
@@ -166,7 +166,6 @@ export async function POST(request: NextRequest) {
         });
 
       case 'set_autoplay':
-        const { enabled, interval } = await request.json();
         await slideNarrator.setAutoPlay(enabled, interval);
         
         return NextResponse.json({

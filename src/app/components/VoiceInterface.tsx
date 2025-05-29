@@ -6,11 +6,13 @@ import { Mic, MicOff, Volume2, VolumeX, Settings } from 'lucide-react';
 interface VoiceInterfaceProps {
   onLanguageChange?: (language: 'ja' | 'en') => void;
   onPageTransition?: (page: string) => void;
+  layout?: 'vertical' | 'horizontal';
 }
 
 export default function VoiceInterface({ 
   onLanguageChange, 
-  onPageTransition 
+  onPageTransition,
+  layout = 'vertical'
 }: VoiceInterfaceProps) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -280,12 +282,184 @@ export default function VoiceInterface({
     }
   };
 
+  if (layout === 'horizontal') {
+    return (
+      <div className="glass rounded-2xl p-4 shadow-2xl border border-white/30">
+        <div className="flex items-center gap-6">
+          {/* Status Indicator */}
+          <div className="flex items-center space-x-3">
+            <div className={`w-3 h-3 rounded-full transition-all duration-500 ${
+              conversationState === 'idle' ? 'bg-gray-400' :
+              conversationState === 'listening' ? 'bg-blue-500 animate-pulse' :
+              conversationState === 'processing' ? 'bg-yellow-500 animate-bounce' :
+              'bg-green-500 animate-pulse'
+            }`} />
+            <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+              {conversationState === 'idle' && (currentLanguage === 'ja' ? '待機中' : 'Ready')}
+              {conversationState === 'listening' && (currentLanguage === 'ja' ? '聞いています...' : 'Listening...')}
+              {conversationState === 'processing' && (currentLanguage === 'ja' ? '処理中...' : 'Processing...')}
+              {conversationState === 'speaking' && (currentLanguage === 'ja' ? '話しています...' : 'Speaking...')}
+            </span>
+          </div>
+
+          {/* Voice Waveform Indicator */}
+          {(isListening || isSpeaking) && (
+            <div className="flex items-center space-x-1 h-6">
+              {[...Array(5)].map((_, i) => (
+                <div
+                  key={i}
+                  className="voice-wave-bar w-1 bg-primary rounded-full transition-all"
+                  style={{ height: '100%' }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Main Controls */}
+          <div className="flex items-center space-x-3">
+            {/* Voice button */}
+            <button
+              onClick={isListening ? stopListening : startListening}
+              disabled={conversationState === 'processing'}
+              className={`p-3 rounded-full transition-smooth transform ${
+                isListening 
+                  ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg scale-110 ring-4 ring-red-500/30' 
+                  : conversationState === 'processing'
+                  ? 'bg-gray-400 text-white cursor-not-allowed'
+                  : 'bg-gradient-to-r from-primary to-secondary hover:from-secondary hover:to-primary text-white shadow-lg hover:shadow-xl hover:scale-105'
+              }`}
+            >
+              {isListening ? (
+                <MicOff className="w-5 h-5" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+            </button>
+
+            {/* Interruption button */}
+            {isSpeaking && (
+              <button
+                onClick={handleInterruption}
+                className="p-2.5 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg transition-smooth transform hover:scale-105"
+                title={currentLanguage === 'ja' ? '話を止める' : 'Interrupt'}
+              >
+                <VolumeX className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Volume control */}
+            <button
+              onClick={() => setIsMuted(!isMuted)}
+              className={`p-2.5 rounded-full transition-smooth transform hover:scale-105 ${
+                isMuted 
+                  ? 'bg-gray-500 hover:bg-gray-600' 
+                  : 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700'
+              } text-white shadow-lg`}
+            >
+              {isMuted ? (
+                <VolumeX className="w-4 h-4" />
+              ) : (
+                <Volume2 className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+
+          {/* Volume Slider */}
+          {!isMuted && (
+            <div className="flex items-center space-x-3 flex-1 max-w-xs">
+              <label className="text-xs text-gray-600 whitespace-nowrap">
+                {currentLanguage === 'ja' ? '音量' : 'Volume'}
+              </label>
+              <div className="slider-container flex-1">
+                <div 
+                  className="slider-fill" 
+                  style={{ width: `${volume * 100}%` }}
+                />
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={volume}
+                  onChange={(e) => setVolume(parseFloat(e.target.value))}
+                  className="slider w-full"
+                />
+              </div>
+              <span className="text-xs text-gray-500 whitespace-nowrap">
+                {Math.round(volume * 100)}%
+              </span>
+            </div>
+          )}
+
+          {/* Conversation Display (Compact) */}
+          {(transcript || response) && (
+            <div className="flex-1 max-w-lg">
+              <div className="bg-gray-50/50 backdrop-blur-sm rounded-lg px-4 py-2 max-h-12 overflow-hidden">
+                {response ? (
+                  <p className="text-sm text-gray-800 truncate">
+                    <span className="text-xs text-secondary font-semibold">AI: </span>
+                    {response}
+                  </p>
+                ) : transcript && (
+                  <p className="text-sm text-gray-800 truncate">
+                    <span className="text-xs text-primary font-semibold">
+                      {currentLanguage === 'ja' ? 'あなた: ' : 'You: '}
+                    </span>
+                    {transcript}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex items-center space-x-2">
+            <div className="px-2 py-1 bg-primary/10 rounded-full">
+              <span className="text-xs font-semibold text-primary">
+                {currentLanguage.toUpperCase()}
+              </span>
+            </div>
+            
+            <button
+              onClick={toggleLanguage}
+              className="btn-primary text-sm px-3 py-1.5"
+            >
+              {currentLanguage === 'ja' ? 'EN' : 'JP'}
+            </button>
+            
+            <button
+              onClick={clearConversation}
+              className="btn-secondary text-sm px-3 py-1.5"
+            >
+              {currentLanguage === 'ja' ? 'リセット' : 'Clear'}
+            </button>
+            
+            <button
+              className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-smooth"
+              title={currentLanguage === 'ja' ? '設定' : 'Settings'}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="mt-3 bg-red-50/80 border border-red-200 rounded-lg px-3 py-2 backdrop-blur-sm">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Original vertical layout
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-md">
+    <div className="glass rounded-2xl p-6 max-w-md shadow-2xl border border-white/30">
       {/* Status Indicator */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${
+          <div className={`w-3 h-3 rounded-full transition-all duration-500 ${
             conversationState === 'idle' ? 'bg-gray-400' :
             conversationState === 'listening' ? 'bg-blue-500 animate-pulse' :
             conversationState === 'processing' ? 'bg-yellow-500 animate-bounce' :
@@ -298,10 +472,25 @@ export default function VoiceInterface({
             {conversationState === 'speaking' && (currentLanguage === 'ja' ? '話しています...' : 'Speaking...')}
           </span>
         </div>
-        <div className="text-xs text-gray-500">
-          {currentLanguage.toUpperCase()}
+        <div className="px-2 py-1 bg-primary/10 rounded-full">
+          <span className="text-xs font-semibold text-primary">
+            {currentLanguage.toUpperCase()}
+          </span>
         </div>
       </div>
+
+      {/* Voice Waveform Indicator */}
+      {(isListening || isSpeaking) && (
+        <div className="flex items-center justify-center space-x-1 mb-4 h-8">
+          {[...Array(5)].map((_, i) => (
+            <div
+              key={i}
+              className="voice-wave-bar w-1 bg-primary rounded-full transition-all"
+              style={{ height: '100%' }}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Main Controls */}
       <div className="flex items-center justify-center space-x-4 mb-4">
@@ -309,12 +498,12 @@ export default function VoiceInterface({
         <button
           onClick={isListening ? stopListening : startListening}
           disabled={conversationState === 'processing'}
-          className={`p-4 rounded-full transition-all duration-200 ${
+          className={`p-4 rounded-full transition-smooth transform ${
             isListening 
-              ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg scale-110' 
+              ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg scale-110 ring-4 ring-red-500/30' 
               : conversationState === 'processing'
               ? 'bg-gray-400 text-white cursor-not-allowed'
-              : 'bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-lg hover:scale-105'
+              : 'bg-gradient-to-r from-primary to-secondary hover:from-secondary hover:to-primary text-white shadow-lg hover:shadow-xl hover:scale-105'
           }`}
         >
           {isListening ? (
@@ -328,7 +517,7 @@ export default function VoiceInterface({
         {isSpeaking && (
           <button
             onClick={handleInterruption}
-            className="p-3 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-md transition-all duration-200"
+            className="p-3 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg transition-smooth transform hover:scale-105"
             title={currentLanguage === 'ja' ? '話を止める' : 'Interrupt'}
           >
             <VolumeX className="w-5 h-5" />
@@ -338,11 +527,11 @@ export default function VoiceInterface({
         {/* Volume control */}
         <button
           onClick={() => setIsMuted(!isMuted)}
-          className={`p-3 rounded-full transition-all duration-200 ${
+          className={`p-3 rounded-full transition-smooth transform hover:scale-105 ${
             isMuted 
               ? 'bg-gray-500 hover:bg-gray-600' 
-              : 'bg-purple-500 hover:bg-purple-600'
-          } text-white shadow-md`}
+              : 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700'
+          } text-white shadow-lg`}
         >
           {isMuted ? (
             <VolumeX className="w-5 h-5" />
@@ -355,38 +544,49 @@ export default function VoiceInterface({
       {/* Volume Slider */}
       {!isMuted && (
         <div className="mb-4">
-          <label className="text-xs text-gray-600 block mb-1">
-            {currentLanguage === 'ja' ? '音量' : 'Volume'}
-          </label>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.1"
-            value={volume}
-            onChange={(e) => setVolume(parseFloat(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-          />
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs text-gray-600">
+              {currentLanguage === 'ja' ? '音量' : 'Volume'}
+            </label>
+            <span className="text-xs text-gray-500">
+              {Math.round(volume * 100)}%
+            </span>
+          </div>
+          <div className="slider-container">
+            <div 
+              className="slider-fill" 
+              style={{ width: `${volume * 100}%` }}
+            />
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value={volume}
+              onChange={(e) => setVolume(parseFloat(e.target.value))}
+              className="slider"
+            />
+          </div>
         </div>
       )}
 
       {/* Conversation Display */}
       {(transcript || response) && (
-        <div className="bg-gray-50 rounded-lg p-3 mb-4 max-h-40 overflow-y-auto">
+        <div className="bg-gray-50/50 backdrop-blur-sm rounded-lg p-3 mb-4 max-h-40 overflow-y-auto scrollbar-thin">
           {transcript && (
             <div className="mb-2">
-              <span className="text-xs text-blue-600 font-medium">
+              <span className="text-xs text-primary font-semibold">
                 {currentLanguage === 'ja' ? 'あなた:' : 'You:'}
               </span>
-              <p className="text-sm text-gray-800">{transcript}</p>
+              <p className="text-sm text-gray-800 mt-1">{transcript}</p>
             </div>
           )}
           {response && (
             <div>
-              <span className="text-xs text-green-600 font-medium">
+              <span className="text-xs text-secondary font-semibold">
                 {currentLanguage === 'ja' ? 'AI:' : 'AI:'}
               </span>
-              <p className="text-sm text-gray-800">{response}</p>
+              <p className="text-sm text-gray-800 mt-1">{response}</p>
             </div>
           )}
         </div>
@@ -394,7 +594,7 @@ export default function VoiceInterface({
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+        <div className="bg-red-50/80 border border-red-200 rounded-lg p-3 mb-4 backdrop-blur-sm">
           <p className="text-sm text-red-800">{error}</p>
         </div>
       )}
@@ -403,20 +603,20 @@ export default function VoiceInterface({
       <div className="flex space-x-2">
         <button
           onClick={toggleLanguage}
-          className="flex-1 px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-md transition-colors duration-200 text-sm font-medium"
+          className="btn-primary flex-1"
         >
           {currentLanguage === 'ja' ? 'English' : '日本語'}
         </button>
         
         <button
           onClick={clearConversation}
-          className="flex-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors duration-200 text-sm font-medium"
+          className="btn-secondary flex-1"
         >
           {currentLanguage === 'ja' ? 'リセット' : 'Clear'}
         </button>
         
         <button
-          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors duration-200"
+          className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-smooth"
           title={currentLanguage === 'ja' ? '設定' : 'Settings'}
         >
           <Settings className="w-4 h-4" />
@@ -424,11 +624,13 @@ export default function VoiceInterface({
       </div>
 
       {/* Instructions */}
-      <div className="mt-4 text-xs text-gray-500 text-center">
-        {currentLanguage === 'ja' 
-          ? 'マイクボタンを押して話しかけてください' 
-          : 'Press the mic button to start talking'
-        }
+      <div className="mt-4 text-center">
+        <p className="text-xs text-gray-500">
+          {currentLanguage === 'ja' 
+            ? 'マイクボタンを押して話しかけてください' 
+            : 'Press the mic button to start talking'
+          }
+        </p>
       </div>
     </div>
   );

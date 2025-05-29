@@ -21,9 +21,9 @@ const config: Config = {
     url: process.env.NEXTAUTH_URL!,
     secret: process.env.NEXTAUTH_SECRET!,
   },
-  vercel: {
+  vercel: process.env.VERCEL_URL ? {
     url: process.env.VERCEL_URL,
-  },
+  } : undefined,
   external: {
     websocketUrl: process.env.WEBSOCKET_URL,
     receptionApiUrl: process.env.RECEPTION_API_URL,
@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
           theme,
           outputFormat: outputFormat || 'html',
         });
+        
+        console.log(`Rendered ${slideFile} with ${renderResult.slideCount} slides`);
         
         return NextResponse.json({
           success: renderResult.success,
@@ -123,6 +125,8 @@ export async function POST(request: NextRequest) {
             error: slidesResult.error,
           });
         }
+        
+        console.log(`Rendered ${slideFile} with narration: ${slidesResult.slideCount} slides`);
 
         // Load narration data
         const narrationTool = navigator.getTool('narrationLoader');

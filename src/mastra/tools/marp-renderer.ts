@@ -22,8 +22,18 @@ export class MarpRendererTool {
   }
 
   private configureMarp() {
-    // Configure Marp with Engineer Cafe settings
-    this.marp.use(require('@marp-team/marp-core/browser'));
+    // Configure Marp with Engineer Cafe settings using proper Marp API
+    try {
+      // Enable HTML support if available
+      if (this.marp.markdown && this.marp.markdown.set) {
+        this.marp.markdown.set({ html: true });
+      }
+      
+      console.log('Marp configured successfully');
+    } catch (error) {
+      console.warn('Marp configuration warning:', error);
+      // Continue without error as basic functionality should still work
+    }
   }
 
   async execute(params: z.infer<typeof this.schema>): Promise<{
@@ -48,8 +58,10 @@ export class MarpRendererTool {
         await this.applyTheme(theme);
       }
 
-      // Render markdown to HTML
-      const { html, css } = this.marp.render(content);
+      // Render markdown to HTML with options for better slide detection
+      const { html, css } = this.marp.render(content, {
+        html: true,
+      });
 
       // Parse slide structure for JSON output
       const slideData = await this.parseSlideStructure(content, frontmatter);
@@ -78,14 +90,17 @@ export class MarpRendererTool {
   }
 
   private async applyTheme(themeName: string): Promise<void> {
+    const themePath = path.join(process.cwd(), 'src', 'slides', 'themes', `${themeName}.css`);
     try {
-      const themePath = path.resolve(`src/slides/themes/${themeName}.css`);
+      // Use process.cwd() to get the project root directory
+      console.log(`Attempting to load theme from: ${themePath}`);
       const themeCSS = await fs.readFile(themePath, 'utf-8');
       
       // Apply custom theme
       this.marp.themeSet.add(themeCSS);
+      console.log(`Successfully loaded theme: ${themeName}`);
     } catch (error) {
-      console.warn(`Theme ${themeName} not found, using default`);
+      console.warn(`Theme ${themeName} not found at ${themePath}, using default. Error:`, error);
     }
   }
 
@@ -98,20 +113,35 @@ export class MarpRendererTool {
       notes?: string;
     }>;
   }> {
-    // Split content by slide separators
-    const slideContents = content.split(/^---$/m).filter(slide => slide.trim());
+    // Split content by slide separators (three dashes on their own line)
+    const slideContents = content.split(/\n---\n/).filter(slide => slide.trim());
+
+    console.log(`Parsing ${slideContents.length} slides from markdown`);
 
     const slides = slideContents.map((slideContent, index) => {
       const lines = slideContent.trim().split('\n');
-      const firstLine = lines[0];
       
       // Extract title (first heading)
-      const titleMatch = firstLine.match(/^#\s+(.+)$/);
-      const title = titleMatch ? titleMatch[1] : undefined;
+      let title: string | undefined;
+      for (const line of lines) {
+        const titleMatch = line.match(/^#+\s+(.+)$/);
+        if (titleMatch) {
+          title = titleMatch[1];
+          break;
+        }
+      }
 
-      // Extract speaker notes (comments)
-      const notesMatch = slideContent.match(/<!--\s*(.*?)\s*-->/s);
-      const notes = notesMatch ? notesMatch[1].trim() : undefined;
+      // Extract speaker notes (HTML comments)
+      const notesMatch = slideContent.match(/<!--([\s\S]*?)-->/g);
+      let notes: string | undefined;
+      if (notesMatch) {
+        // Combine all comments as notes, excluding directives
+        notes = notesMatch
+          .map(comment => comment.replace(/<!--\s*|\s*-->/g, '').trim())
+          .filter(note => !note.startsWith('_') && note.length > 0)
+          .join('\n\n');
+        if (notes.length === 0) notes = undefined;
+      }
 
       return {
         slideNumber: index + 1,
@@ -193,8 +223,10 @@ export class MarpRendererTool {
           // Slide navigation logic will be handled by the main app
           window.slideNavigationCallbacks = {
             onSlideChange: function(slideNumber, totalSlides) {
-              document.getElementById('slideCounter').textContent = 
-                \`Slide \${slideNumber} of \${totalSlides}\`;
+              const counter = document.getElementById('slideCounter');
+              if (counter) {
+                counter.textContent = \`Slide \${slideNumber} of \${totalSlides}\`;
+              }
             }
           };
           
@@ -205,6 +237,20 @@ export class MarpRendererTool {
           function previousSlide() {
             window.parent.postMessage({ type: 'slide-control', action: 'previous' }, '*');
           }
+          
+          // Log slide information on load
+          window.addEventListener('load', function() {
+            const marpit = document.querySelector('.marpit');
+            if (marpit) {
+              const slides = marpit.querySelectorAll('svg[id^="slide-"]');
+              console.log('Marp slides found:', slides.length);
+              // Update counter with actual count
+              const counter = document.getElementById('slideCounter');
+              if (counter && slides.length > 0) {
+                counter.textContent = \`Slide 1 of \${slides.length}\`;
+              }
+            }
+          });
         </script>
       </body>
       </html>

@@ -27,7 +27,10 @@ export class ExternalApiTool {
 
   constructor(config: any) {
     this.config = config;
-    this.initializeWebSocket();
+    // Only initialize WebSocket if explicitly configured
+    if (config?.websocketUrl && config.websocketUrl !== '') {
+      this.initializeWebSocket();
+    }
   }
 
   private async initializeWebSocket(): Promise<void> {

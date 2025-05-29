@@ -1,4 +1,4 @@
-import { Agent } from '@mastra/core';
+import { Agent } from '@mastra/core/agent';
 import { z } from 'zod';
 import { SupportedLanguage, SlideNarration } from '../types/config';
 
@@ -7,6 +7,7 @@ export class SlideNarrator extends Agent {
   private totalSlides: number = 0;
   private autoPlay: boolean = false;
   private narrationData: any = null;
+  private memory: any;
 
   constructor(mastra: any) {
     super({
@@ -24,8 +25,10 @@ export class SlideNarrator extends Agent {
         Provide informative answers to content questions.`,
       model: 'gemini-2.5-flash-preview-04-17',
       tools: [],
-      memory: mastra.memory,
     });
+    
+    // Initialize memory
+    this.memory = mastra.memory || new Map();
   }
 
   async loadNarration(slideFile: string, language: SupportedLanguage): Promise<void> {
@@ -36,9 +39,16 @@ export class SlideNarrator extends Agent {
       this.totalSlides = this.narrationData.slides.length;
       this.currentSlide = 1;
       
-      await this.memory.store('currentSlide', this.currentSlide);
-      await this.memory.store('totalSlides', this.totalSlides);
-      await this.memory.store('narrationData', this.narrationData);
+      // Store in memory if available
+      if (this.memory && typeof this.memory.store === 'function') {
+        await this.memory.store('currentSlide', this.currentSlide);
+        await this.memory.store('totalSlides', this.totalSlides);
+        await this.memory.store('narrationData', this.narrationData);
+      } else if (this.memory instanceof Map) {
+        this.memory.set('currentSlide', this.currentSlide);
+        this.memory.set('totalSlides', this.totalSlides);
+        this.memory.set('narrationData', this.narrationData);
+      }
       
     } catch (error) {
       console.error('Failed to load narration:', error);
@@ -67,12 +77,23 @@ export class SlideNarrator extends Agent {
     
     // Convert narration to speech
     const voiceService = this.tools.get('voiceService');
-    const language = await this.memory.get('language') as SupportedLanguage || 'ja';
+    // Get language from memory
+    let language: SupportedLanguage = 'ja';
+    if (this.memory && typeof this.memory.get === 'function') {
+      language = await this.memory.get('language') as SupportedLanguage || 'ja';
+    } else if (this.memory instanceof Map) {
+      language = this.memory.get('language') as SupportedLanguage || 'ja';
+    }
     const audioBuffer = await voiceService.textToSpeech(narration, { language });
     
     // Update current slide
     this.currentSlide = targetSlide;
-    await this.memory.store('currentSlide', this.currentSlide);
+    // Store current slide in memory
+    if (this.memory && typeof this.memory.store === 'function') {
+      await this.memory.store('currentSlide', this.currentSlide);
+    } else if (this.memory instanceof Map) {
+      this.memory.set('currentSlide', this.currentSlide);
+    }
     
     // Determine character action based on slide content
     const characterAction = this.determineCharacterAction(slideData);
@@ -94,7 +115,13 @@ export class SlideNarrator extends Agent {
     transitionMessage?: string;
   }> {
     if (this.currentSlide >= this.totalSlides) {
-      const language = await this.memory.get('language') as SupportedLanguage || 'ja';
+      // Get language from memory
+      let language: SupportedLanguage = 'ja';
+      if (this.memory && typeof this.memory.get === 'function') {
+        language = await this.memory.get('language') as SupportedLanguage || 'ja';
+      } else if (this.memory instanceof Map) {
+        language = this.memory.get('language') as SupportedLanguage || 'ja';
+      }
       const message = language === 'en' 
         ? "This is the last slide. Would you like to go back to the beginning or ask any questions?"
         : "最後のスライドです。最初に戻りますか、それとも何かご質問はございますか？";
@@ -131,7 +158,13 @@ export class SlideNarrator extends Agent {
     transitionMessage?: string;
   }> {
     if (this.currentSlide <= 1) {
-      const language = await this.memory.get('language') as SupportedLanguage || 'ja';
+      // Get language from memory
+      let language: SupportedLanguage = 'ja';
+      if (this.memory && typeof this.memory.get === 'function') {
+        language = await this.memory.get('language') as SupportedLanguage || 'ja';
+      } else if (this.memory instanceof Map) {
+        language = this.memory.get('language') as SupportedLanguage || 'ja';
+      }
       const message = language === 'en' 
         ? "This is the first slide. Would you like to continue forward?"
         : "最初のスライドです。先に進みますか？";
@@ -186,7 +219,13 @@ export class SlideNarrator extends Agent {
     }
 
     const currentSlideData = this.narrationData.slides.find((s: any) => s.slideNumber === this.currentSlide);
-    const language = await this.memory.get('language') as SupportedLanguage || 'ja';
+    // Get language from memory
+    let language: SupportedLanguage = 'ja';
+    if (this.memory && typeof this.memory.get === 'function') {
+      language = await this.memory.get('language') as SupportedLanguage || 'ja';
+    } else if (this.memory instanceof Map) {
+      language = this.memory.get('language') as SupportedLanguage || 'ja';
+    }
     
     // Check if there's a predefined answer for this question
     if (currentSlideData?.narration?.onDemand) {
@@ -243,10 +282,17 @@ export class SlideNarrator extends Agent {
 
   async setAutoPlay(enabled: boolean, interval?: number): Promise<void> {
     this.autoPlay = enabled;
-    await this.memory.store('autoPlay', enabled);
-    
-    if (enabled && interval) {
-      await this.memory.store('autoPlayInterval', interval);
+    // Store autoPlay settings in memory
+    if (this.memory && typeof this.memory.store === 'function') {
+      await this.memory.store('autoPlay', enabled);
+      if (enabled && interval) {
+        await this.memory.store('autoPlayInterval', interval);
+      }
+    } else if (this.memory instanceof Map) {
+      this.memory.set('autoPlay', enabled);
+      if (enabled && interval) {
+        this.memory.set('autoPlayInterval', interval);
+      }
     }
   }
 
@@ -255,7 +301,13 @@ export class SlideNarrator extends Agent {
       return;
     }
 
-    const interval = await this.memory.get('autoPlayInterval') || 30000; // 30 seconds default
+    // Get autoPlay interval from memory
+    let interval = 30000; // 30 seconds default
+    if (this.memory && typeof this.memory.get === 'function') {
+      interval = await this.memory.get('autoPlayInterval') || 30000;
+    } else if (this.memory instanceof Map) {
+      interval = this.memory.get('autoPlayInterval') || 30000;
+    }
     
     // TODO: Implement auto-advance logic with timing
     // This would automatically advance slides after the specified interval
@@ -263,6 +315,11 @@ export class SlideNarrator extends Agent {
 
   async stopAutoPlay(): Promise<void> {
     this.autoPlay = false;
-    await this.memory.store('autoPlay', false);
+    // Store autoPlay setting in memory
+    if (this.memory && typeof this.memory.store === 'function') {
+      await this.memory.store('autoPlay', false);
+    } else if (this.memory instanceof Map) {
+      this.memory.set('autoPlay', false);
+    }
   }
 }

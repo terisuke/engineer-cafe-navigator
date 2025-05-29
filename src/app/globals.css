@@ -1,0 +1,290 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply text-gray-900 bg-white;
+  }
+}
+
+@layer components {
+  /* Button styles */
+  .btn-primary {
+    @apply px-4 py-2 bg-primary text-white rounded-lg hover:bg-secondary transition-colors duration-200 font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 font-medium;
+  }
+
+  /* Card styles */
+  .card {
+    @apply bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200;
+  }
+
+  .card-header {
+    @apply p-4 border-b border-gray-100 font-semibold;
+  }
+
+  /* Glass morphism effect */
+  .glass {
+    @apply bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg;
+  }
+
+  /* Voice interface animations */
+  .voice-active {
+    @apply animate-pulse-slow;
+  }
+
+  /* Character avatar container */
+  .avatar-container {
+    @apply relative w-full h-full bg-gradient-to-b from-blue-50 to-indigo-100 rounded-lg overflow-hidden;
+  }
+
+  /* Slide viewer styles */
+  .slide-container {
+    @apply bg-white rounded-lg shadow-inner;
+  }
+
+  /* Control panel styles */
+  .control-panel {
+    @apply bg-white/90 backdrop-blur-md rounded-lg shadow-lg p-4;
+  }
+}
+
+@layer utilities {
+  /* Custom scrollbar */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-gray-100 rounded-full;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-gray-400 rounded-full hover:bg-gray-500;
+  }
+
+  /* Text gradients */
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
+  }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    @apply transition-all duration-300 ease-in-out;
+  }
+}
+
+/* Loading animations */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.loading-skeleton {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 25%,
+    #e0e0e0 50%,
+    #f0f0f0 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Custom range slider with filled track */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+}
+
+.slider::-webkit-slider-track {
+  @apply w-full h-2 bg-gray-200 rounded-lg;
+  position: relative;
+  overflow: hidden;
+}
+
+.slider::-moz-range-track {
+  @apply w-full h-2 bg-gray-200 rounded-lg;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Filled track effect */
+.slider::-webkit-slider-runnable-track {
+  @apply w-full h-2 bg-gray-200 rounded-lg;
+}
+
+.slider::-moz-range-progress {
+  @apply bg-primary h-2 rounded-lg;
+}
+
+/* Webkit filled track hack */
+.slider-container {
+  position: relative;
+  width: 100%;
+}
+
+.slider-fill {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  height: 8px;
+  border-radius: 4px;
+  @apply bg-gradient-to-r from-primary to-secondary;
+  pointer-events: none;
+  transition: width 0.1s ease-out;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  @apply w-5 h-5 bg-white rounded-full shadow-lg hover:shadow-xl transition-all cursor-pointer;
+  border: 2px solid theme('colors.primary');
+  margin-top: -6px;
+  position: relative;
+  z-index: 2;
+}
+
+.slider::-moz-range-thumb {
+  @apply w-5 h-5 bg-white rounded-full shadow-lg hover:shadow-xl transition-all cursor-pointer border-0;
+  border: 2px solid theme('colors.primary');
+  position: relative;
+  z-index: 2;
+}
+
+.slider:focus {
+  outline: none;
+}
+
+.slider:focus::-webkit-slider-thumb {
+  @apply ring-2 ring-primary ring-offset-2;
+}
+
+.slider:focus::-moz-range-thumb {
+  @apply ring-2 ring-primary ring-offset-2;
+}
+
+/* Voice waveform animation */
+@keyframes voice-wave {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(1.5);
+  }
+}
+
+.voice-wave-bar {
+  animation: voice-wave 1s ease-in-out infinite;
+}
+
+.voice-wave-bar:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.voice-wave-bar:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.voice-wave-bar:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+.voice-wave-bar:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+/* Layout improvements */
+.header-container {
+  z-index: 1000;
+}
+
+.main-content {
+  position: relative;
+  z-index: 1;
+}
+
+.character-container {
+  position: relative;
+  z-index: 10;
+}
+
+.slide-viewer {
+  position: relative;
+  z-index: 5;
+}
+
+.debug-button {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 40;
+}
+
+.slide-navigation {
+  position: relative;
+  z-index: 30;
+}
+
+/* Audio controls styling */
+.audio-controls {
+  transition: all 0.2s ease;
+}
+
+.audio-controls:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Voice interface modal */
+.voice-modal {
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Remove default white backgrounds */
+.character-panel,
+.presentation-panel {
+  background-color: transparent !important;
+}
+
+/* Ensure panels have subtle backdrop for readability if needed */
+.content-panel {
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+/* Remove any white overlays */
+canvas {
+  background-color: transparent !important;
+}
