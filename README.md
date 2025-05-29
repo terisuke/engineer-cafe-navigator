@@ -2,10 +2,10 @@
 
 > 福岡市エンジニアカフェの音声AIエージェントシステム
 
-[![Next.js](https://img.shields.io/badge/Next.js-15.x-black)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
-[![Mastra](https://img.shields.io/badge/Mastra-0.9.x-green)](https://mastra.ai/)
-[![React](https://img.shields.io/badge/React-19.x-61dafb)](https://reactjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15.3.2-black)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-blue)](https://www.typescriptlang.org/)
+[![Mastra](https://img.shields.io/badge/Mastra-0.9.4-green)](https://mastra.ai/)
+[![React](https://img.shields.io/badge/React-19.1.0-61dafb)](https://reactjs.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-VRM-orange)](https://threejs.org/)
 
 ## 📖 プロジェクト概要
@@ -18,6 +18,7 @@ Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福
 - **多言語サポート**: 日本語・英語での対応
 - **インタラクティブなプレゼンテーション**: 音声制御可能なスライドシステム
 - **3Dキャラクターガイド**: VRMアバターによる親しみやすい接客
+- **背景カスタマイズ**: 動的な背景変更とカスタマイズ機能
 
 ### ✨ 主要機能
 
@@ -29,6 +30,8 @@ Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福
 | 🌐 **多言語対応** | 日本語・英語切り替え              |
 | 🔍 **RAG Q&A**    | 知識ベースからのリアルタイム回答           |
 | 🔗 **外部連携**   | WebSocket受付システム統合          |
+| 🎨 **背景制御**   | 動的背景画像変更、グラデーション対応     |
+| 🔒 **セキュリティ**  | XSS対策、iframe サンドボックス化     |
 
 ## 🏗️ アーキテクチャ
 
@@ -66,29 +69,35 @@ graph TB
 ### 🛠️ 技術スタック
 
 #### コア技術
-- **フレームワーク**: [Mastra](https://mastra.ai/) - AI エージェント開発フレームワーク
-- **Frontend**: [Next.js 15](https://nextjs.org/) + [TypeScript](https://www.typescriptlang.org/)
+- **フレームワーク**: [Mastra 0.9.4](https://mastra.ai/) - AI エージェント開発フレームワーク
+- **Frontend**: [Next.js 15.3.2](https://nextjs.org/) + [TypeScript 5.8.3](https://www.typescriptlang.org/)
 - **AI/ML**: [Google Gemini 2.5 Flash Preview](https://ai.google.dev/)
 - **音声処理**: [Google Cloud Speech-to-Text/Text-to-Speech](https://cloud.google.com/speech-to-text)
 
 #### 専門技術
-- **3Dキャラクター**: [Three.js](https://threejs.org/) + [@pixiv/three-vrm](https://github.com/pixiv/three-vrm)
-- **スライドシステム**: [Marp](https://marp.app/) (Markdown Presentation Ecosystem)
-- **データベース**: [PostgreSQL](https://www.postgresql.org/) + [pgvector](https://github.com/pgvector/pgvector)
-- **スタイリング**: [Tailwind CSS v3.4.14](https://tailwindcss.com/) ⚠️ **重要: v3を使用**
+- **3Dキャラクター**: [Three.js 0.176.0](https://threejs.org/) + [@pixiv/three-vrm 3.4.0](https://github.com/pixiv/three-vrm)
+- **スライドシステム**: [Marp Core 4.1.0](https://marp.app/) (Markdown Presentation Ecosystem)
+- **データベース**: [PostgreSQL](https://www.postgresql.org/) + [Supabase 2.49.8](https://supabase.com/)
+- **スタイリング**: [Tailwind CSS v3.4.17](https://tailwindcss.com/) ⚠️ **重要: v3を使用**
+
+#### セキュリティ・品質
+- **HTMLサニタイゼーション**: カスタム実装によるXSS対策
+- **iframe サンドボックス**: `allow-scripts allow-same-origin allow-popups allow-forms`
+- **Origin検証**: postMessage通信での信頼できるオリジンチェック
+- **状態管理**: React 19.1.0の新機能活用
 
 ## ⚠️ 重要: Tailwind CSS バージョンについて
 
-このプロジェクトは **Tailwind CSS v3.4.14** を使用しています。Tailwind CSS v4にはアップグレードしないでください。v4には破壊的変更があり、異なる設定要件があります。
+このプロジェクトは **Tailwind CSS v3.4.17** を使用しています。Tailwind CSS v4にはアップグレードしないでください。v4には破壊的変更があり、異なる設定要件があります。
 
 ### CSS フレームワーク依存関係
-- `tailwindcss@3.4.14` - CSSフレームワーク (v3、v4ではありません)
+- `tailwindcss@3.4.17` - CSSフレームワーク (v3、v4ではありません)
 - `postcss@8.4.47` - CSSプロセッサー
 - `autoprefixer@10.4.20` - ベンダープレフィックス追加
 
 ### インストール
 ```bash
-pnpm add -D tailwindcss@3.4.14 postcss@8.4.47 autoprefixer@10.4.20
+pnpm add -D tailwindcss@3.4.17 postcss@8.4.47 autoprefixer@10.4.20
 ```
 
 ### 必要な設定ファイル
@@ -135,7 +144,7 @@ GOOGLE_TRANSLATE_API_KEY=your-translate-api-key
 
 # 🤖 Gemini AI
 GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-2.5-flash-preview-04-17
+GEMINI_MODEL=gemini-2.5-flash-preview-05-20
 
 # 🗄️ Database
 POSTGRES_URL=postgresql://user:password@localhost:5432/engineer_cafe_navigator
@@ -167,9 +176,8 @@ psql engineer_cafe_navigator -c "CREATE EXTENSION IF NOT EXISTS vector;"
 VRMファイルを以下に配置：
 
 ```
-src/characters/models/
-├── engineer-guide.vrm      # メインガイド
-└── engineer-greeter.vrm    # 受付キャラクター
+public/characters/models/
+└── sakura.vrm              # メインガイドキャラクター
 ```
 
 > 💡 **VRMモデルの入手方法**
@@ -177,7 +185,20 @@ src/characters/models/
 > - [Booth](https://booth.pm/) - 有料・高品質モデル
 > - [VRoid Studio](https://vroid.com/studio) - 自作も可能
 
-### 6. 開発サーバーの起動
+### 6. 背景画像の配置（オプション）
+
+カスタム背景画像を使用する場合：
+
+```
+public/backgrounds/
+├── IMG_5573.JPG           # カスタム背景画像
+├── office.png
+└── cafe-interior.jpg
+```
+
+> 💡 背景画像は動的に検出され、設定パネルで選択可能です
+
+### 7. 開発サーバーの起動
 
 ```bash
 pnpm run dev
@@ -196,31 +217,68 @@ engineer-cafe-navigator/
 │   │   │   ├── marp/route.ts         # スライドAPI
 │   │   │   ├── character/route.ts    # キャラクターAPI
 │   │   │   ├── slides/route.ts       # スライド操作API
-│   │   │   ├── backgrounds/route.ts  # 背景画像API
+│   │   │   ├── external/route.ts     # 外部API連携
 │   │   │   └── qa/route.ts           # Q&A API
 │   │   ├── components/               # React Components
-│   │   ├── hooks/                    # React Hooks
-│   │   ├── utils/                    # 共通ユーティリティ
+│   │   │   ├── AudioControls.tsx     # 音声制御コンポーネント
+│   │   │   ├── BackgroundSelector.tsx # 背景選択コンポーネント
+│   │   │   ├── CharacterAvatar.tsx   # VRMキャラクター表示
+│   │   │   ├── LanguageSelector.tsx  # 言語切り替え
+│   │   │   ├── MarpViewer.tsx        # Marpスライドビューア
+│   │   │   ├── SlideDebugPanel.tsx   # スライドデバッグパネル
+│   │   │   └── VoiceInterface.tsx    # 音声インターフェース
+│   │   ├── globals.css               # グローバルスタイル
 │   │   └── page.tsx                  # メインページ
 │   ├── mastra/                       # Mastra設定
 │   │   ├── agents/                   # AIエージェント
+│   │   │   ├── qa-agent.ts           # Q&Aエージェント
+│   │   │   ├── realtime-agent.ts     # リアルタイムエージェント
+│   │   │   ├── slide-narrator.ts     # スライドナレーター
+│   │   │   └── welcome-agent.ts      # ウェルカムエージェント
 │   │   ├── tools/                    # Mastra Tools
-│   │   └── voice/                    # 音声サービス
+│   │   │   ├── character-control.ts  # キャラクター制御
+│   │   │   ├── external-api.ts       # 外部API連携
+│   │   │   ├── language-switch.ts    # 言語切り替え
+│   │   │   ├── marp-renderer.ts      # Marpレンダラー
+│   │   │   ├── narration-loader.ts   # ナレーション読み込み
+│   │   │   ├── page-transition.ts    # ページ遷移
+│   │   │   └── slide-control.ts      # スライド制御
+│   │   ├── voice/                    # 音声サービス
+│   │   │   └── google-cloud-voice.ts # Google Cloud音声API
+│   │   ├── types/                    # Mastra型定義
+│   │   └── index.ts                  # Mastra設定ファイル
 │   ├── slides/                       # スライドコンテンツ
+│   │   ├── engineer-cafe.md          # メインスライドファイル
 │   │   ├── themes/                   # カスタムテーマ
-│   │   └── narration/                # ナレーションJSON
+│   │   │   ├── default.css           # デフォルトテーマ
+│   │   │   └── engineer-cafe.css     # カスタムテーマ
+│   │   ├── narration/                # ナレーションJSON
+│   │   │   ├── engineer-cafe-ja.json # 日本語ナレーション
+│   │   │   └── engineer-cafe-en.json # 英語ナレーション
+│   │   └── assets/images/            # スライド用画像
 │   ├── characters/                   # キャラクターアセット
-│   │   ├── models/                   # VRMモデル
 │   │   ├── animations/               # アニメーション
+│   │   │   └── greetings.json        # 挨拶アニメーション
 │   │   └── expressions/              # 表情データ
 │   ├── lib/                          # 共通ライブラリ
+│   │   ├── audio-player.ts           # 音声再生
+│   │   ├── marp-processor.ts         # Marp処理
+│   │   ├── narration-manager.ts      # ナレーション管理
+│   │   ├── supabase.ts              # Supabase設定
+│   │   ├── supabase-memory.ts       # Supabaseメモリ管理
+│   │   ├── voice-recorder.ts         # 音声録音
+│   │   ├── vrm-utils.ts             # VRMユーティリティ
+│   │   └── websocket-manager.ts      # WebSocket管理
 │   └── types/                        # 型定義
+│       └── supabase.ts              # Supabase型定義
 ├── public/
-│   └── backgrounds/                  # 背景画像 (自動検出)
-├── config/
-│   └── service-account-key.json      # GCPサービスアカウントキー (Git追跡対象外)
-├── supabase/                         # Supabase migration & config
-├── scripts/                          # 補助スクリプト
+│   ├── characters/models/            # VRMモデル
+│   │   └── sakura.vrm               # メインキャラクター
+│   └── backgrounds/                  # 背景画像 (動的検出)
+├── supabase/                         # Supabase設定
+│   ├── config.toml                   # Supabase設定ファイル
+│   └── migrations/                   # データベースマイグレーション
+├── config/                           # 設定ファイル
 ├── .env                              # 環境変数
 ├── package.json
 ├── pnpm-lock.yaml
@@ -468,19 +526,72 @@ pnpm run logs:marp      # スライドログ
 - **会話ログ**: 暗号化保存（Mastra Memory）
 - **個人情報**: GDPR・個人情報保護法準拠
 
+### セキュリティ対策
+
+#### XSS (Cross-Site Scripting) 対策
+```typescript
+// HTMLサニタイゼーション
+const sanitizeHtml = (html: string): string => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  
+  // スクリプトタグの除去
+  const scripts = doc.querySelectorAll('script');
+  scripts.forEach(script => script.remove());
+  
+  // イベントハンドラーの除去
+  const allElements = doc.querySelectorAll('*');
+  allElements.forEach(element => {
+    Array.from(element.attributes).forEach(attr => {
+      if (attr.name.startsWith('on')) {
+        element.removeAttribute(attr.name);
+      }
+    });
+  });
+  
+  return doc.documentElement.outerHTML;
+};
+```
+
+#### iframe サンドボックス化
+```html
+<iframe
+  srcDoc={sanitizedHtml}
+  sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+  title="Slide presentation"
+>
+```
+
+#### postMessage Origin検証
+```typescript
+const handleMessage = (event: MessageEvent) => {
+  const allowedOrigins = [
+    window.location.origin,
+    'null', // iframe srcDocコンテンツ用
+  ];
+  
+  if (!allowedOrigins.includes(event.origin)) {
+    console.warn('信頼できないオリジンからのメッセージを拒否:', event.origin);
+    return;
+  }
+  
+  // メッセージ処理...
+};
+```
+
 ### API セキュリティ
 
 ```typescript
-// Rate limiting example
+// 入力値検証
+const schema = z.object({
+  audioData: z.string().max(10000000), // 10MB制限
+  sessionId: z.string().uuid(),
+});
+
+// レート制限
 const ratelimit = new Ratelimit({
   redis: Redis.fromEnv(),
   limiter: Ratelimit.slidingWindow(10, "10 s"),
-});
-
-// Input validation
-const schema = z.object({
-  audioData: z.string().max(10000000), // 10MB limit
-  sessionId: z.string().uuid(),
 });
 ```
 
@@ -575,12 +686,28 @@ pnpm run test
 - **Discussion**: [GitHub Discussions](https://github.com/your-org/engineer-cafe-navigator/discussions)
 - **Discord**: [開発コミュニティ](https://discord.gg/your-invite)
 
+## 📖 詳細ドキュメント
+
+### 技術ドキュメント
+- **[📚 ドキュメント一覧](docs/README.md)** - 全ドキュメントのインデックス
+- **[📖 API仕様書](docs/API.md)** - REST API完全仕様
+- **[🔒 セキュリティガイド](docs/SECURITY.md)** - セキュリティ対策・脅威分析
+- **[🛠️ 開発ガイド](docs/DEVELOPMENT.md)** - 開発者向け技術仕様
+- **[🚀 デプロイガイド](docs/DEPLOYMENT.md)** - 本番環境デプロイ手順
+
+### セキュリティハイライト
+- ✅ **XSS対策**: HTMLサニタイゼーション実装済み
+- ✅ **iframe保護**: サンドボックス化 + Origin検証
+- ✅ **通信暗号化**: HTTPS + セキュリティヘッダー
+- ✅ **入力検証**: Zodスキーマバリデーション
+- ✅ **プライバシー**: UI状態同期によるデータ保護
+
 ---
 
 <div align="center">
 
 **Built with ❤️ by Engineer Cafe Team**
 
-[🏠 ホーム](https://engineer-cafe.fukuoka.jp) • [📖 ドキュメント](docs/) • [🚀 デモ](https://demo.engineer-cafe-navigator.vercel.app)
+[🏠 ホーム](https://engineer-cafe.fukuoka.jp) • [📚 ドキュメント](docs/README.md) • [🚀 デモ](https://demo.engineer-cafe-navigator.vercel.app)
 
 </div>

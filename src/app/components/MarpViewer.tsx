@@ -84,6 +84,17 @@ export default function MarpViewer({
   // Handle iframe messages and slide visibility
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      // Security check: verify event origin
+      const allowedOrigins = [
+        window.location.origin,
+        'null', // For iframe srcDoc content
+      ];
+      
+      if (!allowedOrigins.includes(event.origin)) {
+        console.warn('Rejected message from untrusted origin:', event.origin);
+        return;
+      }
+
       if (event.data.type === 'slide-control') {
         if (event.data.action === 'next') {
           nextSlide();
@@ -160,8 +171,11 @@ export default function MarpViewer({
         }
 
         if (result.html) {
+          // First, sanitize the raw HTML content
+          const sanitizedHtml = sanitizeHtml(result.html);
+          
           // Inject CSS for proper Marp slide display
-          const enhancedHtml = result.html.replace(
+          const enhancedHtml = sanitizedHtml.replace(
             '</head>',
             `<style>
               /* Reset and base styles */
@@ -207,7 +221,7 @@ export default function MarpViewer({
             </head>`
           );
           
-          // Also ensure script execution
+          // Add controlled script for slide detection (safe since we control this content)
           const scriptEnhancedHtml = enhancedHtml.replace(
             '</body>',
             `<script>
@@ -219,8 +233,14 @@ export default function MarpViewer({
                   if (slides.length > 0) {
                     console.log('Slides found:', slides.length);
                     clearInterval(checkSlides);
-                    // Notify parent
-                    window.parent.postMessage({ type: 'marp-ready', slideCount: slides.length }, '*');
+                    // Notify parent (safe since we're in a sandboxed iframe)
+                    if (window.parent && window.parent.postMessage) {
+                      try {
+                        window.parent.postMessage({ type: 'marp-ready', slideCount: slides.length }, '*');
+                      } catch (e) {
+                        console.warn('Could not send message to parent:', e);
+                      }
+                    }
                   }
                 }, 100);
               });
@@ -380,6 +400,56 @@ export default function MarpViewer({
       };
     } catch (error) {
       console.error('Error playing narration audio:', error);
+    }
+  };
+
+  // Sanitize HTML content to prevent XSS attacks
+  // Note: This provides basic XSS protection. For production, consider using DOMPurify library
+  const sanitizeHtml = (html: string): string => {
+    try {
+      // Create a temporary DOM parser
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      
+      // Remove all script tags and their content (we'll add our own controlled scripts later)
+      const scripts = doc.querySelectorAll('script');
+      scripts.forEach(script => script.remove());
+      
+      // Remove javascript: URLs and on* event handlers
+      const allElements = doc.querySelectorAll('*');
+      allElements.forEach(element => {
+        // Remove all on* event handlers (onclick, onload, etc.)
+        Array.from(element.attributes).forEach(attr => {
+          if (attr.name.startsWith('on')) {
+            element.removeAttribute(attr.name);
+          }
+        });
+        
+        // Check and sanitize href and src attributes for javascript: URLs
+        ['href', 'src', 'action', 'formaction', 'data'].forEach(attrName => {
+          const attrValue = element.getAttribute(attrName);
+          if (attrValue && (
+            attrValue.toLowerCase().includes('javascript:') ||
+            attrValue.toLowerCase().includes('data:text/html') ||
+            attrValue.toLowerCase().includes('vbscript:')
+          )) {
+            element.removeAttribute(attrName);
+          }
+        });
+      });
+      
+      // Remove potentially dangerous tags
+      const dangerousTags = ['object', 'embed', 'applet', 'link[rel="import"]', 'meta[http-equiv]', 'base'];
+      dangerousTags.forEach(selector => {
+        const tags = doc.querySelectorAll(selector);
+        tags.forEach(tag => tag.remove());
+      });
+      
+      return doc.documentElement.outerHTML;
+    } catch (error) {
+      console.error('HTML sanitization failed:', error);
+      // Return empty HTML document as fallback
+      return '<!DOCTYPE html><html><head><title>Error</title></head><body><p>Content could not be displayed safely.</p></body></html>';
     }
   };
 
@@ -669,6 +739,7 @@ export default function MarpViewer({
               srcDoc={renderedHtml}
               className="w-full h-full border-0"
               title="Slide presentation"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
               onLoad={() => {
                 setTimeout(() => {
                   debugSlideStructure();

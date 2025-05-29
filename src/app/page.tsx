@@ -54,6 +54,21 @@ export default function Home() {
     return {};
   };
 
+  // Synchronized voice interface and recording control
+  const handleVoiceInterfaceToggle = () => {
+    const newRecordingState = !isRecording;
+    const newVoiceInterfaceState = !showVoiceInterface;
+    
+    setIsRecording(newRecordingState);
+    setShowVoiceInterface(newVoiceInterfaceState);
+  };
+
+  // Close voice interface and stop recording
+  const handleVoiceInterfaceClose = () => {
+    setIsRecording(false);
+    setShowVoiceInterface(false);
+  };
+
   return (
     <main className="min-h-screen" style={getBackgroundStyle()}>
       {/* Header */}
@@ -84,10 +99,7 @@ export default function Home() {
                 isRecording={isRecording}
                 onMuteToggle={() => setIsMuted(!isMuted)}
                 onVolumeChange={setVolume}
-                onMicToggle={() => {
-                  setIsRecording(!isRecording);
-                  setShowVoiceInterface(!showVoiceInterface);
-                }}
+                onMicToggle={handleVoiceInterfaceToggle}
               />
               
               {/* Language Selector */}
@@ -201,7 +213,7 @@ export default function Home() {
               <div className="p-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-800">音声インターフェース</h3>
                 <button
-                  onClick={() => setShowVoiceInterface(false)}
+                  onClick={handleVoiceInterfaceClose}
                   className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
