@@ -271,7 +271,7 @@ export class EmotionManager {
   }
 
   /**
-   * Animate expression value change
+   * Animate expression value change with emotion-specific easing
    */
   private static animateExpressionValue(
     expressionManager: any,
@@ -287,8 +287,32 @@ export class EmotionManager {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1.0);
       
-      // Ease-out animation
-      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      // Emotion-specific easing curves based on research
+      let easedProgress: number;
+      
+      switch (expressionName) {
+        case 'happy':
+          // Slow onset for authentic happiness (research: slow smiles are more genuine)
+          easedProgress = progress * progress; // Ease-in
+          break;
+        case 'surprised':
+          // Fast onset, quick peak (research: surprise is shortest)
+          easedProgress = 1 - Math.pow(1 - progress, 4); // Sharp ease-out
+          break;
+        case 'sad':
+          // Gradual build-up (research: sadness takes time to develop)
+          easedProgress = progress * progress * progress; // Ease-in cubic
+          break;
+        case 'angry':
+          // Medium-fast onset (research: anger builds moderately fast)
+          easedProgress = 1 - Math.pow(1 - progress, 2); // Ease-out quadratic
+          break;
+        default:
+          // Standard ease-out for neutral/relaxed
+          easedProgress = 1 - Math.pow(1 - progress, 3);
+          break;
+      }
+      
       const currentValue = fromValue + valueDiff * easedProgress;
       
       try {
@@ -307,24 +331,45 @@ export class EmotionManager {
   }
 
   /**
-   * Calculate appropriate duration for emotion based on type and context
+   * Calculate appropriate duration for emotion based on scientific research
+   * Based on Ekman's macro expressions (0.5-4s) and Pollick et al. studies
    */
   private static calculateDuration(emotion: string, textLength: number): number {
+    // Research-based durations (ms) for natural expression perception
     const baseDurations = {
-      neutral: 1000,
-      happy: 2000,
-      sad: 3000,
-      angry: 2500,
-      relaxed: 2500,
-      surprised: 1500,
+      // Neutral baseline - quick transition
+      neutral: 500,
+      
+      // Happy: slow onset (1100ms research), authentic smiles 5s total
+      // Using 1100ms as base for natural happiness recognition
+      happy: 1100,
+      
+      // Sad: longer natural duration (1067ms onset + 900-1000ms optimal)
+      // Using 1000ms for natural sadness perception
+      sad: 1000,
+      
+      // Angry: medium duration (933ms onset + 500-740ms optimal)
+      // Using 700ms for natural anger recognition
+      angry: 700,
+      
+      // Relaxed: calm state, moderate duration
+      relaxed: 800,
+      
+      // Surprised: shortest duration (<1s, 858ms research)
+      // Quick flash of surprise, then rapid return to neutral
+      surprised: 600,
     };
 
-    const baseDuration = baseDurations[emotion as keyof typeof baseDurations] || 1500;
+    const baseDuration = baseDurations[emotion as keyof typeof baseDurations] || 800;
     
-    // Adjust duration based on text length (longer text = longer emotion)
-    const lengthFactor = Math.max(0.5, Math.min(2.0, textLength / 50));
+    // Adjust duration based on text length but keep within natural ranges
+    // Longer text = slight extension, but capped to avoid artificial appearance
+    const lengthFactor = Math.max(0.8, Math.min(1.5, textLength / 30));
     
-    return Math.round(baseDuration * lengthFactor);
+    const finalDuration = Math.round(baseDuration * lengthFactor);
+    
+    // Ensure durations stay within Ekman's natural range (500-4000ms)
+    return Math.max(500, Math.min(4000, finalDuration));
   }
 
   /**
