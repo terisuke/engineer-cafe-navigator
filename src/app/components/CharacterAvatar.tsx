@@ -1,6 +1,9 @@
 'use client';
 
-import { VRMUtils } from '@/lib/vrm-utils';
+import { VRMUtils, VRMBlendShapeController } from '@/lib/vrm-utils';
+import { EmotionManager, EmotionData } from '@/lib/emotion-manager';
+import { LipSyncAnalyzer, LipSyncFrame } from '@/lib/lip-sync-analyzer';
+import { ExpressionController, ExpressionData } from '@/lib/expression-controller';
 import { VRM, VRMLoaderPlugin } from '@pixiv/three-vrm';
 import { VRMAnimationLoaderPlugin, VRMAnimation, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
 import { Download, Maximize2, RotateCcw, Settings } from 'lucide-react';
@@ -41,6 +44,9 @@ interface CharacterAvatarProps {
   enableClickAnimation?: boolean;
   onCharacterLoad?: (character: VRM) => void;
   onStateChange?: (state: CharacterState) => void;
+  onEmotionUpdate?: (applyEmotion: (emotion: EmotionData) => void) => void;
+  onVisemeControl?: (setViseme: (viseme: string, intensity: number) => void) => void;
+  onExpressionControl?: (setExpression: (expression: string, weight: number) => void) => void;
 }
 
 export default function CharacterAvatar({
@@ -62,6 +68,9 @@ export default function CharacterAvatar({
   enableClickAnimation = false,
   onCharacterLoad,
   onStateChange,
+  onEmotionUpdate,
+  onVisemeControl,
+  onExpressionControl,
 }: CharacterAvatarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -75,6 +84,10 @@ export default function CharacterAvatar({
   const isPlayingSequence = useRef(false);
   const isIdleAnimationActive = useRef(false);
   const currentAnimationUrlRef = useRef<string | null>(null);
+  const blendShapeControllerRef = useRef<VRMBlendShapeController | null>(null);
+  const lipSyncAnalyzerRef = useRef<LipSyncAnalyzer | null>(null);
+  const expressionControllerRef = useRef<ExpressionController | null>(null);
+  const autoBlinkCleanupRef = useRef<(() => void) | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -582,6 +595,23 @@ useEffect(() => {
         modelPositionOffset.z
       );
 
+      // Initialize lip-sync and expression controllers
+      console.log('Initializing BlendShape controllers...');
+      blendShapeControllerRef.current = new VRMBlendShapeController(vrm);
+      lipSyncAnalyzerRef.current = new LipSyncAnalyzer();
+      expressionControllerRef.current = new ExpressionController();
+      
+      // Log available expressions
+      const availableExpressions = blendShapeControllerRef.current.getAvailableExpressions();
+      console.log('Available VRM expressions:', availableExpressions);
+
+      // Start automatic blinking
+      if (autoBlinkCleanupRef.current) {
+        autoBlinkCleanupRef.current();
+      }
+      autoBlinkCleanupRef.current = blendShapeControllerRef.current.startAutoBlink();
+      console.log('Auto-blink started');
+
       // Set initial pose
       await updateCharacterExpression(characterState.expression);
       await updateCharacterAnimation(characterState.animation);
@@ -594,7 +624,63 @@ useEffect(() => {
       await loadVRMAnimation('/animations/idle_loop.vrma', vrm, true, true);
       console.log('After idle animation load, model position:', vrm.scene.position);
 
+      // Create viseme control function
+      const setViseme = (viseme: string, intensity: number) => {
+        console.log(`[CharacterAvatar] Setting viseme: ${viseme}, intensity: ${intensity}`);
+        if (blendShapeControllerRef.current) {
+          // Map viseme to VRM expression name
+          const visemeMap: Record<string, string> = {
+            'A': 'aa',
+            'I': 'ih',
+            'U': 'ou',
+            'E': 'ee',
+            'O': 'oh',
+            'Closed': 'neutral'
+          };
+          
+          const vrmExpression = visemeMap[viseme] || 'neutral';
+          console.log(`[CharacterAvatar] Mapped viseme ${viseme} to VRM expression ${vrmExpression}`);
+          blendShapeControllerRef.current.setViseme(vrmExpression, intensity);
+        } else {
+          console.warn('[CharacterAvatar] BlendShape controller not available');
+        }
+      };
+
+      // Create expression control function
+      const setExpression = (expression: string, weight: number) => {
+        console.log(`[CharacterAvatar] Setting expression: ${expression}, weight: ${weight}`);
+        if (blendShapeControllerRef.current) {
+          // Use the VRM expression manager to set expressions
+          const expressionManager = vrm.expressionManager;
+          if (expressionManager) {
+            // Reset all expressions first if weight is significant
+            if (weight > 0.1) {
+              Object.keys(expressionManager.expressionMap).forEach(name => {
+                if (name !== expression) {
+                  expressionManager.setValue(name, 0);
+                }
+              });
+            }
+            
+            // Set the target expression
+            if (expressionManager.expressionMap[expression]) {
+              expressionManager.setValue(expression, weight);
+              console.log(`[CharacterAvatar] Applied expression ${expression} with weight ${weight}`);
+            } else {
+              console.warn(`[CharacterAvatar] Expression ${expression} not found in VRM model`);
+            }
+          } else {
+            console.warn('[CharacterAvatar] Expression manager not available');
+          }
+        } else {
+          console.warn('[CharacterAvatar] BlendShape controller not available');
+        }
+      };
+
       onCharacterLoad?.(vrm);
+      onEmotionUpdate?.(applyEmotionToCharacter);
+      onVisemeControl?.(setViseme);
+      onExpressionControl?.(setExpression);
       setIsLoading(false);
     } catch (error) {
       console.error('Error loading character:', error);
@@ -655,6 +741,24 @@ useEffect(() => {
       }
     } catch (error) {
       console.error('Error updating expression:', error);
+    }
+  };
+
+  const applyEmotionToCharacter = (emotionData: EmotionData, transitionDuration: number = 500) => {
+    if (!charactersRef.current) return;
+
+    try {
+      // Use the EmotionManager to apply emotion to VRM
+      EmotionManager.applyEmotionToVRM(charactersRef.current, emotionData, transitionDuration);
+      
+      // Update character state
+      const mapping = EmotionManager.mapEmotionToVRM(emotionData);
+      setCharacterState(prev => ({ ...prev, expression: mapping.primary }));
+      onStateChange?.({ ...characterState, expression: mapping.primary });
+
+      console.log('Applied emotion to character:', emotionData);
+    } catch (error) {
+      console.error('Error applying emotion to character:', error);
     }
   };
 

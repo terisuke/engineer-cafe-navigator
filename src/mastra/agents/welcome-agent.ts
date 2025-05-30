@@ -3,9 +3,13 @@ import { z } from 'zod';
 import { SupportedLanguage } from '../types/config';
 
 export class WelcomeAgent extends Agent {
-  constructor(mastra: any) {
+  private memory: any;
+  private _tools: Map<string, any> = new Map();
+
+  constructor(config: any) {
     super({
       name: 'WelcomeAgent',
+      model: config.llm.model,
       instructions: `You are a friendly welcome agent for Engineer Cafe in Fukuoka.
         Your role is to:
         1. Greet new visitors warmly
@@ -17,10 +21,13 @@ export class WelcomeAgent extends Agent {
         Always maintain a professional yet welcoming tone.
         Be concise but informative in your responses.
         Use the slide control tools to navigate presentations effectively.`,
-      model: 'gemini-2.5-flash-preview-05-20',
-      tools: [],
-      memory: mastra.memory,
     });
+    this.memory = config.memory || new Map();
+  }
+
+  // Method to add tools to this agent
+  addTool(name: string, tool: any) {
+    this._tools.set(name, tool);
   }
 
   async welcome(language?: SupportedLanguage): Promise<string> {
@@ -56,8 +63,10 @@ export class WelcomeAgent extends Agent {
       ? `Answer this question about slide ${slideNumber} of Engineer Cafe presentation: ${question}`
       : `エンジニアカフェのプレゼンテーション${slideNumber}枚目のスライドについての質問に答えてください: ${question}`;
     
-    const response = await this.run(prompt);
-    return response;
+    const response = await this.generate([
+      { role: 'user', content: prompt }
+    ]);
+    return response.text;
   }
 
   async transitionToQA(): Promise<string> {

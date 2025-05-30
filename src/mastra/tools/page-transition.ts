@@ -427,7 +427,7 @@ export class PageTransitionTool {
     const canNavigateResult = await this.canNavigate('welcome');
     const allowedPages = canNavigateResult.result.allowedPages || [];
     
-    const pageDetails = allowedPages.map(page => ({
+    const pageDetails = allowedPages.map((page: any) => ({
       page,
       info: this.getPageInfo(page),
     }));

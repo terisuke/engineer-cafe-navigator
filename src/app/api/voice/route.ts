@@ -7,7 +7,7 @@ const config: Config = {
   googleCloud: {
     projectId: process.env.GOOGLE_CLOUD_PROJECT_ID!,
     credentials: process.env.GOOGLE_CLOUD_CREDENTIALS!,
-    speechApiKey: process.env.GOOGLE_SPEECH_API_KEY!,
+    // speechApiKey is not needed with service account
     translateApiKey: process.env.GOOGLE_TRANSLATE_API_KEY,
   },
   gemini: {
@@ -46,7 +46,20 @@ export async function POST(request: NextRequest) {
     const { action, audioData, sessionId, language, text } = body;
 
     switch (action) {
+      case 'start_session':
+        const newSessionId = await realtimeAgent.startSession(body.visitorId, body.language || 'ja');
+        
+        return NextResponse.json({
+          success: true,
+          sessionId: newSessionId,
+        });
+
       case 'process_voice':
+        // Ensure session is active
+        if (sessionId && !realtimeAgent.getCurrentSessionId()) {
+          await realtimeAgent.startSession(undefined, language || 'ja');
+        }
+        
         // Convert base64 audio to ArrayBuffer
         const audioBuffer = Buffer.from(audioData, 'base64').buffer;
         
@@ -62,9 +75,21 @@ export async function POST(request: NextRequest) {
           audioResponse: audioResponseBase64,
           shouldUpdateCharacter: result.shouldUpdateCharacter,
           characterAction: result.characterAction,
+          emotion: result.emotion,
+          sessionId: realtimeAgent.getCurrentSessionId(),
+        });
+
+      case 'end_session':
+        await realtimeAgent.endSession();
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Session ended',
         });
 
       case 'set_language':
+        await realtimeAgent.setLanguage(language);
+        
         const languageTool = navigator.getTool('languageSwitch');
         
         if (languageTool) {
@@ -80,10 +105,10 @@ export async function POST(request: NextRequest) {
           });
         }
         
-        return NextResponse.json(
-          { error: 'Language switch tool not available' },
-          { status: 500 }
-        );
+        return NextResponse.json({
+          success: true,
+          message: 'Language updated',
+        });
 
       case 'get_conversation_state':
         const state = realtimeAgent.getConversationState();
@@ -110,6 +135,27 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           message: 'Interruption handled',
+        });
+
+      case 'text_to_speech':
+        // Ensure session is active for TTS
+        if (sessionId && !realtimeAgent.getCurrentSessionId()) {
+          await realtimeAgent.startSession(undefined, language || 'ja');
+        }
+        
+        // Set language for TTS
+        if (language) {
+          await realtimeAgent.setLanguage(language);
+        }
+        
+        // Generate TTS audio
+        const ttsResult = await realtimeAgent.generateTTSAudio(text);
+        const ttsAudioBase64 = Buffer.from(ttsResult).toString('base64');
+        
+        return NextResponse.json({
+          success: true,
+          audioResponse: ttsAudioBase64,
+          text: text,
         });
 
       case 'detect_language':

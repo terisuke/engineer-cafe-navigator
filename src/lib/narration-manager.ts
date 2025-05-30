@@ -604,25 +604,3 @@ export interface NarrationProgress {
   progress: number; // 0-1
 }
 
-export interface NarrationConfig {
-  metadata: {
-    title: string;
-    language: string;
-    speaker: string;
-    version: string;
-  };
-  slides: SlideNarration[];
-}
-
-export interface SlideNarration {
-  slideNumber: number;
-  narration: {
-    auto: string;
-    onEnter: string;
-    onDemand: Record<string, string>;
-  };
-  transitions: {
-    next: string | null;
-    previous: string | null;
-  };
-}

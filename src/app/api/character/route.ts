@@ -73,7 +73,10 @@ export async function POST(request: NextRequest) {
       rotation, 
       modelPath, 
       duration, 
-      transition 
+      transition,
+      emotion,
+      text,
+      language
     } = body;
 
     if (!action) {
@@ -92,6 +95,9 @@ export async function POST(request: NextRequest) {
       modelPath,
       duration,
       transition,
+      emotion,
+      text,
+      language,
     });
     
     return NextResponse.json({

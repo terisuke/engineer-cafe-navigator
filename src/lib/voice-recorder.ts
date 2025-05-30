@@ -1,7 +1,7 @@
 export class VoiceRecorder {
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
-  private stream: MediaStream | null = null;
+  protected stream: MediaStream | null = null;
   private isRecording = false;
 
   constructor(

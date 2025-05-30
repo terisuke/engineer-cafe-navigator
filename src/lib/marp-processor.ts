@@ -151,7 +151,7 @@ export class MarpProcessor {
       const title = titleMatch ? titleMatch[1] : undefined;
 
       // Extract speaker notes (HTML comments)
-      const notesMatch = trimmedContent.match(/<!--\s*(.*?)\s*-->/s);
+      const notesMatch = trimmedContent.match(/<!--\s*([\s\S]*?)\s*-->/);
       const notes = notesMatch ? notesMatch[1].trim() : undefined;
 
       // Extract background image
@@ -190,8 +190,9 @@ export class MarpProcessor {
     }
 
     // Extract other custom directives
-    const customDirectiveMatches = content.matchAll(/<!--\s*_(\w+):\s*(.+?)\s*-->/g);
-    for (const match of customDirectiveMatches) {
+    const customDirectiveRegex = /<!--\s*_(\w+):\s*(.+?)\s*-->/g;
+    let match;
+    while ((match = customDirectiveRegex.exec(content)) !== null) {
       const [, key, value] = match;
       if (key !== 'class' && key !== 'backgroundColor') {
         directives[key] = value.trim();
@@ -561,7 +562,7 @@ export class MarpUtils {
 
   static addSlideNotes(slideContent: string, notes: string): string {
     // Remove existing notes
-    const withoutNotes = slideContent.replace(/<!--\s*.*?\s*-->/s, '');
+    const withoutNotes = slideContent.replace(/<!--\s*[\s\S]*?\s*-->/, '');
     
     // Add new notes
     return `${withoutNotes.trim()}\n\n<!-- ${notes} -->`;

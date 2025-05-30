@@ -1,23 +1,39 @@
-# API ドキュメント
+# API Documentation - Engineer Cafe Navigator
 
-> Engineer Cafe Navigator REST API 仕様書
+> Complete REST API specification for Engineer Cafe Navigator voice AI agent system
 
-## 📖 概要
+[日本語版](./API-ja.md) | English
 
-Engineer Cafe Navigator は以下のRESTful APIエンドポイントを提供します：
+## 📖 Overview
 
-- **音声処理**: 音声認識、合成、AI応答生成
-- **スライド制御**: Marpスライドの表示・操作
-- **キャラクター制御**: VRMキャラクターの表情・動作
-- **外部連携**: WebSocket受付システム統合
-- **Q&A**: AIによる質問回答システム
+Engineer Cafe Navigator provides the following RESTful API endpoints:
 
-## 🔗 ベースURL
+- **Voice Processing**: Speech recognition, synthesis, and AI response generation
+- **Emotion Detection**: Real-time emotion analysis from text and voice
+- **Character Control**: VRM character expressions and emotion-driven animations
+- **Slide Control**: Marp slide display and navigation
+- **External Integration**: WebSocket reception system integration
+- **Q&A System**: AI-powered question answering
+- **Session Management**: Multi-turn conversation with context persistence
+- **Background Control**: Dynamic background management
+
+## 🔗 Base URL
 
 ```
-本番環境: https://engineer-cafe-navigator.vercel.app
-開発環境: http://localhost:3000
+Production: https://engineer-cafe-navigator.vercel.app/api
+Development: http://localhost:3000/api
 ```
+
+## 🔐 Authentication
+
+The API uses Service Account authentication for Google Cloud services. Session-based authentication is used for client requests.
+
+### Service Account Setup
+
+1. Create a service account in Google Cloud Console
+2. Grant roles: `roles/speech.client`
+3. Download JSON key and place at `./config/service-account-key.json`
+4. Set environment variable: `GOOGLE_CLOUD_CREDENTIALS=./config/service-account-key.json`
 
 ## 🎤 音声処理 API
 
@@ -38,11 +54,20 @@ Engineer Cafe Navigator は以下のRESTful APIエンドポイントを提供し
 ```json
 {
   "action": "process_voice",
-  "audioData": "data:audio/wav;base64,UklGRt4DAABXQVZFZm10...",
+  "audioData": "base64-encoded-audio-data",
   "sessionId": "uuid-session-id",
   "language": "ja"
 }
 ```
+
+**Additional Actions:**
+- `start_session`: Start a new conversation session
+- `end_session`: End the current session
+- `set_language`: Change session language
+- `get_conversation_state`: Get current conversation state
+- `clear_conversation`: Clear conversation history
+- `handle_interruption`: Handle user interruption
+- `detect_language`: Auto-detect language from text
 
 **Parameters:**
 - `action` (string, required): 実行する操作
@@ -55,16 +80,55 @@ Engineer Cafe Navigator は以下のRESTful APIエンドポイントを提供し
 
 #### レスポンス
 
-**成功 (200):**
+**Success (200):**
 ```json
 {
   "success": true,
   "transcript": "エンジニアカフェについて教えてください",
   "response": "エンジニアカフェは福岡市にある...",
-  "audioResponse": "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAWGluZ...",
+  "audioResponse": "base64-encoded-mp3-audio",
   "shouldUpdateCharacter": true,
   "characterAction": "greeting",
+  "emotion": {
+    "emotion": "explaining",
+    "intensity": 0.75,
+    "confidence": 0.82,
+    "duration": 2500
+  },
   "sessionId": "uuid-session-id"
+}
+```
+
+### Session Management Examples
+
+**Start Session:**
+```json
+// Request
+{
+  "action": "start_session",
+  "visitorId": "visitor-123",
+  "language": "ja"
+}
+
+// Response
+{
+  "success": true,
+  "sessionId": "5caaff9e-bae9-4131-bf49-01c6694a3e9c"
+}
+```
+
+**End Session:**
+```json
+// Request
+{
+  "action": "end_session",
+  "sessionId": "5caaff9e-bae9-4131-bf49-01c6694a3e9c"
+}
+
+// Response
+{
+  "success": true,
+  "message": "Session ended"
 }
 ```
 
@@ -254,30 +318,91 @@ Marpスライドのレンダリング
 - `action` (string, required): 実行する操作
   - `setExpression`: 表情設定
   - `playAnimation`: アニメーション再生
+  - `setEmotion`: 感情に基づく表情設定
+  - `detectEmotion`: テキストから感情検出
   - `setLighting`: ライティング調整
   - `supported_features`: 対応機能一覧
 - `expression` (string): 表情名
   - `neutral`: 中立
-  - `friendly`: フレンドリー
+  - `happy`: 喜び
+  - `sad`: 悲しみ
+  - `angry`: 怒り
   - `surprised`: 驚き
   - `thinking`: 考え中
+  - `explaining`: 説明中
+  - `greeting`: 挨拶
+  - `speaking`: 話し中
+  - `listening`: 聞いている
+- `emotion` (string): 感情名（上記表情名と同様）
+- `text` (string): 感情検出用テキスト
+- `language` (string): 言語設定 (`ja` | `en`)
 - `animation` (string): アニメーション名
 - `transition` (boolean): スムーズ遷移の有無
 - `duration` (number): 持続時間（ミリ秒）
 
-#### レスポンス
+#### レスポンス例
 
+**表情設定レスポンス:**
 ```json
 {
   "success": true,
-  "message": "表情を 'friendly' に設定しました",
+  "message": "表情を 'happy' に設定しました",
   "currentState": {
-    "expression": "friendly",
+    "expression": "happy",
     "animation": "idle",
     "lighting": {
       "intensity": 1.0,
       "ambient": 0.3
     }
+  }
+}
+```
+
+**感情検出レスポンス:**
+```json
+{
+  "success": true,
+  "result": {
+    "text": "こんにちは！今日はとても嬉しいです！",
+    "language": "ja",
+    "emotionData": {
+      "emotion": "happy",
+      "intensity": 0.85,
+      "confidence": 0.92,
+      "duration": 2000
+    },
+    "vrmMapping": {
+      "primary": "happy",
+      "secondary": "relaxed",
+      "weight": 0.78,
+      "blinkOverride": 0.2
+    },
+    "suggestions": {
+      "expression": "happy",
+      "animation": "greeting"
+    }
+  }
+}
+```
+
+**感情設定レスポンス:**
+```json
+{
+  "success": true,
+  "result": {
+    "emotion": "happy",
+    "vrmMapping": {
+      "primary": "happy",
+      "secondary": "relaxed",
+      "weight": 0.64
+    },
+    "emotionData": {
+      "emotion": "happy",
+      "intensity": 0.8,
+      "confidence": 0.9,
+      "duration": 2000
+    },
+    "transition": true
   }
 }
 ```
@@ -508,11 +633,17 @@ curl -X POST http://localhost:3000/api/voice \
 - **Issues**: [GitHub Issues](https://github.com/your-org/engineer-cafe-navigator/issues)
 - **API Status**: [ステータスページ](https://status.engineer-cafe-navigator.vercel.app)
 
-### 更新履歴
+### Changelog
 
-- **v1.0.0** (2024-01-20): 初期リリース
-- **v1.1.0** (2024-01-25): セキュリティ強化、XSS対策追加
-- **v1.2.0** (2024-01-30): 背景制御API追加
+- **v1.0.0** (2024-01-20): Initial release
+- **v1.1.0** (2024-01-25): Security enhancements, XSS protection
+- **v1.2.0** (2024-01-30): Background control API added
+- **v2.0.0** (2025-05-30): 
+  - Service Account authentication
+  - Supabase memory integration
+  - Multi-turn conversation support
+  - Simplified voice service for Next.js compatibility
+  - Session management improvements
 
 ---
 

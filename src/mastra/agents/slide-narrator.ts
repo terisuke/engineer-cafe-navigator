@@ -8,10 +8,12 @@ export class SlideNarrator extends Agent {
   private autoPlay: boolean = false;
   private narrationData: any = null;
   private memory: any;
+  private _tools: Map<string, any> = new Map();
 
-  constructor(mastra: any) {
+  constructor(config: any) {
     super({
       name: 'SlideNarrator',
+      model: config.llm.model,
       instructions: `You are a slide narration agent for Engineer Cafe presentations.
         Your role is to:
         1. Provide scripted narration for each slide
@@ -23,18 +25,21 @@ export class SlideNarrator extends Agent {
         Deliver narrations in a clear, engaging manner.
         Respond to navigation commands promptly.
         Provide informative answers to content questions.`,
-      model: 'gemini-2.5-flash-preview-05-20',
-      tools: [],
     });
     
     // Initialize memory
-    this.memory = mastra.memory || new Map();
+    this.memory = config.memory || new Map();
+  }
+
+  // Method to add tools to this agent
+  addTool(name: string, tool: any) {
+    this._tools.set(name, tool);
   }
 
   async loadNarration(slideFile: string, language: SupportedLanguage): Promise<void> {
     try {
       // Load narration JSON for the specified language
-      const narrationLoader = this.tools.get('narrationLoader');
+      const narrationLoader = this._tools.get('narrationLoader');
       this.narrationData = await narrationLoader.loadNarration(slideFile, language);
       this.totalSlides = this.narrationData.slides.length;
       this.currentSlide = 1;
@@ -76,7 +81,7 @@ export class SlideNarrator extends Agent {
     const narration = slideData.narration.auto;
     
     // Convert narration to speech
-    const voiceService = this.tools.get('voiceService');
+    const voiceService = this._tools.get('voiceService');
     // Get language from memory
     let language: SupportedLanguage = 'ja';
     if (this.memory && typeof this.memory.get === 'function') {
@@ -245,8 +250,10 @@ export class SlideNarrator extends Agent {
       ? `Answer this question about slide ${this.currentSlide}: ${question}\nSlide context: ${slideContext}`
       : `スライド${this.currentSlide}について以下の質問に答えてください: ${question}\nスライドの内容: ${slideContext}`;
     
-    const response = await this.run(prompt);
-    return response;
+    const response = await this.generate([
+      { role: 'user', content: prompt }
+    ]);
+    return response.text;
   }
 
   private determineCharacterAction(slideData: any): string {

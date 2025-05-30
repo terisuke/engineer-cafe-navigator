@@ -223,7 +223,7 @@ export class LanguageSwitchTool {
 
       // TODO: Implement actual translation using Google Cloud Translation API
       // For now, provide some common phrase translations
-      const translatedText = await this.performTranslation(text, sourceLanguage, targetLanguage);
+      const translatedText = await this.performTranslation(text, sourceLanguage || 'auto', targetLanguage);
 
       return {
         success: true,

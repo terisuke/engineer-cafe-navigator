@@ -3,9 +3,13 @@ import { z } from 'zod';
 import { SupportedLanguage } from '../types/config';
 
 export class QAAgent extends Agent {
-  constructor(mastra: any) {
+  private memory: any;
+  private _tools: Map<string, any> = new Map();
+
+  constructor(config: any) {
     super({
       name: 'QAAgent',
+      model: config.llm.model,
       instructions: `You are a knowledgeable Q&A agent for Engineer Cafe in Fukuoka.
         Your role is to:
         1. Answer questions about Engineer Cafe services, facilities, and policies
@@ -17,10 +21,13 @@ export class QAAgent extends Agent {
         Use the RAG tools to search for accurate, up-to-date information.
         If you don't have specific information, politely say so and offer alternatives.
         Always be helpful and professional.`,
-      model: 'gemini-2.5-flash-preview-05-20',
-      tools: [],
-      memory: mastra.memory,
     });
+    this.memory = config.memory || new Map();
+  }
+
+  // Method to add tools to this agent
+  addTool(name: string, tool: any) {
+    this._tools.set(name, tool);
   }
 
   async answerQuestion(question: string): Promise<string> {
@@ -33,8 +40,10 @@ export class QAAgent extends Agent {
       ? `Based on the following context about Engineer Cafe, answer this question: ${question}\n\nContext: ${context}`
       : `エンジニアカフェについて以下の情報を参考に、この質問に答えてください: ${question}\n\n参考情報: ${context}`;
     
-    const response = await this.run(prompt);
-    return response;
+    const response = await this.generate([
+      { role: 'user', content: prompt }
+    ]);
+    return response.text;
   }
 
   private async searchKnowledgeBase(query: string): Promise<string> {

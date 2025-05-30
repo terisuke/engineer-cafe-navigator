@@ -1,6 +1,7 @@
 import { Mastra } from '@mastra/core';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { Config } from './types/config';
-import { GoogleCloudVoiceService } from './voice/google-cloud-voice';
+import { GoogleCloudVoiceServiceSimple } from './voice/google-cloud-voice-simple';
 import { WelcomeAgent } from './agents/welcome-agent';
 import { QAAgent } from './agents/qa-agent';
 import { RealtimeAgent } from './agents/realtime-agent';
@@ -21,21 +22,12 @@ export class EngineerCafeNavigator {
   private config: Config;
   private agents: Map<string, any> = new Map();
   private tools: Map<string, any> = new Map();
-  private voiceService: GoogleCloudVoiceService;
+  private voiceService!: GoogleCloudVoiceServiceSimple;
 
   constructor(config: Config) {
     this.config = config;
     this.mastra = new Mastra({
-      name: 'Engineer Cafe Navigator',
-      version: '1.0.0',
-      description: 'Multi-language voice AI agent for Engineer Cafe',
-      // Disable built-in memory for now to avoid SQLite issues
-      // We'll use our custom SupabaseMemoryAdapter instead
-      observability: {
-        enabled: true,
-        trace: true,
-        metrics: true,
-      },
+      agents: {},
     });
 
     this.initializeServices();
@@ -45,15 +37,28 @@ export class EngineerCafeNavigator {
 
   private initializeServices() {
     // Initialize Google Cloud Voice Service
-    this.voiceService = new GoogleCloudVoiceService(this.config.googleCloud);
+    this.voiceService = new GoogleCloudVoiceServiceSimple(this.config.googleCloud);
   }
 
   private initializeAgents() {
-    // Initialize agents
-    const welcomeAgent = new WelcomeAgent(this.mastra);
-    const qaAgent = new QAAgent(this.mastra);
-    const realtimeAgent = new RealtimeAgent(this.mastra);
-    const slideNarrator = new SlideNarrator(this.mastra);
+    // Initialize agents with model configuration
+    const google = createGoogleGenerativeAI({
+      apiKey: this.config.gemini.apiKey,
+    });
+    
+    const model = google(this.config.gemini.model);
+    
+    const modelConfig = {
+      llm: {
+        model,
+      },
+      memory: this.mastra.memory,
+    };
+    
+    const welcomeAgent = new WelcomeAgent(modelConfig);
+    const qaAgent = new QAAgent(modelConfig);
+    const realtimeAgent = new RealtimeAgent(modelConfig, this.voiceService);
+    const slideNarrator = new SlideNarrator(modelConfig);
 
     this.agents.set('welcome', welcomeAgent);
     this.agents.set('qa', qaAgent);
