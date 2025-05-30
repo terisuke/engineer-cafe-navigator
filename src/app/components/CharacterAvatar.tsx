@@ -16,7 +16,10 @@ interface CharacterState {
 }
 
 export interface BackgroundOption {
+  id?: string;
+  name?: string;
   type: 'solid' | 'gradient' | 'image';
+  value?: string;
   color1?: string;
   color2?: string;
   angle?: number;
@@ -31,6 +34,9 @@ interface CharacterAvatarProps {
   showControls?: boolean;
   background?: BackgroundOption;
   lightingIntensity?: number;
+  cameraPositionOffset?: { x: number; y: number; z: number };
+  modelPositionOffset?: { x: number; y: number; z: number };
+  modelRotationOffset?: { x: number; y: number; z: number };
   onCharacterLoad?: (character: VRM) => void;
   onStateChange?: (state: CharacterState) => void;
 }
@@ -48,6 +54,9 @@ export default function CharacterAvatar({
     angle: 135
   },
   lightingIntensity = 1,
+  cameraPositionOffset = { x: 0, y: 0, z: 0 },
+  modelPositionOffset = { x: 0, y: 0, z: 0 },
+  modelRotationOffset = { x: 0, y: 0, z: 0 },
   onCharacterLoad,
   onStateChange,
 }: CharacterAvatarProps) {
@@ -92,6 +101,40 @@ useEffect(() => {
       loadCharacter();
     }
   }, [modelPath]);
+
+  // Update camera position when offset changes
+  useEffect(() => {
+    if (cameraRef.current) {
+      cameraRef.current.position.set(
+        0 + cameraPositionOffset.x,
+        1.4 + cameraPositionOffset.y,
+        1.5 + cameraPositionOffset.z
+      );
+      cameraRef.current.lookAt(0 + cameraPositionOffset.x, 1, 0);
+    }
+  }, [cameraPositionOffset]);
+
+  // Update model position when offset changes
+  useEffect(() => {
+    if (charactersRef.current) {
+      charactersRef.current.scene.position.set(
+        modelPositionOffset.x,
+        modelPositionOffset.y,
+        modelPositionOffset.z
+      );
+    }
+  }, [modelPositionOffset]);
+
+  // Update model rotation when offset changes
+  useEffect(() => {
+    if (charactersRef.current) {
+      charactersRef.current.scene.rotation.set(
+        modelRotationOffset.x,
+        Math.PI + modelRotationOffset.y,
+        modelRotationOffset.z
+      );
+    }
+  }, [modelRotationOffset]);
 
   // Update character state when props change
   useEffect(() => {
@@ -187,10 +230,12 @@ useEffect(() => {
       sceneRef.current.background = new THREE.Color(color);
     } else if (options.type === 'gradient') {
       sceneRef.current.background = createGradientTexture(options);
-    } else if (options.type === 'image' && options.imageUrl) {
+    } else if (options.type === 'image' && (options.imageUrl || options.value)) {
       const loader = new THREE.TextureLoader();
-      loader.load(
-        options.imageUrl,
+      const imageUrl = options.imageUrl || options.value || '';
+      if (imageUrl) {
+        loader.load(
+          imageUrl,
         (texture) => {
           texture.colorSpace = THREE.SRGBColorSpace;
           if (sceneRef.current) {
@@ -210,7 +255,8 @@ useEffect(() => {
             sceneRef.current.background = new THREE.Color('#f5f5f5');
           }
         }
-      );
+        );
+      }
     } else {
       sceneRef.current.background = new THREE.Color('#f5f5f5');
     }
@@ -239,8 +285,12 @@ useEffect(() => {
       0.1,
       1000
     );
-    camera.position.set(0, 1.4, 1.5);
-    camera.lookAt(0, 1, 0);
+    camera.position.set(
+      0 + cameraPositionOffset.x, 
+      1.4 + cameraPositionOffset.y, 
+      1.5 + cameraPositionOffset.z
+    );
+    camera.lookAt(0 + cameraPositionOffset.x, 1, 0);
     cameraRef.current = camera;
 
     // Renderer
@@ -333,7 +383,18 @@ useEffect(() => {
       charactersRef.current = vrm;
 
       // Rotate character 180 degrees to face forward
-      vrm.scene.rotation.y = Math.PI;
+      vrm.scene.rotation.set(
+        modelRotationOffset.x,
+        Math.PI + modelRotationOffset.y,
+        modelRotationOffset.z
+      );
+      
+      // Set initial position
+      vrm.scene.position.set(
+        modelPositionOffset.x,
+        modelPositionOffset.y,
+        modelPositionOffset.z
+      );
 
       // Set initial pose
       await updateCharacterExpression(characterState.expression);
