@@ -38,6 +38,16 @@ export class VRMUtils {
     'lookUp', 'lookDown', 'lookLeft', 'lookRight'
   ];
 
+  // Lip-sync viseme mapping
+  private static visemeMapping = {
+    'A': 'aa',
+    'I': 'ih', 
+    'U': 'ou',
+    'E': 'ee',
+    'O': 'oh',
+    'Closed': 'neutral'
+  };
+
   private static humanoidBoneNames = [
     'hips', 'spine', 'chest', 'upperChest', 'neck', 'head',
     'leftShoulder', 'leftUpperArm', 'leftLowerArm', 'leftHand',
@@ -305,9 +315,12 @@ export class VRMUtils {
     if (!lookAt) return;
 
     if (target instanceof THREE.Vector3) {
-      lookAt.target = target;
+      // Create a temporary object at the target position
+      const targetObject = new THREE.Object3D();
+      targetObject.position.copy(target);
+      lookAt.target = targetObject;
     } else {
-      lookAt.target = target.position;
+      lookAt.target = target;
     }
   }
 
@@ -315,7 +328,9 @@ export class VRMUtils {
     const lookAt = vrm.lookAt;
     if (!lookAt) return;
 
-    lookAt.enabled = enabled;
+    // Note: VRM lookAt API varies by version
+    // TODO: Update according to the VRM library version being used
+    // lookAt.enabled = enabled;
   }
 
   static setLookAtEyeDirection(vrm: VRM, direction: THREE.Vector3): void {
@@ -626,5 +641,221 @@ export class VRMAnimationManager {
     this.mixer.stopAllAction();
     this.clips.clear();
     this.currentAction = null;
+  }
+}
+
+// VRM BlendShape Controller for Lip-sync and Expressions
+export class VRMBlendShapeController {
+  private vrm: VRM;
+  private currentViseme: string = 'neutral';
+  private currentExpression: Record<string, number> = { neutral: 1.0 };
+  private animationFrame: number | null = null;
+
+  constructor(vrm: VRM) {
+    this.vrm = vrm;
+  }
+
+  /**
+   * Set facial expression
+   */
+  setExpression(expressionName: string, weight: number): void {
+    if (!this.vrm.expressionManager) {
+      console.warn('VRM expressionManager not available');
+      return;
+    }
+
+    try {
+      const expression = this.vrm.expressionManager.getExpression(expressionName);
+      if (expression) {
+        const clampedWeight = Math.max(0, Math.min(1, weight));
+        expression.weight = clampedWeight;
+        console.log(`Set expression "${expressionName}" to weight ${clampedWeight}`);
+      } else {
+        console.warn(`Expression "${expressionName}" not found in VRM model`);
+      }
+    } catch (error) {
+      console.warn(`Error setting expression "${expressionName}":`, error);
+    }
+  }
+
+  /**
+   * Set multiple expressions at once
+   */
+  setExpressions(expressions: Record<string, number>): void {
+    Object.entries(expressions).forEach(([name, weight]) => {
+      this.setExpression(name, weight);
+    });
+    this.currentExpression = { ...expressions };
+  }
+
+  /**
+   * Set viseme for lip-sync
+   */
+  setViseme(viseme: string, intensity: number = 1.0): void {
+    if (!this.vrm.expressionManager) return;
+
+    // Clear previous viseme
+    if (this.currentViseme && this.currentViseme !== viseme) {
+      this.setExpression(this.currentViseme, 0);
+    }
+
+    // Set new viseme
+    this.setExpression(viseme, intensity);
+    this.currentViseme = viseme;
+  }
+
+  /**
+   * Apply lip-sync frame data
+   */
+  applyLipSyncFrame(frame: import('./lip-sync-analyzer').LipSyncFrame): void {
+    const visemeMap = VRMUtils.visemeMapping;
+    const vrmViseme = visemeMap[frame.mouthShape as keyof typeof visemeMap] || 'neutral';
+    
+    this.setViseme(vrmViseme, frame.mouthOpen);
+  }
+
+  /**
+   * Apply expression data
+   */
+  applyExpressionData(expressionData: import('./expression-controller').ExpressionData): void {
+    this.setExpressions(expressionData);
+  }
+
+  /**
+   * Start automatic blinking
+   */
+  startAutoBlink(): () => void {
+    let blinkTimeout: NodeJS.Timeout;
+    
+    const scheduleNextBlink = () => {
+      const nextBlinkTime = 2000 + Math.random() * 4000; // 2-6 seconds
+      blinkTimeout = setTimeout(() => {
+        this.performBlink();
+        scheduleNextBlink();
+      }, nextBlinkTime);
+    };
+
+    scheduleNextBlink();
+
+    // Return cleanup function
+    return () => {
+      if (blinkTimeout) {
+        clearTimeout(blinkTimeout);
+      }
+    };
+  }
+
+  /**
+   * Perform a single blink animation
+   */
+  private performBlink(): void {
+    if (!this.vrm.expressionManager) return;
+
+    // Quick blink
+    this.setExpression('blink', 1.0);
+    
+    setTimeout(() => {
+      this.setExpression('blink', 0.0);
+    }, 150);
+  }
+
+  /**
+   * Animate expression transition
+   */
+  animateToExpression(
+    targetExpression: Record<string, number>, 
+    duration: number = 1000
+  ): Promise<void> {
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      const startExpression = { ...this.currentExpression };
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease-out animation
+        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        
+        // Interpolate expressions
+        const currentFrame: Record<string, number> = {};
+        
+        // Handle existing expressions
+        Object.keys(startExpression).forEach(key => {
+          const start = startExpression[key] || 0;
+          const target = targetExpression[key] || 0;
+          currentFrame[key] = start + (target - start) * easeProgress;
+        });
+        
+        // Handle new expressions
+        Object.keys(targetExpression).forEach(key => {
+          if (!(key in startExpression)) {
+            currentFrame[key] = targetExpression[key] * easeProgress;
+          }
+        });
+        
+        this.setExpressions(currentFrame);
+        
+        if (progress < 1) {
+          this.animationFrame = requestAnimationFrame(animate);
+        } else {
+          this.currentExpression = { ...targetExpression };
+          resolve();
+        }
+      };
+      
+      if (this.animationFrame) {
+        cancelAnimationFrame(this.animationFrame);
+      }
+      
+      animate();
+    });
+  }
+
+  /**
+   * Reset all expressions to neutral
+   */
+  resetToNeutral(): void {
+    if (!this.vrm.expressionManager) return;
+
+    // Get all available expressions and set them to 0
+    const expressions = this.vrm.expressionManager.expressions;
+    expressions.forEach(expression => {
+      expression.weight = 0;
+    });
+
+    // Set neutral to 1
+    this.setExpression('neutral', 1.0);
+    this.currentExpression = { neutral: 1.0 };
+    this.currentViseme = 'neutral';
+  }
+
+  /**
+   * Get available expressions
+   */
+  getAvailableExpressions(): string[] {
+    if (!this.vrm.expressionManager) return [];
+    
+    return this.vrm.expressionManager.expressions.map(expr => expr.expressionName);
+  }
+
+  /**
+   * Get current expression weights
+   */
+  getCurrentExpressions(): Record<string, number> {
+    if (!this.vrm.expressionManager) return {};
+    
+    const current: Record<string, number> = {};
+    this.vrm.expressionManager.expressions.forEach(expr => {
+      current[expr.expressionName] = expr.weight;
+    });
+    
+    return current;
+  }
+
+  dispose(): void {
+    if (this.animationFrame) {
+      cancelAnimationFrame(this.animationFrame);
+    }
   }
 }

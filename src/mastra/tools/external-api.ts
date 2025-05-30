@@ -399,7 +399,6 @@ export class ExternalApiTool {
       try {
         const response = await fetch(`${this.config.receptionApiUrl}/health`, { 
           method: 'GET',
-          timeout: 5000 as any,
         });
         receptionApiStatus = response.ok ? 'available' : 'unavailable';
       } catch (error) {

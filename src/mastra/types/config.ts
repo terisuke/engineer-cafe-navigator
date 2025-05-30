@@ -2,7 +2,7 @@ export interface Config {
   googleCloud: {
     projectId: string;
     credentials: string;
-    speechApiKey: string;
+    speechApiKey?: string; // Optional - not needed with service account
     translateApiKey?: string;
   };
   gemini: {

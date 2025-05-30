@@ -53,6 +53,10 @@ export class SupabaseMemoryAdapter {
     }
   }
 
+  async set(key: string, value: any, ttl?: number): Promise<void> {
+    return this.store(key, value, ttl);
+  }
+
   async delete(key: string): Promise<void> {
     try {
       const { error } = await supabaseAdmin

@@ -12,6 +12,17 @@
 
 Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福岡市エンジニアカフェの新規顧客対応を自動化する**多言語対応音声AIエージェントシステム**です。Mastraフレームワークを活用し、スタッフの負担軽減と顧客満足度向上を目指します。
 
+### 🆕 最新アップデート (2025/05/30)
+
+#### ✅ 実装完了
+- **Service Account認証への移行** - APIキー不要でより安全な認証方式に
+- **Supabaseメモリアダプタ統合** - 永続的な会話履歴とセッション管理
+- **マルチターン会話対応** - 文脈を保持した自然な対話が可能に
+- **Google Cloud Voice Service** - TTS/STT完全統合、Service Account認証
+- **感情認識システム** - テキストから感情を検出し、VRM表情制御に連携
+- **VRM表情アニメーション** - 会話内容に応じた自動表情変化
+- **会話文脈保持** - 感情を含む詳細な会話履歴の永続化
+
 ### 🎯 主な目的
 
 - **新規顧客対応の自動化**: 音声による案内とQ&A対応
@@ -25,10 +36,12 @@ Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福
 | 機能カテゴリ          | 機能詳細                       |
 |-------------------|----------------------------|
 | 🎤 **音声対話**   | リアルタイム音声認識・合成、割り込み対応 |
+| 🎭 **感情認識**   | テキスト解析による感情検出、VRM表情制御 |
 | 📊 **動的スライド**   | Marp Markdown、音声ナレーション連動   |
-| 🤖 **3Dキャラクター**   | VRMアバター、表情・動作制御          |
-| 🌐 **多言語対応** | 日本語・英語切り替え              |
+| 🤖 **3Dキャラクター**   | VRMアバター、感情連動表情・動作制御      |
+| 🌐 **多言語対応** | 日本語・英語切り替え、多言語感情認識    |
 | 🔍 **RAG Q&A**    | 知識ベースからのリアルタイム回答           |
+| 💾 **会話記憶**   | Supabase永続化、文脈保持機能        |
 | 🔗 **外部連携**   | WebSocket受付システム統合          |
 | 🎨 **背景制御**   | 動的背景画像変更、グラデーション対応     |
 | 🔒 **セキュリティ**  | XSS対策、iframe サンドボックス化     |
@@ -137,17 +150,20 @@ cp .env.example .env
 `.env`ファイルを編集：
 
 ```env
-# 🔑 Google Cloud
+# 🔑 Google Cloud (Service Account認証)
 GOOGLE_CLOUD_PROJECT_ID=your-gcp-project-id
-GOOGLE_SPEECH_API_KEY=your-speech-api-key
-GOOGLE_TRANSLATE_API_KEY=your-translate-api-key
+GOOGLE_CLOUD_CREDENTIALS=./config/service-account-key.json
+# APIキーは不要になりました（Service Accountで認証）
 
 # 🤖 Gemini AI
 GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
 GEMINI_MODEL=gemini-2.5-flash-preview-05-20
 
-# 🗄️ Database
-POSTGRES_URL=postgresql://user:password@localhost:5432/engineer_cafe_navigator
+# 🗄️ Database (Supabase)
+POSTGRES_URL=postgresql://postgres:password@db.project.supabase.co:5432/postgres
+NEXT_PUBLIC_SUPABASE_URL=https://project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # 🌐 Next.js
 NEXTAUTH_URL=http://localhost:3000
@@ -158,7 +174,31 @@ WEBSOCKET_URL=ws://localhost:8080
 RECEPTION_API_URL=http://localhost:8080/api
 ```
 
+#### Service Account 設定
+
+1. **Service Account作成**:
+   ```bash
+   # Google Cloud Console で Service Account を作成
+   # 必要な権限: Cloud Speech-to-Text User, Cloud Text-to-Speech User
+   ```
+
+2. **キーファイル配置**:
+   ```bash
+   # ダウンロードしたJSONキーを配置
+   cp ~/Downloads/service-account-key.json ./config/service-account-key.json
+   ```
+
 ### 4. データベースのセットアップ
+
+#### Supabaseを使用する場合（推奨）
+
+```bash
+# Supabaseプロジェクトで自動的にPostgreSQL + pgvectorが利用可能
+# マイグレーションの実行
+pnpm supabase migration up
+```
+
+#### ローカルPostgreSQLを使用する場合
 
 ```bash
 # PostgreSQL + pgvectorのインストール (macOS)
@@ -169,6 +209,9 @@ createdb engineer_cafe_navigator
 
 # pgvector拡張の有効化
 psql engineer_cafe_navigator -c "CREATE EXTENSION IF NOT EXISTS vector;"
+
+# マイグレーション実行
+psql engineer_cafe_navigator < supabase/migrations/20250529005253_init_engineer_cafe_navigator.sql
 ```
 
 ### 5. VRMキャラクターモデルの配置
@@ -468,8 +511,34 @@ const mastra = new Mastra({
 # 2. HTTPSの確認（本番環境）
 # localhostは例外なのでHTTPでも動作
 
-# 3. Google Cloud APIキーの確認
-echo $GOOGLE_SPEECH_API_KEY
+# 3. Service Account権限の確認
+gcloud projects get-iam-policy $GOOGLE_CLOUD_PROJECT_ID \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:serviceAccount:*"
+
+# 4. Google Cloud APIの有効化確認
+gcloud services list --enabled --filter="name:(speech|texttospeech)"
+```
+
+#### 🔐 Service Account認証エラー
+
+**症状**: "Could not refresh access token" エラー
+
+**解決方法**:
+```bash
+# 1. Service Accountキーファイルの確認
+ls -la config/service-account-key.json
+
+# 2. 必要な権限の付与
+gcloud projects add-iam-policy-binding $GOOGLE_CLOUD_PROJECT_ID \
+  --member="serviceAccount:YOUR_SERVICE_ACCOUNT_EMAIL" \
+  --role="roles/speech.client"
+
+# 3. APIの有効化
+gcloud services enable speech.googleapis.com texttospeech.googleapis.com
+
+# 4. 環境変数の確認
+cat .env | grep GOOGLE_CLOUD
 ```
 
 #### 🤖 キャラクターが表示されない
