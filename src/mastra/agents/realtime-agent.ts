@@ -1,5 +1,4 @@
 import { Agent } from '@mastra/core';
-import { z } from 'zod';
 import { SupportedLanguage } from '../types/config';
 import { SupabaseMemoryAdapter, ConversationManager } from '@/lib/supabase-memory';
 import { EmotionManager, EmotionData } from '@/lib/emotion-manager';
@@ -29,22 +28,19 @@ export class RealtimeAgent extends Agent {
         You must include emotion tags in your responses to control the VRM character's facial expressions.
         Use emotion tags at the beginning of sentences or phrases to indicate the character's emotion.
         
-        Available emotion tags:
-        [happy] - for joyful, excited, cheerful responses
-        [sad] - for disappointed, melancholy responses  
+        Available emotion tags (aituber-kit standard):
+        [neutral] - for calm, normal, explaining responses
+        [happy] - for joyful, excited, cheerful, greeting responses
+        [sad] - for disappointed, melancholy, apologetic responses  
         [angry] - for frustrated, annoyed responses
+        [relaxed] - for thinking, pondering, listening responses
         [surprised] - for shocked, amazed responses
-        [thinking] - for pondering, considering responses
-        [explaining] - for teaching, describing responses
-        [greeting] - for welcoming, introductory responses
-        [listening] - for attentive, focused responses
-        [neutral] - for calm, normal responses
         
         You can also specify intensity: [happy:0.8] (0.0-1.0)
         
         Examples:
-        Japanese: "[greeting]はじめまして！[happy]今日はとても良い天気ですね。[thinking]何かお手伝いできることはありますか？"
-        English: "[greeting]Hello there! [happy]It's such a beautiful day today. [thinking]How can I help you?"
+        Japanese: "[happy]はじめまして！[neutral]今日はとても良い天気ですね。[relaxed]何かお手伝いできることはありますか？"
+        English: "[happy]Hello there! [neutral]It's such a beautiful day today. [relaxed]How can I help you?"
         
         Keep responses conversational and natural.
         Handle interruptions gracefully.
@@ -63,10 +59,13 @@ export class RealtimeAgent extends Agent {
   async processVoiceInput(audioBuffer: ArrayBuffer): Promise<{
     transcript: string;
     response: string;
+    rawResponse?: string;
     audioResponse: ArrayBuffer;
     shouldUpdateCharacter: boolean;
     characterAction?: string;
     emotion?: EmotionData;
+    emotionTags?: any[];
+    primaryEmotion?: string;
   }> {
     try {
       this.conversationState = 'processing';
@@ -116,8 +115,7 @@ export class RealtimeAgent extends Agent {
         emotion = EmotionManager.detectConversationEmotion(
           transcript,
           cleanResponse,
-          conversationHistory,
-          language
+          conversationHistory
         );
         console.log('Using fallback emotion detection:', emotion);
       }
@@ -156,7 +154,32 @@ export class RealtimeAgent extends Agent {
   }
 
   async generateResponse(input: string): Promise<string> {
-    const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+    let language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+    
+    // Auto-detect language from input if confidence is high enough
+    const languageTool = this._tools.get('languageSwitch');
+    if (languageTool) {
+      try {
+        const detection = await languageTool.execute({
+          action: 'detectLanguage',
+          text: input,
+        });
+        
+        if (detection.success && detection.result.confidence >= 0.8) {
+          const detectedLanguage = detection.result.detectedLanguage;
+          
+          // Switch language if detected language is different and confidence is high
+          if (detectedLanguage !== language) {
+            console.log(`Auto-switching language from ${language} to ${detectedLanguage} (confidence: ${detection.result.confidence})`);
+            await this.setLanguage(detectedLanguage);
+            language = detectedLanguage;
+          }
+        }
+      } catch (error) {
+        console.error('Language detection error:', error);
+      }
+    }
+    
     const currentMode = await this.supabaseMemory.get('currentMode') || 'welcome';
     
     // Get conversation context
@@ -200,9 +223,11 @@ export class RealtimeAgent extends Agent {
   ): string {
     const systemPrompt = language === 'en'
       ? `You are assisting a visitor at Engineer Cafe. Current mode: ${mode}. 
-         Respond naturally and helpfully to their voice input.`
+         IMPORTANT: Respond ONLY in English. Use emotion tags like [happy], [neutral], [relaxed], etc.
+         Respond naturally and helpfully to their voice input in English.`
       : `エンジニアカフェの来訪者をサポートしています。現在のモード: ${mode}。
-         音声入力に自然で親切に応答してください。`;
+         重要: 日本語のみで応答してください。[happy]、[neutral]、[relaxed]などの感情タグを使用してください。
+         音声入力に自然で親切に日本語で応答してください。`;
 
     const contextHistory = history.length > 0 
       ? `Previous conversation:\n${history.slice(-6).map(h => `${h.role}: ${h.content}`).join('\n')}\n\n`
@@ -215,15 +240,12 @@ export class RealtimeAgent extends Agent {
     // Prioritize emotion-based action if emotion is detected with high confidence
     if (emotion && emotion.confidence > 0.6) {
       const emotionActions: Record<string, string> = {
+        'neutral': 'neutral',
         'happy': 'greeting',
         'sad': 'thinking',
         'angry': 'explaining',
+        'relaxed': 'thinking',
         'surprised': 'greeting',
-        'thinking': 'thinking',
-        'explaining': 'explaining',
-        'greeting': 'greeting',
-        'speaking': 'explaining',
-        'listening': 'thinking',
       };
       
       if (emotionActions[emotion.emotion]) {

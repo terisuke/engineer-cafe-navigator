@@ -20,17 +20,14 @@ export interface VRMExpressionMapping {
 }
 
 export class EmotionManager {
+  // aituber-kit standardized emotions: neutral, happy, sad, angry, relaxed, surprised
   private static readonly EMOTION_KEYWORDS = {
-    happy: ['嬉しい', 'happy', '楽しい', 'fun', '笑い', 'laugh', '喜び', 'joy', 'ありがとう', 'thank', '素晴らしい', 'wonderful', 'great'],
-    sad: ['悲しい', 'sad', '残念', 'sorry', '寂しい', 'lonely', '困った', 'trouble', 'がっかり', 'disappointed'],
-    angry: ['怒り', 'angry', '腹立つ', 'mad', 'イライラ', 'irritated', '許せない', 'unforgivable', 'ムカつく', 'annoying'],
-    surprised: ['驚き', 'surprised', 'びっくり', 'shocked', '信じられない', 'unbelievable', 'まさか', 'no way', 'えっ', 'what'],
-    thinking: ['考える', 'think', '思う', 'believe', 'どうしよう', 'what to do', '迷う', 'confused', 'うーん', 'hmm'],
-    explaining: ['説明', 'explain', '教える', 'teach', 'つまり', 'in other words', 'というのは', 'that is', '例えば', 'for example'],
-    greeting: ['こんにちは', 'hello', 'はじめまして', 'nice to meet', 'おはよう', 'good morning', 'こんばんは', 'good evening'],
-    speaking: ['話す', 'speak', '言う', 'say', '伝える', 'tell', '発表', 'present', '報告', 'report'],
-    listening: ['聞く', 'listen', '分かります', 'understand', 'なるほど', 'I see', 'そうですね', 'that\'s right'],
-    neutral: ['です', 'is', 'ます', 'polite ending', 'について', 'about', '普通', 'normal', '通常', 'usual']
+    neutral: ['です', 'is', 'ます', 'polite ending', 'について', 'about', '普通', 'normal', '通常', 'usual', '説明', 'explain', '教える', 'teach'],
+    happy: ['嬉しい', 'happy', '楽しい', 'fun', '笑い', 'laugh', '喜び', 'joy', 'ありがとう', 'thank', '素晴らしい', 'wonderful', 'great', 'こんにちは', 'hello', 'はじめまして', 'nice to meet'],
+    sad: ['悲しい', 'sad', '残念', 'sorry', '寂しい', 'lonely', '困った', 'trouble', 'がっかり', 'disappointed', '申し訳', 'apologize'],
+    angry: ['怒り', 'angry', '腹立つ', 'mad', 'イライラ', 'irritated', '許せない', 'unforgivable', 'ムカつく', 'annoying', '問題', 'problem'],
+    relaxed: ['リラックス', 'relax', '落ち着く', 'calm', 'ゆっくり', 'slowly', '平和', 'peaceful', 'のんびり', 'leisurely', '考える', 'think', 'うーん', 'hmm'],
+    surprised: ['驚き', 'surprised', 'びっくり', 'shocked', '信じられない', 'unbelievable', 'まさか', 'no way', 'えっ', 'what', 'すごい', 'amazing']
   };
 
   private static readonly VRM_EXPRESSION_MAP: Record<string, VRMExpressionMapping> = {
@@ -40,7 +37,6 @@ export class EmotionManager {
     },
     happy: {
       primary: 'happy',
-      secondary: 'relaxed',
       weight: 0.8,
       blinkOverride: 0.2,
     },
@@ -56,39 +52,16 @@ export class EmotionManager {
       blinkOverride: 0.6,
       lookAtOverride: 0.2,
     },
+    relaxed: {
+      primary: 'relaxed',
+      weight: 0.7,
+      blinkOverride: 0.3,
+      lookAtOverride: 0.4,
+    },
     surprised: {
       primary: 'surprised',
       weight: 1.0,
       blinkOverride: 0.8,
-    },
-    thinking: {
-      primary: 'neutral',
-      secondary: 'relaxed',
-      weight: 0.6,
-      lookAtOverride: 0.5,
-    },
-    explaining: {
-      primary: 'neutral',
-      secondary: 'happy',
-      weight: 0.7,
-      mouthOverride: 0.3,
-    },
-    greeting: {
-      primary: 'happy',
-      secondary: 'relaxed',
-      weight: 0.9,
-      blinkOverride: 0.1,
-    },
-    speaking: {
-      primary: 'neutral',
-      weight: 0.8,
-      mouthOverride: 0.6,
-    },
-    listening: {
-      primary: 'neutral',
-      secondary: 'relaxed',
-      weight: 0.6,
-      lookAtOverride: 0.4,
     },
   };
 
@@ -167,19 +140,18 @@ export class EmotionManager {
   static detectConversationEmotion(
     userInput: string, 
     aiResponse: string, 
-    conversationContext?: string[],
-    language: 'ja' | 'en' = 'ja'
+    conversationContext?: string[]
   ): EmotionData {
     // Combine input and response for context-aware detection
     const combinedText = `${userInput} ${aiResponse}`;
     
     // Get base emotion from combined text
-    const baseEmotion = this.detectEmotion(combinedText, language);
+    const baseEmotion = this.detectEmotion(combinedText);
     
     // Apply conversation context modifiers
     if (conversationContext && conversationContext.length > 0) {
       const contextText = conversationContext.slice(-3).join(' '); // Last 3 messages
-      const contextEmotion = this.detectEmotion(contextText, language);
+      const contextEmotion = this.detectEmotion(contextText);
       
       // Blend base emotion with context (70% base, 30% context)
       const blendedIntensity = baseEmotion.intensity * 0.7 + contextEmotion.intensity * 0.3;
@@ -204,12 +176,12 @@ export class EmotionManager {
     intensity: number = 0.8
   ): EmotionData {
     const emotionMap = {
-      welcome: 'greeting',
-      question: 'listening',
-      explanation: 'explaining',
+      welcome: 'happy',
+      question: 'neutral',
+      explanation: 'neutral',
       goodbye: 'happy',
       error: 'sad',
-      thinking: 'thinking',
+      thinking: 'relaxed',
     };
 
     return {
@@ -343,12 +315,8 @@ export class EmotionManager {
       happy: 2000,
       sad: 3000,
       angry: 2500,
+      relaxed: 2500,
       surprised: 1500,
-      thinking: 2000,
-      explaining: 3000,
-      greeting: 2000,
-      speaking: 1500,
-      listening: 2000,
     };
 
     const baseDuration = baseDurations[emotion as keyof typeof baseDurations] || 1500;
