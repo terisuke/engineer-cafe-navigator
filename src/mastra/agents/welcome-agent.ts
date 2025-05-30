@@ -1,5 +1,4 @@
 import { Agent } from '@mastra/core/agent';
-import { z } from 'zod';
 import { SupportedLanguage } from '../types/config';
 
 export class WelcomeAgent extends Agent {
@@ -32,8 +31,8 @@ export class WelcomeAgent extends Agent {
 
   async welcome(language?: SupportedLanguage): Promise<string> {
     const welcomeMessage = language === 'en' 
-      ? "Welcome to Engineer Cafe! I'm here to guide you through our services. Would you like to start with our presentation?"
-      : "エンジニアカフェへようこそ！サービスのご案内をさせていただきます。プレゼンテーションから始めませんか？";
+      ? "[happy]Welcome to Engineer Cafe! I'm here to guide you through our services. Would you like to start with our presentation?[/happy]"
+      : "[happy]エンジニアカフェへようこそ！サービスのご案内をさせていただきます。プレゼンテーションから始めませんか？[/happy]";
     
     // Store language preference in memory
     await this.memory.store('language', language || 'ja');
@@ -49,8 +48,8 @@ export class WelcomeAgent extends Agent {
     await this.memory.store('language', language);
     
     const response = language === 'en'
-      ? "Great! I'll assist you in English. Let's begin with our service overview."
-      : "ありがとうございます！日本語でご案内いたします。サービス概要から始めましょう。";
+      ? "[happy]Great! I'll assist you in English. Let's begin with our service overview.[/happy]"
+      : "[happy]ありがとうございます！日本語でご案内いたします。サービス概要から始めましょう。[/happy]";
     
     return { language, response };
   }
@@ -73,8 +72,8 @@ export class WelcomeAgent extends Agent {
     const language = await this.memory.get('language') as SupportedLanguage || 'ja';
     
     const message = language === 'en'
-      ? "I'd be happy to answer any specific questions you have about Engineer Cafe. What would you like to know?"
-      : "エンジニアカフェについて、どのようなご質問がございますか？お気軽にお聞きください。";
+      ? "[neutral]I'd be happy to answer any specific questions you have about Engineer Cafe. What would you like to know?[/neutral]"
+      : "[neutral]エンジニアカフェについて、どのようなご質問がございますか？お気軽にお聞きください。[/neutral]";
     
     return message;
   }
@@ -83,8 +82,8 @@ export class WelcomeAgent extends Agent {
     const language = await this.memory.get('language') as SupportedLanguage || 'ja';
     
     const message = language === 'en'
-      ? "Great! Let me guide you through the registration process. First, you'll need to create an account..."
-      : "ありがとうございます！新規登録のご案内をいたします。まず、アカウントの作成から始めましょう...";
+      ? "[happy]Great! Let me guide you through the registration process. First, you'll need to create an account...[/happy]"
+      : "[happy]ありがとうございます！新規登録のご案内をいたします。まず、アカウントの作成から始めましょう...[/happy]";
     
     return message;
   }

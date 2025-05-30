@@ -1,6 +1,6 @@
 import { Agent } from '@mastra/core/agent';
-import { z } from 'zod';
 import { SupportedLanguage } from '../types/config';
+import { EmotionTagParser } from '../../lib/emotion-tag-parser';
 
 export class QAAgent extends Agent {
   private memory: any;
@@ -43,10 +43,12 @@ export class QAAgent extends Agent {
     const response = await this.generate([
       { role: 'user', content: prompt }
     ]);
-    return response.text;
+    
+    // Auto-enhance response with emotion tags
+    return EmotionTagParser.enhanceAgentResponse(response.text, 'qa', language);
   }
 
-  private async searchKnowledgeBase(query: string): Promise<string> {
+  private async searchKnowledgeBase(_query: string): Promise<string> {
     // TODO: Implement RAG search using Mastra RAG tools
     // This would search through the Engineer Cafe knowledge base
     // For now, return placeholder context
@@ -64,10 +66,6 @@ export class QAAgent extends Agent {
   }
 
   async categorizeQuestion(question: string): Promise<string> {
-    const categories = [
-      'pricing', 'facilities', 'access', 'events', 
-      'membership', 'technical', 'general', 'other'
-    ];
     
     // Simple categorization logic - in practice, this could use ML
     const lowerQuestion = question.toLowerCase();
@@ -93,20 +91,20 @@ export class QAAgent extends Agent {
     const language = await this.memory.get('language') as SupportedLanguage || 'ja';
     
     const fallback = language === 'en'
-      ? "I don't have specific information about that. Would you like me to connect you with our staff for detailed assistance?"
-      : "その件について詳しい情報がございません。スタッフにお繋ぎしてより詳しくご案内させていただきましょうか？";
+      ? "[sad]I don't have specific information about that. Would you like me to connect you with our staff for detailed assistance?[/sad]"
+      : "[sad]その件について詳しい情報がございません。スタッフにお繋ぎしてより詳しくご案内させていただきましょうか？[/sad]";
     
     return fallback;
   }
 
-  async escalateToStaff(question: string): Promise<string> {
+  async escalateToStaff(_question: string): Promise<string> {
     const language = await this.memory.get('language') as SupportedLanguage || 'ja';
     
     // TODO: Implement staff notification system
     
     const message = language === 'en'
-      ? "I've notified our staff about your inquiry. Someone will be with you shortly to provide detailed assistance."
-      : "スタッフにご連絡いたしました。詳しいご案内のため、まもなくスタッフがお伺いいたします。";
+      ? "[happy]I've notified our staff about your inquiry. Someone will be with you shortly to provide detailed assistance.[/happy]"
+      : "[happy]スタッフにご連絡いたしました。詳しいご案内のため、まもなくスタッフがお伺いいたします。[/happy]";
     
     return message;
   }

@@ -16,59 +16,54 @@ export interface EmotionTag {
 }
 
 export class EmotionTagParser {
-  // Supported emotion tags with VRM expression mapping
-  private static readonly EMOTION_MAPPING = {
+  // aituber-kit standardized emotions: neutral, happy, sad, angry, relaxed, surprised
+  private static readonly EMOTION_MAPPING: Record<string, string> = {
     // Basic emotions
+    'neutral': 'neutral',
+    'calm': 'neutral',
+    'normal': 'neutral',
+    'explaining': 'neutral',
+    'teaching': 'neutral',
+    'describing': 'neutral',
+    
     'happy': 'happy',
     'joy': 'happy',
     'excited': 'happy',
     'cheerful': 'happy',
     'pleased': 'happy',
+    'greeting': 'happy',
+    'welcoming': 'happy',
+    'confident': 'happy',
+    'proud': 'happy',
+    'grateful': 'happy',
     
     'sad': 'sad',
     'disappointed': 'sad',
     'melancholy': 'sad',
     'down': 'sad',
+    'worried': 'sad',
+    'embarrassed': 'sad',
+    'apologetic': 'sad',
     
     'angry': 'angry',
     'mad': 'angry',
     'frustrated': 'angry',
     'annoyed': 'angry',
     
+    'relaxed': 'relaxed',
+    'thinking': 'relaxed',
+    'pondering': 'relaxed',
+    'wondering': 'relaxed',
+    'listening': 'relaxed',
+    'attentive': 'relaxed',
+    'concerned': 'relaxed',
+    'shy': 'relaxed',
+    'confused': 'relaxed',
+    
     'surprised': 'surprised',
     'shocked': 'surprised',
     'amazed': 'surprised',
     'astonished': 'surprised',
-    
-    'neutral': 'neutral',
-    'calm': 'neutral',
-    'normal': 'neutral',
-    
-    // Speaking states
-    'thinking': 'thinking',
-    'pondering': 'thinking',
-    'wondering': 'thinking',
-    
-    'explaining': 'explaining',
-    'teaching': 'explaining',
-    'describing': 'explaining',
-    
-    'greeting': 'greeting',
-    'welcoming': 'greeting',
-    
-    'listening': 'listening',
-    'attentive': 'listening',
-    
-    // Special expressions
-    'confused': 'thinking',
-    'worried': 'sad',
-    'concerned': 'thinking',
-    'embarrassed': 'sad',
-    'shy': 'neutral',
-    'confident': 'happy',
-    'proud': 'happy',
-    'grateful': 'happy',
-    'apologetic': 'sad',
   };
 
   /**
@@ -131,16 +126,16 @@ export class EmotionTagParser {
       happy: 0,
       sad: 0,
       angry: 0,
+      relaxed: 0,
       surprised: 0,
-      thinking: 0,
-      explaining: 0,
-      greeting: 0,
-      listening: 0,
     };
 
     const normalizedIntensity = Math.max(0, Math.min(1, intensity));
 
     switch (emotion) {
+      case 'neutral':
+        weights.neutral = 1;
+        break;
       case 'happy':
         weights.happy = normalizedIntensity;
         weights.neutral = 1 - normalizedIntensity;
@@ -153,26 +148,12 @@ export class EmotionTagParser {
         weights.angry = normalizedIntensity;
         weights.neutral = 1 - normalizedIntensity;
         break;
+      case 'relaxed':
+        weights.relaxed = normalizedIntensity;
+        weights.neutral = 1 - normalizedIntensity;
+        break;
       case 'surprised':
         weights.surprised = normalizedIntensity;
-        weights.neutral = 1 - normalizedIntensity;
-        break;
-      case 'thinking':
-        weights.thinking = normalizedIntensity;
-        weights.neutral = 1 - normalizedIntensity;
-        break;
-      case 'explaining':
-        weights.explaining = normalizedIntensity;
-        weights.neutral = 1 - normalizedIntensity;
-        break;
-      case 'greeting':
-        weights.greeting = normalizedIntensity;
-        weights.happy = normalizedIntensity * 0.3; // Slight happiness
-        weights.neutral = 1 - normalizedIntensity;
-        break;
-      case 'listening':
-        weights.listening = normalizedIntensity;
-        weights.surprised = normalizedIntensity * 0.2; // Slight attention
         weights.neutral = 1 - normalizedIntensity;
         break;
       default:
@@ -188,9 +169,9 @@ export class EmotionTagParser {
    */
   static createSampleEmotionalText(language: 'ja' | 'en' = 'ja'): string {
     if (language === 'ja') {
-      return '[greeting]はじめまして！[happy]今日はとても良い天気ですね。[thinking]ところで、何かお手伝いできることはありますか？[listening]';
+      return '[happy]はじめまして！[neutral]今日はとても良い天気ですね。[relaxed]ところで、何かお手伝いできることはありますか？[/relaxed]';
     } else {
-      return '[greeting]Hello there! [happy]It\'s such a beautiful day today. [thinking]By the way, is there anything I can help you with? [listening]';
+      return '[happy]Hello there! [neutral]It\'s such a beautiful day today. [relaxed]By the way, is there anything I can help you with?[/relaxed]';
     }
   }
 
@@ -213,5 +194,81 @@ export class EmotionTagParser {
    */
   static getVRMExpressions(): string[] {
     return Array.from(new Set(Object.values(this.EMOTION_MAPPING)));
+  }
+
+  /**
+   * Auto-add emotion tags to AI responses based on content analysis
+   */
+  static addEmotionTags(text: string, language: 'ja' | 'en' = 'ja'): string {
+    // If text already has emotion tags, return as is
+    if (text.includes('[') && text.includes(']')) {
+      return text;
+    }
+
+    // Analyze text content to determine appropriate emotion
+    const lowerText = text.toLowerCase();
+    let emotion = 'neutral'; // default
+
+    // Detection patterns for different emotions
+    if (language === 'ja') {
+      if (lowerText.includes('ようこそ') || lowerText.includes('はじめまして') || lowerText.includes('ありがとう') || lowerText.includes('素晴らしい')) {
+        emotion = 'happy';
+      } else if (lowerText.includes('申し訳') || lowerText.includes('すみません') || lowerText.includes('残念') || lowerText.includes('困り')) {
+        emotion = 'sad';
+      } else if (lowerText.includes('考え') || lowerText.includes('うーん') || lowerText.includes('どうしよう') || lowerText.includes('リラックス')) {
+        emotion = 'relaxed';
+      } else if (lowerText.includes('びっくり') || lowerText.includes('驚き') || lowerText.includes('すごい') || lowerText.includes('まさか')) {
+        emotion = 'surprised';
+      } else if (lowerText.includes('問題') || lowerText.includes('怒り') || lowerText.includes('イライラ')) {
+        emotion = 'angry';
+      }
+    } else {
+      if (lowerText.includes('welcome') || lowerText.includes('hello') || lowerText.includes('great') || lowerText.includes('wonderful') || lowerText.includes('thank')) {
+        emotion = 'happy';
+      } else if (lowerText.includes('sorry') || lowerText.includes('apologize') || lowerText.includes('unfortunately') || lowerText.includes('problem')) {
+        emotion = 'sad';
+      } else if (lowerText.includes('think') || lowerText.includes('consider') || lowerText.includes('hmm') || lowerText.includes('relax')) {
+        emotion = 'relaxed';
+      } else if (lowerText.includes('wow') || lowerText.includes('amazing') || lowerText.includes('surprised') || lowerText.includes('incredible')) {
+        emotion = 'surprised';
+      } else if (lowerText.includes('angry') || lowerText.includes('frustrated') || lowerText.includes('annoying')) {
+        emotion = 'angry';
+      }
+    }
+
+    return `[${emotion}]${text}[/${emotion}]`;
+  }
+
+  /**
+   * Auto-enhance agent responses with appropriate emotion tags
+   */
+  static enhanceAgentResponse(response: string, context?: 'welcome' | 'qa' | 'error' | 'success', language: 'ja' | 'en' = 'ja'): string {
+    // If response already has emotion tags, return as is
+    if (response.includes('[') && response.includes(']')) {
+      return response;
+    }
+
+    let emotion = 'neutral';
+
+    // Context-based emotion selection
+    switch (context) {
+      case 'welcome':
+        emotion = 'happy';
+        break;
+      case 'qa':
+        emotion = 'neutral';
+        break;
+      case 'error':
+        emotion = 'sad';
+        break;
+      case 'success':
+        emotion = 'happy';
+        break;
+      default:
+        // Use content-based detection
+        return this.addEmotionTags(response, language);
+    }
+
+    return `[${emotion}]${response}[/${emotion}]`;
   }
 }
