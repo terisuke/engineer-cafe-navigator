@@ -285,13 +285,12 @@ export default function MarpViewer({
 
   const handleSlideNavigation = async (action: string, targetSlide?: number) => {
     try {
-      // For local navigation without API call when slide data is already loaded
-      if (action === 'goto' && targetSlide !== undefined) {
-        if (targetSlide >= 1 && targetSlide <= totalSlides) {
-          setCurrentSlide(targetSlide);
-          onSlideChange?.(targetSlide);
-          return;
-        }
+      // Skip API call if environment variables are not set
+      const isBackendAvailable = process.env.NEXT_PUBLIC_SKIP_BACKEND !== 'true';
+      
+      if (!isBackendAvailable) {
+        console.log('Backend skipped, using local navigation only');
+        return;
       }
       
       const response = await fetch('/api/slides', {
@@ -306,6 +305,10 @@ export default function MarpViewer({
           language,
         }),
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const result = await response.json();
 
@@ -326,31 +329,36 @@ export default function MarpViewer({
       }
     } catch (error) {
       console.error('Error navigating slides:', error);
+      // Don't show error for navigation issues, just log them
+      console.warn('Slide navigation API unavailable, using local navigation only');
     }
   };
 
-  const nextSlide = () => {
+  const nextSlide = async () => {
     if (currentSlide < totalSlides) {
       const newSlide = currentSlide + 1;
       setCurrentSlide(newSlide);
       onSlideChange?.(newSlide);
-      handleSlideNavigation('next');
+      // Don't await to avoid blocking UI
+      handleSlideNavigation('next', newSlide);
     }
   };
 
-  const previousSlide = () => {
+  const previousSlide = async () => {
     if (currentSlide > 1) {
       const newSlide = currentSlide - 1;
       setCurrentSlide(newSlide);
       onSlideChange?.(newSlide);
-      handleSlideNavigation('previous');
+      // Don't await to avoid blocking UI
+      handleSlideNavigation('previous', newSlide);
     }
   };
 
-  const gotoSlide = (slideNumber: number) => {
+  const gotoSlide = async (slideNumber: number) => {
     if (slideNumber >= 1 && slideNumber <= totalSlides) {
       setCurrentSlide(slideNumber);
       onSlideChange?.(slideNumber);
+      // Don't await to avoid blocking UI
       handleSlideNavigation('goto', slideNumber);
     }
   };
@@ -893,7 +901,7 @@ export default function MarpViewer({
       {/* Debug Panel - only in development */}
       {process.env.NODE_ENV === 'development' && (
         <SlideDebugPanel
-          iframeRef={iframeRef}
+          iframeRef={iframeRef as React.RefObject<HTMLIFrameElement>}
           currentSlide={currentSlide}
           totalSlides={totalSlides}
           onRefresh={() => {
