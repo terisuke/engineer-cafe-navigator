@@ -48,8 +48,19 @@ export class VoiceRecorder {
   }
 
   start(): void {
-    if (!this.mediaRecorder || this.isRecording) {
-      this.onError(new Error('Recorder not initialized or already recording'));
+    if (!this.mediaRecorder) {
+      this.onError(new Error('Recorder not initialized'));
+      return;
+    }
+
+    if (this.isRecording || this.mediaRecorder.state === 'recording') {
+      this.onError(new Error('Already recording'));
+      return;
+    }
+
+    if (this.mediaRecorder.state === 'paused') {
+      // Resume instead of start if paused
+      this.resume();
       return;
     }
 
@@ -58,6 +69,7 @@ export class VoiceRecorder {
       this.mediaRecorder.start();
       this.isRecording = true;
     } catch (error) {
+      this.isRecording = false;
       this.onError(new Error(`Failed to start recording: ${error}`));
     }
   }
@@ -125,6 +137,10 @@ export class VoiceRecorder {
 
   isCurrentlyRecording(): boolean {
     return this.isRecording;
+  }
+
+  isInitialized(): boolean {
+    return this.mediaRecorder !== null && this.stream !== null;
   }
 
   private getSupportedMimeType(): string {
@@ -303,7 +319,7 @@ export class AdvancedVoiceRecorder extends VoiceRecorder {
     const analyze = () => {
       if (!this.analyser || !this.dataArray) return;
 
-      this.analyser.getByteFrequencyData(this.dataArray);
+      this.analyser.getByteFrequencyData(this.dataArray as Uint8Array<ArrayBuffer>);
       
       // Calculate average level
       let sum = 0;
@@ -357,7 +373,7 @@ export class AdvancedVoiceRecorder extends VoiceRecorder {
   getCurrentLevel(): number {
     if (!this.analyser || !this.dataArray) return 0;
 
-    this.analyser.getByteFrequencyData(this.dataArray);
+    this.analyser.getByteFrequencyData(this.dataArray as Uint8Array<ArrayBuffer>);
     
     let sum = 0;
     for (let i = 0; i < this.dataArray.length; i++) {
