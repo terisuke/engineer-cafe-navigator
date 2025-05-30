@@ -166,7 +166,7 @@ export default function Home() {
           </div>
         ) : (
           // Full layout with character and slides
-          <div className="grid grid-cols-12 gap-6 h-[calc(100vh-140px)]">
+          <div className="grid grid-cols-12 gap-6 min-h-[calc(100vh-140px)] max-h-[calc(100vh-140px)]">
               {/* Character Avatar Section */}
               <div className="col-span-12 lg:col-span-4">
                 <div 

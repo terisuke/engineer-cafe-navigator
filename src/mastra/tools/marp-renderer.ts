@@ -215,7 +215,7 @@ export class MarpRendererTool {
         <div class="slide-counter" id="slideCounter">
           Slide 1 of X
         </div>
-        <div class="slide-navigation">
+        <div class="slide-navigation" style="display: none;">
           <button onclick="previousSlide()">Previous</button>
           <button onclick="nextSlide()">Next</button>
         </div>
