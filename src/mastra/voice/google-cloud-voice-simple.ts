@@ -20,8 +20,8 @@ export class GoogleCloudVoiceServiceSimple {
     this.currentSettings = {
       language: 'ja',
       speaker: 'ja-JP-Wavenet-B',
-      speed: 1.1,
-      pitch: 0.2,
+      speed: 1.5,
+      pitch: 0.5,
       volumeGainDb: 2.0,
     };
     
@@ -65,7 +65,7 @@ export class GoogleCloudVoiceServiceSimple {
       this.tokenExpiry = Date.now() + 50 * 60 * 1000;
       
       console.log('Access token obtained successfully');
-      return this.accessToken;
+      return this.accessToken!;
     } catch (error) {
       console.error('Error getting access token:', error);
       throw error;
