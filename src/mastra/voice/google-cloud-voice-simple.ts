@@ -205,8 +205,8 @@ export class GoogleCloudVoiceServiceSimple {
     this.currentSettings.language = language;
     if (language === 'ja') {
       this.currentSettings.speaker = 'ja-JP-Wavenet-B';
-      this.currentSettings.speed = 1.1;
-      this.currentSettings.pitch = 0.2;
+      this.currentSettings.speed = 1.5;
+      this.currentSettings.pitch = 0.5;
       this.currentSettings.volumeGainDb = 2.0;
     } else {
       this.currentSettings.speaker = 'en-GB-Standard-F';
@@ -222,8 +222,8 @@ export class GoogleCloudVoiceServiceSimple {
       this.currentSettings.speaker = 'ja-JP-Wavenet-B';
       switch (emotion) {
         case 'neutral':
-          this.currentSettings.speed = 1.1;
-          this.currentSettings.pitch = 0.2;
+          this.currentSettings.speed = 1.5;
+          this.currentSettings.pitch = 0.5;
           this.currentSettings.volumeGainDb = 2.0;
           break;
         case 'friendly':
