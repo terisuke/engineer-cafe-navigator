@@ -630,7 +630,7 @@ export default function MarpViewer({
           <button
             onClick={previousSlide}
             disabled={currentSlide === 1}
-            className="p-2 rounded bg-blue-500 text-white disabled:bg-gray-300 hover:bg-blue-600 transition-colors hidden"
+            className="p-2 rounded bg-blue-500 text-white disabled:bg-gray-300 hover:bg-blue-600 transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -642,7 +642,7 @@ export default function MarpViewer({
           <button
             onClick={nextSlide}
             disabled={currentSlide === totalSlides}
-            className="p-2 rounded bg-blue-500 text-white disabled:bg-gray-300 hover:bg-blue-600 transition-colors hidden"
+            className="p-2 rounded bg-blue-500 text-white disabled:bg-gray-300 hover:bg-blue-600 transition-colors"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
