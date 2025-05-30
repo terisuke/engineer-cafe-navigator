@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import MarpViewer from './components/MarpViewer';
 import CharacterAvatar from './components/CharacterAvatar';
 import EnvironmentSettings from './components/EnvironmentSettings';
@@ -76,24 +76,61 @@ export default function Home() {
         })
       });
 
-      // Start auto greeting
-      await fetch('/api/voice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'text_to_speech',
-          text: language === 'ja' 
-            ? 'はじめまして！何かお手伝いできることはありますか？'
-            : 'Hello there! How can I help you today?',
-          language: language,
-          sessionId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        })
-      }).then(response => response.json()).then(result => {
-        if (result.success && result.audioResponse) {
-          // Play greeting audio with lip-sync
-          playAudioWithLipSync(result.audioResponse);
+      // Start auto greeting using cache for speed
+      const { GreetingCache } = await import('@/lib/greeting-cache');
+      const cachedGreeting = GreetingCache.getGreeting(language, 'initial');
+      
+      if (cachedGreeting.audioBase64) {
+        // Use cached audio for instant playback
+        console.log('[Main] Using cached greeting audio');
+        await playAudioWithLipSync(cachedGreeting.audioBase64);
+        
+        // Apply emotion tags from cached greeting
+        if (cachedGreeting.text.includes('[')) {
+          const { EmotionTagParser } = await import('@/lib/emotion-tag-parser');
+          const parsedResponse = EmotionTagParser.parseEmotionTags(cachedGreeting.text);
+          
+          if (parsedResponse.primaryEmotion && setExpressionFunction) {
+            const expressionWeights = EmotionTagParser.getExpressionWeights(parsedResponse.primaryEmotion, 0.8);
+            const strongestExpression = Object.entries(expressionWeights)
+              .filter(([_, weight]) => weight > 0.1)
+              .sort(([_, a], [__, b]) => b - a)[0];
+            
+            if (strongestExpression) {
+              const [expressionName, weight] = strongestExpression;
+              setExpressionFunction(expressionName, weight);
+            }
+          }
         }
-      });
+      } else {
+        // Fallback to API if no cached audio
+        console.log('[Main] No cached audio, using API');
+        const { EmotionTagParser } = await import('@/lib/emotion-tag-parser');
+        const cleanText = EmotionTagParser.parseEmotionTags(cachedGreeting.text).cleanText;
+        
+        const response = await fetch('/api/voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'text_to_speech',
+            text: cleanText,
+            language: language,
+            sessionId: `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+          })
+        });
+        
+        const result = await response.json();
+        if (result.success && result.audioResponse) {
+          // Cache this greeting for future use
+          GreetingCache.cacheGreeting({
+            ...cachedGreeting,
+            audioBase64: result.audioResponse
+          });
+          
+          // Play greeting audio with lip-sync
+          await playAudioWithLipSync(result.audioResponse);
+        }
+      }
 
       // Set character to speaking state
       await fetch('/api/character', {
@@ -156,11 +193,136 @@ export default function Home() {
       setIsListening(false);
       setIsRecording(false);
       
-      // Convert audio to base64
+      // First try to get speech-to-text for quick response check
       const audioBuffer = await audioBlob.arrayBuffer();
       const audioBase64 = Buffer.from(audioBuffer).toString('base64');
       
-      // Send to voice API
+      // Try speech recognition first for quick response
+      const speechResponse = await fetch('/api/voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'speech_to_text',
+          audioData: audioBase64,
+          language: currentLanguage
+        })
+      });
+      
+      const speechResult = await speechResponse.json();
+      
+      // Check for quick cached responses
+      if (speechResult.success && speechResult.transcript) {
+        const { ResponseCache } = await import('@/lib/response-cache');
+        const { EnhancedEmotionManager } = await import('@/lib/enhanced-emotion-manager');
+        const { ConversationMemory } = await import('@/lib/conversation-memory');
+        
+        console.log('[Main] Speech transcript:', speechResult.transcript);
+        
+        // First check FAQ database
+        const faqMatch = ConversationMemory.searchFAQ(speechResult.transcript, currentLanguage);
+        
+        let quickResponse;
+        if (faqMatch) {
+          console.log('[Main] Found FAQ match:', faqMatch);
+          quickResponse = {
+            text: faqMatch.answer,
+            emotion: faqMatch.emotion,
+            audioBase64: faqMatch.audioBase64,
+            cached: !!faqMatch.audioBase64
+          };
+        } else {
+          // Try to get a quick response from cache or predefined responses
+          quickResponse = await ResponseCache.getQuickResponse(
+            speechResult.transcript,
+            currentLanguage
+          );
+        }
+        
+        if (quickResponse) {
+          console.log('[Main] Using quick response:', quickResponse);
+          
+          // Analyze emotion from the response text
+          const emotionManager = new EnhancedEmotionManager();
+          const emotionAnalysis = emotionManager.analyzeTextEmotion(quickResponse.text, currentLanguage);
+          
+          // Set emotion with enhanced analysis
+          const emotionToUse = quickResponse.emotion || emotionAnalysis.emotion;
+          console.log('[Main] Setting enhanced emotion:', emotionToUse, 'intensity:', emotionAnalysis.intensity);
+          
+          // Update character with enhanced emotion
+          await fetch('/api/character', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'setEmotion',
+              emotion: emotionToUse,
+              intensity: emotionAnalysis.intensity,
+              transition: true
+            })
+          });
+          
+          // Apply enhanced expressions
+          if (setExpressionFunction) {
+            emotionManager.setEmotion(emotionToUse, emotionAnalysis.intensity);
+            const expressionWeights = emotionManager.getExpressionWeights();
+            console.log('[Main] Enhanced expression weights:', expressionWeights);
+            
+            // Apply multiple expressions with proper weights
+            Object.entries(expressionWeights).forEach(([expressionName, weight]) => {
+              if (weight > 0.1) {
+                setExpressionFunction(expressionName, weight);
+              }
+            });
+          }
+          
+          // If we have cached audio, use it; otherwise generate TTS
+          if (quickResponse.audioBase64) {
+            await playAudioWithLipSync(quickResponse.audioBase64);
+          } else {
+            // Generate TTS for the quick response
+            const ttsResponse = await fetch('/api/voice', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'text_to_speech',
+                text: quickResponse.text,
+                language: currentLanguage,
+                emotion: emotionToUse,
+                intensity: emotionAnalysis.intensity
+              })
+            });
+            
+            const ttsResult = await ttsResponse.json();
+            if (ttsResult.success && ttsResult.audioResponse) {
+              // Cache the audio for future use
+              await ResponseCache.cacheResponse({
+                id: `quick_${Date.now()}`,
+                text: quickResponse.text,
+                audioBase64: ttsResult.audioResponse,
+                emotion: emotionToUse,
+                language: currentLanguage,
+                category: 'common'
+              });
+              
+              await playAudioWithLipSync(ttsResult.audioResponse);
+            }
+          }
+          
+          // Save conversation to memory
+          ConversationMemory.saveConversation({
+            userInput: speechResult.transcript,
+            aiResponse: quickResponse.text,
+            emotion: emotionToUse,
+            language: currentLanguage,
+            responseTime: Date.now() - (speechResult.startTime || Date.now()),
+            cached: quickResponse.cached
+          });
+          
+          return; // Early return for quick response
+        }
+      }
+      
+      // If no quick response, proceed with full AI processing
       const response = await fetch('/api/voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -168,7 +330,7 @@ export default function Home() {
           action: 'process_voice',
           audioData: audioBase64,
           language: currentLanguage,
-          sessionId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          sessionId: `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
         })
       });
       
@@ -177,42 +339,67 @@ export default function Home() {
       if (result.success) {
         console.log('[Main] Voice processing result:', result);
         
-        // Update character expression based on emotion tags or detected emotion
-        if (result.primaryEmotion || result.emotion) {
-          const emotionToUse = result.primaryEmotion || result.emotion;
-          console.log('[Main] Setting character emotion:', emotionToUse);
+        // Enhanced emotion processing
+        if (result.responseText) {
+          const { EnhancedEmotionManager } = await import('@/lib/enhanced-emotion-manager');
+          const { ResponseCache } = await import('@/lib/response-cache');
+          const { ConversationMemory } = await import('@/lib/conversation-memory');
           
+          const emotionManager = new EnhancedEmotionManager();
+          const emotionAnalysis = emotionManager.analyzeTextEmotion(result.responseText, currentLanguage);
+          
+          const emotionToUse = result.primaryEmotion || result.emotion || emotionAnalysis.emotion;
+          const intensity = emotionAnalysis.intensity;
+          
+          console.log('[Main] Enhanced emotion analysis:', { emotionToUse, intensity, confidence: emotionAnalysis.confidence });
+          
+          // Update character with enhanced emotion
           await fetch('/api/character', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               action: 'setEmotion',
               emotion: emotionToUse,
+              intensity: intensity,
               transition: true
             })
           });
           
-          // Also apply expression directly if we have the viseme function
-          if (setVisemeFunction) {
-            // Import emotion tag parser for expression weights
-            const { EmotionTagParser } = await import('@/lib/emotion-tag-parser');
-            const expressionWeights = EmotionTagParser.getExpressionWeights(emotionToUse, 0.8);
-            console.log('[Main] Expression weights:', expressionWeights);
+          // Apply enhanced expressions
+          if (setExpressionFunction) {
+            emotionManager.setEmotion(emotionToUse, intensity);
+            const expressionWeights = emotionManager.getExpressionWeights();
+            console.log('[Main] Enhanced expression weights:', expressionWeights);
             
-            // Apply the strongest expression
-            const strongestExpression = Object.entries(expressionWeights)
-              .filter(([_, weight]) => weight > 0.1)
-              .sort(([_, a], [__, b]) => b - a)[0];
-            
-            if (strongestExpression) {
-              const [expressionName, weight] = strongestExpression;
-              console.log('[Main] Applying expression:', expressionName, 'weight:', weight);
-              
-              // Set character expression using the blend shape controller
-              if (setExpressionFunction) {
+            Object.entries(expressionWeights).forEach(([expressionName, weight]) => {
+              if (weight > 0.1) {
                 setExpressionFunction(expressionName, weight);
               }
-            }
+            });
+          }
+          
+          // Cache the response for future use
+          if (result.audioResponse && result.responseText) {
+            await ResponseCache.cacheResponse({
+              id: `ai_${Date.now()}`,
+              text: result.responseText,
+              audioBase64: result.audioResponse,
+              emotion: emotionToUse,
+              language: currentLanguage,
+              category: 'common'
+            });
+          }
+          
+          // Save conversation to memory
+          if (result.responseText && speechResult.transcript) {
+            ConversationMemory.saveConversation({
+              userInput: speechResult.transcript,
+              aiResponse: result.responseText,
+              emotion: emotionToUse,
+              language: currentLanguage,
+              responseTime: Date.now() - (speechResult.startTime || Date.now()),
+              cached: false
+            });
           }
         }
         
@@ -223,6 +410,35 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error processing voice input:', error);
+      
+      // Fallback error response
+      const { ResponseCache } = await import('@/lib/response-cache');
+      const errorResponse = ResponseCache.getPredefinedResponse('confusion', currentLanguage, 'apologetic');
+      
+      if (errorResponse && setExpressionFunction) {
+        setExpressionFunction('sorry', 0.8);
+        
+        // Generate TTS for error response
+        try {
+          const ttsResponse = await fetch('/api/voice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'text_to_speech',
+              text: errorResponse.text,
+              language: currentLanguage,
+              emotion: errorResponse.emotion
+            })
+          });
+          
+          const ttsResult = await ttsResponse.json();
+          if (ttsResult.success && ttsResult.audioResponse) {
+            await playAudioWithLipSync(ttsResult.audioResponse);
+          }
+        } catch (ttsError) {
+          console.error('Error generating error response TTS:', ttsError);
+        }
+      }
     }
   };
 
@@ -230,6 +446,11 @@ export default function Home() {
   const startVoiceRecording = async () => {
     if (isInitializingRecorder) {
       console.log('Voice recorder is initializing, please wait...');
+      return;
+    }
+
+    if (isRecording) {
+      console.log('Already recording, ignoring start request');
       return;
     }
 
@@ -242,6 +463,25 @@ export default function Home() {
         console.error('Failed to initialize voice recorder');
         return;
       }
+    }
+
+    // Verify recorder is properly initialized
+    if (!recorder.isInitialized()) {
+      console.log('Recorder not properly initialized, re-initializing...');
+      recorder = await initializeVoiceRecorder();
+      if (!recorder) {
+        console.error('Failed to re-initialize voice recorder');
+        return;
+      }
+    }
+
+    // Check if recorder is in a valid state to start
+    const recorderState = recorder.getState();
+    if (recorderState === 'recording') {
+      console.log('Recorder already recording, stopping first');
+      recorder.stop();
+      // Wait a bit for the recorder to fully stop
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
     
     try {
@@ -358,6 +598,31 @@ export default function Home() {
       console.error('[Main] Error playing audio with lip-sync:', error);
     }
   };
+
+  // Pre-generate greetings on app load for faster responses
+  useEffect(() => {
+    const preGenerateGreetings = async () => {
+      try {
+        const { GreetingCache } = await import('@/lib/greeting-cache');
+        const stats = GreetingCache.getCacheStats();
+        
+        // Only pre-generate if cache is empty or has few greetings
+        if (stats.totalCached < 4) {
+          console.log('[Main] Pre-generating greetings for faster responses...');
+          await GreetingCache.preGenerateGreetings();
+          console.log('[Main] Greeting pre-generation complete');
+        } else {
+          console.log('[Main] Greetings already cached:', stats);
+        }
+      } catch (error) {
+        console.warn('[Main] Failed to pre-generate greetings:', error);
+      }
+    };
+
+    // Delay the pre-generation to not block initial load
+    const timer = setTimeout(preGenerateGreetings, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <main className="min-h-screen" style={getBackgroundStyle()}>

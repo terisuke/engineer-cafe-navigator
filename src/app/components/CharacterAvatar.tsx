@@ -653,9 +653,13 @@ useEffect(() => {
           // Use the VRM expression manager to set expressions
           const expressionManager = vrm.expressionManager;
           if (expressionManager) {
+            // Log available expressions for debugging
+            const availableExpressions = Object.keys(expressionManager.expressionMap);
+            console.log(`[CharacterAvatar] Available expressions:`, availableExpressions);
+            
             // Reset all expressions first if weight is significant
             if (weight > 0.1) {
-              Object.keys(expressionManager.expressionMap).forEach(name => {
+              availableExpressions.forEach(name => {
                 if (name !== expression) {
                   expressionManager.setValue(name, 0);
                 }
@@ -667,7 +671,18 @@ useEffect(() => {
               expressionManager.setValue(expression, weight);
               console.log(`[CharacterAvatar] Applied expression ${expression} with weight ${weight}`);
             } else {
-              console.warn(`[CharacterAvatar] Expression ${expression} not found in VRM model`);
+              console.warn(`[CharacterAvatar] Expression ${expression} not found in VRM model. Available:`, availableExpressions);
+              
+              // Try to find a similar expression
+              const similarExpression = availableExpressions.find(name => 
+                name.toLowerCase().includes(expression.toLowerCase()) ||
+                expression.toLowerCase().includes(name.toLowerCase())
+              );
+              
+              if (similarExpression) {
+                console.log(`[CharacterAvatar] Using similar expression: ${similarExpression}`);
+                expressionManager.setValue(similarExpression, weight);
+              }
             }
           } else {
             console.warn('[CharacterAvatar] Expression manager not available');
@@ -704,20 +719,28 @@ useEffect(() => {
   };
 
   const updateCharacterExpression = async (expression: string) => {
-    if (!charactersRef.current) return;
+    if (!charactersRef.current || !expression) return;
 
     try {
+      const requestBody = {
+        action: 'setExpression',
+        expression,
+        transition: true,
+      };
+
+      console.log('Sending character expression request:', requestBody);
+
       const response = await fetch('/api/character', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          action: 'setExpression',
-          expression,
-          transition: true,
-        }),
+        body: JSON.stringify(requestBody),
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const result = await response.json();
 
@@ -763,20 +786,28 @@ useEffect(() => {
   };
 
   const updateCharacterAnimation = async (animation: string) => {
-    if (!charactersRef.current) return;
+    if (!charactersRef.current || !animation) return;
 
     try {
+      const requestBody = {
+        action: 'playAnimation',
+        animation,
+        transition: true,
+      };
+
+      console.log('Sending character animation request:', requestBody);
+
       const response = await fetch('/api/character', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          action: 'playAnimation',
-          animation,
-          transition: true,
-        }),
+        body: JSON.stringify(requestBody),
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const result = await response.json();
 
@@ -809,17 +840,27 @@ useEffect(() => {
   };
 
   const resetCharacter = async () => {
+    if (!charactersRef.current) return;
+
     try {
+      const requestBody = {
+        action: 'resetPose',
+        transition: true,
+      };
+
+      console.log('Sending character reset request:', requestBody);
+
       const response = await fetch('/api/character', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          action: 'resetPose',
-          transition: true,
-        }),
+        body: JSON.stringify(requestBody),
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const result = await response.json();
 
