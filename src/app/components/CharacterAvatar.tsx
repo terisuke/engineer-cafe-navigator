@@ -2,6 +2,7 @@
 
 import { VRMUtils } from '@/lib/vrm-utils';
 import { VRM, VRMLoaderPlugin } from '@pixiv/three-vrm';
+import { VRMAnimationLoaderPlugin, VRMAnimation, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
 import { Download, Maximize2, RotateCcw, Settings } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -37,6 +38,7 @@ interface CharacterAvatarProps {
   cameraPositionOffset?: { x: number; y: number; z: number };
   modelPositionOffset?: { x: number; y: number; z: number };
   modelRotationOffset?: { x: number; y: number; z: number };
+  enableClickAnimation?: boolean;
   onCharacterLoad?: (character: VRM) => void;
   onStateChange?: (state: CharacterState) => void;
 }
@@ -57,6 +59,7 @@ export default function CharacterAvatar({
   cameraPositionOffset = { x: 0, y: 0, z: 0 },
   modelPositionOffset = { x: 0, y: 0, z: 0 },
   modelRotationOffset = { x: 0, y: 0, z: 0 },
+  enableClickAnimation = false,
   onCharacterLoad,
   onStateChange,
 }: CharacterAvatarProps) {
@@ -67,6 +70,11 @@ export default function CharacterAvatar({
   const charactersRef = useRef<VRM | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const clockRef = useRef<THREE.Clock | null>(null);
+  const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const currentActionRef = useRef<THREE.AnimationAction | null>(null);
+  const isPlayingSequence = useRef(false);
+  const isIdleAnimationActive = useRef(false);
+  const currentAnimationUrlRef = useRef<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,11 +125,23 @@ useEffect(() => {
   // Update model position when offset changes
   useEffect(() => {
     if (charactersRef.current) {
-      charactersRef.current.scene.position.set(
-        modelPositionOffset.x,
-        modelPositionOffset.y,
-        modelPositionOffset.z
-      );
+      // Check if current animation is idle
+      const isCurrentlyIdle = currentAnimationUrlRef.current === '/animations/idle_loop.vrma' || isIdleAnimationActive.current;
+      
+      if (isCurrentlyIdle) {
+        // Apply idle animation position adjustment
+        charactersRef.current.scene.position.set(
+          modelPositionOffset.x + 0.15,
+          modelPositionOffset.y,
+          modelPositionOffset.z
+        );
+      } else {
+        charactersRef.current.scene.position.set(
+          modelPositionOffset.x,
+          modelPositionOffset.y,
+          modelPositionOffset.z
+        );
+      }
     }
   }, [modelPositionOffset]);
 
@@ -302,6 +322,10 @@ useEffect(() => {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
+    
+    // Add click event listener
+    renderer.domElement.addEventListener('click', handleCanvasClick);
+    renderer.domElement.style.cursor = enableClickAnimation ? 'pointer' : 'default';
 
     // Enhanced lighting setup
     // Ambient light for overall illumination
@@ -354,6 +378,168 @@ useEffect(() => {
     };
   };
 
+  const loadVRMAnimation = async (animationUrl: string, vrm: VRM, loop: boolean = true, isIdleAnimation: boolean = false) => {
+    console.log('Loading VRM animation:', animationUrl);
+    currentAnimationUrlRef.current = animationUrl;
+    const loader = new GLTFLoader();
+    loader.crossOrigin = 'anonymous';
+    
+    // Register the VRMAnimationLoaderPlugin
+    loader.register((parser) => {
+      return new VRMAnimationLoaderPlugin(parser);
+    });
+
+    try {
+      const gltf = await loader.loadAsync(animationUrl);
+      console.log('GLTF loaded:', gltf);
+      console.log('GLTF userData:', gltf.userData);
+      
+      // Try different ways to access the animation
+      const vrmAnimation = gltf.userData.vrmAnimations?.[0] || gltf.userData.vrmAnimation;
+      console.log('VRM Animation found:', vrmAnimation);
+      
+      if (vrmAnimation) {
+        const clip = createVRMAnimationClip(vrmAnimation, vrm as any);
+        console.log('Animation clip created:', clip);
+        console.log('Animation duration:', clip.duration);
+        
+        if (!mixerRef.current) {
+          mixerRef.current = new THREE.AnimationMixer(vrm.scene);
+          console.log('Mixer created');
+        }
+        
+        // Stop current animation if exists
+        if (currentActionRef.current) {
+          currentActionRef.current.stop();
+        }
+        
+        // Play new animation
+        const action = mixerRef.current.clipAction(clip);
+        if (loop) {
+          action.setLoop(THREE.LoopRepeat, Infinity);
+        } else {
+          action.setLoop(THREE.LoopOnce, 1);
+          action.clampWhenFinished = true;
+        }
+        action.play();
+        currentActionRef.current = action;
+        
+        // Set animation state flag and position
+        isIdleAnimationActive.current = isIdleAnimation;
+        
+        // Ensure position offset is maintained during animation
+        if (isIdleAnimation) {
+          // For idle animation, apply a small adjustment to center it better
+          vrm.scene.position.set(
+            modelPositionOffset.x + 0.15, // Slight adjustment to the right
+            modelPositionOffset.y,
+            modelPositionOffset.z
+          );
+        } else {
+          vrm.scene.position.set(
+            modelPositionOffset.x,
+            modelPositionOffset.y,
+            modelPositionOffset.z
+          );
+        }
+        
+        console.log('Animation playing');
+        
+        return { success: true, duration: clip.duration };
+      } else {
+        console.warn('No VRM animation found in userData');
+        
+        // Try using the gltf animations directly
+        if (gltf.animations && gltf.animations.length > 0) {
+          console.log('Found standard GLTF animations:', gltf.animations);
+          
+          if (!mixerRef.current) {
+            mixerRef.current = new THREE.AnimationMixer(vrm.scene);
+          }
+          
+          const clip = gltf.animations[0];
+          const action = mixerRef.current.clipAction(clip);
+          if (loop) {
+            action.setLoop(THREE.LoopRepeat, Infinity);
+          } else {
+            action.setLoop(THREE.LoopOnce, 1);
+            action.clampWhenFinished = true;
+          }
+          action.play();
+          currentActionRef.current = action;
+          
+          // Set animation state flag and position
+          isIdleAnimationActive.current = isIdleAnimation;
+          
+          // Ensure position offset is maintained during animation
+          if (isIdleAnimation) {
+            // For idle animation, apply a small adjustment to center it better
+            vrm.scene.position.set(
+              modelPositionOffset.x + 0.15, // Slight adjustment to the right
+              modelPositionOffset.y,
+              modelPositionOffset.z
+            );
+          } else {
+            vrm.scene.position.set(
+              modelPositionOffset.x,
+              modelPositionOffset.y,
+              modelPositionOffset.z
+            );
+          }
+          
+          console.log('Playing standard GLTF animation');
+          
+          return { success: true, duration: clip.duration };
+        }
+      }
+    } catch (error) {
+      console.error('Error loading VRM animation:', error);
+    }
+    
+    return { success: false, duration: 0 };
+  };
+
+  const playRandomAnimation = async (vrm: VRM) => {
+    if (isPlayingSequence.current) return;
+    
+    isPlayingSequence.current = true;
+    const animations = ['VRMA_03', 'VRMA_04', 'VRMA_05', 'VRMA_06', 'VRMA_07'];
+    
+    // Select a random animation
+    const randomIndex = Math.floor(Math.random() * animations.length);
+    const animName = animations[randomIndex];
+    const animUrl = `/animations/${animName}.vrma`;
+    
+    console.log(`Playing animation: ${animName}`);
+    
+    try {
+      // Load animation without looping and get its duration
+      const result = await loadVRMAnimation(animUrl, vrm, false);
+      
+      if (result.success) {
+        // Wait for the animation to complete based on its actual duration
+        const waitTime = (result.duration * 1000) + 100; // Add 100ms buffer
+        console.log(`Animation duration: ${result.duration}s, waiting: ${waitTime}ms`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      } else {
+        // Fallback wait time if duration couldn't be determined
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    } catch (error) {
+      console.error(`Failed to play animation ${animName}:`, error);
+    }
+    
+    // Return to idle animation
+    await loadVRMAnimation('/animations/idle_loop.vrma', vrm, true, true);
+    isPlayingSequence.current = false;
+  };
+
+  const handleCanvasClick = () => {
+    if (enableClickAnimation && charactersRef.current && !isPlayingSequence.current) {
+      playRandomAnimation(charactersRef.current);
+    }
+  };
+
   const loadCharacter = async () => {
     if (!sceneRef.current) return;
 
@@ -402,6 +588,11 @@ useEffect(() => {
 
       // Get available expressions and animations
       await fetchAvailableFeatures();
+      
+      // Load default idle animation
+      console.log('Loading idle animation, current modelPositionOffset:', modelPositionOffset);
+      await loadVRMAnimation('/animations/idle_loop.vrma', vrm, true, true);
+      console.log('After idle animation load, model position:', vrm.scene.position);
 
       onCharacterLoad?.(vrm);
       setIsLoading(false);
@@ -547,9 +738,23 @@ useEffect(() => {
 
     const deltaTime = clockRef.current?.getDelta() || 0;
 
+    // Update animation mixer
+    if (mixerRef.current && deltaTime > 0) {
+      mixerRef.current.update(deltaTime);
+    }
+
     // Update VRM
     if (charactersRef.current) {
       charactersRef.current.update(deltaTime);
+      
+      // Ensure position offset is maintained every frame during animation
+      if (isPlayingSequence.current) {
+        charactersRef.current.scene.position.set(
+          modelPositionOffset.x,
+          modelPositionOffset.y,
+          modelPositionOffset.z
+        );
+      }
     }
 
     // Auto-rotate
@@ -564,6 +769,17 @@ useEffect(() => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
+    
+    // Stop and clean up animations
+    if (currentActionRef.current) {
+      currentActionRef.current.stop();
+      currentActionRef.current = null;
+    }
+    
+    if (mixerRef.current) {
+      mixerRef.current.stopAllAction();
+      mixerRef.current = null;
+    }
 
     // Dispose of background texture if it exists
     if (sceneRef.current?.background instanceof THREE.Texture) {
@@ -571,6 +787,7 @@ useEffect(() => {
     }
 
     if (rendererRef.current && containerRef.current) {
+      rendererRef.current.domElement.removeEventListener('click', handleCanvasClick);
       containerRef.current.removeChild(rendererRef.current.domElement);
       rendererRef.current.dispose();
     }

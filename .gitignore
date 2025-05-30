@@ -43,6 +43,7 @@ coverage/
 # Config directory (contains sensitive files like service account keys)
 *service-account-key.json
 *.vrm
+*.vrma
 
 # Supabase CLI artifacts
 supabase/.temp/
