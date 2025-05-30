@@ -227,14 +227,14 @@ export class GoogleCloudVoiceServiceSimple {
           this.currentSettings.volumeGainDb = 2.0;
           break;
         case 'friendly':
-          this.currentSettings.speed = 1.15;
-          this.currentSettings.pitch = 0.4;
+          this.currentSettings.speed = 1.5;
+          this.currentSettings.pitch = 0.5;
           this.currentSettings.volumeGainDb = 2.5;
           break;
         case 'explaining':
-          this.currentSettings.speed = 1.05;
-          this.currentSettings.pitch = 0.1;
-          this.currentSettings.volumeGainDb = 1.8;
+          this.currentSettings.speed = 1.5;
+          this.currentSettings.pitch = 0.5;
+          this.currentSettings.volumeGainDb = 2.0;
           break;
       }
     } else {
