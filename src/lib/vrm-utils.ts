@@ -455,19 +455,22 @@ export class VRMUtils {
     const meta = vrm.meta;
     if (!meta) return {};
 
+    // Type guard to handle different VRM versions
+    const metaAny = meta as any;
+
     return {
-      title: meta.name,
-      version: meta.version,
-      author: meta.authors?.[0],
-      contactInformation: meta.contactInformation,
-      reference: meta.references?.[0],
-      allowedUserName: meta.allowedUserName,
-      violentUssageName: meta.violentUssageName,
-      sexualUssageName: meta.sexualUssageName,
-      commercialUssageName: meta.commercialUssageName,
-      otherPermissionUrl: meta.otherPermissionUrl,
-      licenseName: meta.licenseName,
-      otherLicenseUrl: meta.otherLicenseUrl,
+      title: metaAny.name || metaAny.title,
+      version: metaAny.version,
+      author: metaAny.authors?.[0] || metaAny.author,
+      contactInformation: metaAny.contactInformation,
+      reference: metaAny.references?.[0],
+      allowedUserName: metaAny.allowedUserName,
+      violentUssageName: metaAny.violentUssageName,
+      sexualUssageName: metaAny.sexualUssageName,
+      commercialUssageName: metaAny.commercialUssageName,
+      otherPermissionUrl: metaAny.otherPermissionUrl,
+      licenseName: metaAny.licenseName,
+      otherLicenseUrl: metaAny.otherLicenseUrl,
     };
   }
 
@@ -510,8 +513,17 @@ export class VRMUtils {
       }
     });
 
-    // Dispose of the VRM itself
-    vrm.dispose();
+    // VRM doesn't have a dispose method, but we can clean up its properties
+    if (vrm.expressionManager) {
+      vrm.expressionManager.expressions.forEach(expression => {
+        expression.isBinary = false;
+      });
+    }
+
+    // Remove from parent if exists
+    if (vrm.scene.parent) {
+      vrm.scene.parent.remove(vrm.scene);
+    }
   }
 
   // Animation Presets
