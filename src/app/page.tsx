@@ -8,7 +8,7 @@ import EnvironmentSettings from './components/EnvironmentSettings';
 import BackgroundSelector, { BackgroundOption } from './components/BackgroundSelector';
 import LanguageSelector from './components/LanguageSelector';
 import AudioControls from './components/AudioControls';
-import { Sparkles, MessageSquare, Presentation, Settings, UserPlus } from 'lucide-react';
+import { Sparkles, MessageSquare, Presentation, Settings, UserPlus, Maximize } from 'lucide-react';
 
 export default function Home() {
   const [characterBackground, setCharacterBackground] = useState<BackgroundOption>({
@@ -24,7 +24,6 @@ export default function Home() {
     value: 'linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 50%, #fce4ec 100%)',
   });
   const [lightingIntensity, setLightingIntensity] = useState(1);
-  const [currentLanguage, setCurrentLanguage] = useState<'ja' | 'en'>('ja');
   const [showSettings, setShowSettings] = useState(false);
   const [showFullLayout, setShowFullLayout] = useState(false);
   
@@ -104,7 +103,10 @@ export default function Home() {
               />
               
               {/* Language Selector */}
-              <LanguageSelector onLanguageChange={setCurrentLanguage} />
+              <LanguageSelector onLanguageChange={(lang) => {
+                // Handle language change if needed
+                console.log('Language changed to:', lang);
+              }} />
             </div>
         </div>
       </header>
@@ -164,9 +166,7 @@ export default function Home() {
           </div>
         ) : (
           // Full layout with character and slides
-          <>
-            {/* Main Grid Content */}
-            <div className="grid grid-cols-12 gap-6 h-[calc(100vh-140px)]">
+          <div className="grid grid-cols-12 gap-6 h-[calc(100vh-140px)]">
               {/* Character Avatar Section */}
               <div className="col-span-12 lg:col-span-4">
                 <div 
@@ -242,17 +242,26 @@ export default function Home() {
                   }}
                 >
                   <div 
-                    className="flex items-center space-x-2 p-4"
+                    className="flex items-center justify-between p-4"
                     style={{
                       backgroundColor: 'rgba(255, 255, 255, 0.95)',
                       backdropFilter: 'blur(5px)',
                       WebkitBackdropFilter: 'blur(5px)',
                     }}
                   >
-                    <Presentation className="w-5 h-5 text-primary" />
-                    <h2 className="text-lg font-semibold text-gray-800">
-                      プレゼンテーション & Q&A
-                    </h2>
+                    <div className="flex items-center space-x-2">
+                      <Presentation className="w-5 h-5 text-primary" />
+                      <h2 className="text-lg font-semibold text-gray-800">
+                        プレゼンテーション & Q&A
+                      </h2>
+                    </div>
+                    <button
+                      onClick={() => setShowFullLayout(false)}
+                      className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                      title="全画面表示に戻る"
+                    >
+                      <Maximize className="w-5 h-5 text-gray-600" />
+                    </button>
                   </div>
                   <div className="flex-1 overflow-hidden">
                     <MarpViewer />
@@ -260,7 +269,6 @@ export default function Home() {
                 </div>
               </div>
             </div>
-          </>
         )}
         
         {/* Floating Voice Interface */}
