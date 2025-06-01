@@ -9,6 +9,7 @@
 Engineer Cafe Navigator provides the following RESTful API endpoints:
 
 - **Voice Processing**: Speech recognition, synthesis, and AI response generation
+- **Enhanced Voice Processing**: Voice processing with facial expression context
 - **Emotion Detection**: Real-time emotion analysis from text and voice
 - **Character Control**: VRM character expressions and emotion-driven animations
 - **Slide Control**: Marp slide display and navigation
@@ -179,6 +180,59 @@ The API uses Service Account authentication for Google Cloud services. Session-b
   ]
 }
 ```
+
+## 🎭 Enhanced Voice API
+
+### POST /api/voice/enhanced
+
+Voice processing with facial expression context for emotion-aware responses.
+
+#### Request
+
+```json
+{
+  "action": "process_text",
+  "text": "エンジニアカフェについて教えてください",
+  "language": "ja",
+  "expression": "happy",
+  "expressionConfidence": 0.85
+}
+```
+
+**Parameters:**
+- `action` (string, required): Must be `process_text`
+- `text` (string, required): User input text
+- `language` (string): Language code (`ja` or `en`)
+- `sessionId` (string): Session identifier
+- `expression` (string): Detected facial expression
+  - Values: `neutral`, `happy`, `sad`, `angry`, `fearful`, `disgusted`, `surprised`, `unknown`
+- `expressionConfidence` (number): Confidence level (0-1)
+
+#### Response
+
+```json
+{
+  "success": true,
+  "transcript": "エンジニアカフェについて教えてください",
+  "response": "[happy]はい、喜んでご説明します！エンジニアカフェは...",
+  "audioResponse": "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAWGluZ...",
+  "shouldUpdateCharacter": true,
+  "characterAction": "greeting",
+  "emotion": "happy",
+  "sessionId": "session_123456",
+  "detectedExpression": "happy",
+  "expressionConfidence": 0.85
+}
+```
+
+**Expression-Based Response Behavior:**
+- **Happy**: Enthusiastic, positive responses
+- **Sad**: Empathetic, supportive responses
+- **Angry**: Calm, understanding responses
+- **Surprised**: Informative, reassuring responses
+- **Neutral/Unknown**: Standard professional tone
+
+For detailed documentation, see [Enhanced Voice API Documentation](./API-ENHANCED-VOICE.md).
 
 ## 📊 スライド API
 

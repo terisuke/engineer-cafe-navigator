@@ -249,30 +249,36 @@ export default function Home() {
           const emotionToUse = quickResponse.emotion || emotionAnalysis.emotion;
           console.log('[Main] Setting enhanced emotion:', emotionToUse, 'intensity:', emotionAnalysis.intensity);
           
-          // Update character with enhanced emotion
-          await fetch('/api/character', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'setEmotion',
-              emotion: emotionToUse,
-              intensity: emotionAnalysis.intensity,
-              transition: true
-            })
-          });
+          // Apply expressions directly with simple mapping
+          console.log('[Main] ==========================================');
+          console.log('[Main] Processing cached response emotion:', emotionToUse);
+          console.log('[Main] setExpressionFunction available:', !!setExpressionFunction);
           
-          // Apply enhanced expressions
           if (setExpressionFunction) {
-            emotionManager.setEmotion(emotionToUse, emotionAnalysis.intensity);
-            const expressionWeights = emotionManager.getExpressionWeights();
-            console.log('[Main] Enhanced expression weights:', expressionWeights);
+            // Simple direct emotion to expression mapping
+            const emotionToExpression: Record<string, string> = {
+              'happy': 'happy',
+              'excited': 'happy', 
+              'sad': 'sad',
+              'angry': 'angry',
+              'surprised': 'surprised',
+              'neutral': 'neutral',
+              'relaxed': 'relaxed',
+              'thoughtful': 'relaxed'
+            };
             
-            // Apply multiple expressions with proper weights
-            Object.entries(expressionWeights).forEach(([expressionName, weight]) => {
-              if (weight > 0.1) {
-                setExpressionFunction(expressionName, weight);
-              }
-            });
+            const expressionName = emotionToExpression[emotionToUse] || 'neutral';
+            console.log(`[Main] Direct mapping: ${emotionToUse} -> ${expressionName}`);
+            console.log(`[Main] Calling setExpressionFunction('${expressionName}', 0.8)`);
+            
+            try {
+              setExpressionFunction(expressionName, 0.8);
+              console.log(`[Main] Successfully called setExpressionFunction`);
+            } catch (error) {
+              console.error(`[Main] Error calling setExpressionFunction:`, error);
+            }
+          } else {
+            console.warn('[Main] setExpressionFunction is not available');
           }
           
           // If we have cached audio, use it; otherwise generate TTS
@@ -353,29 +359,36 @@ export default function Home() {
           
           console.log('[Main] Enhanced emotion analysis:', { emotionToUse, intensity, confidence: emotionAnalysis.confidence });
           
-          // Update character with enhanced emotion
-          await fetch('/api/character', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'setEmotion',
-              emotion: emotionToUse,
-              intensity: intensity,
-              transition: true
-            })
-          });
+          // Apply expressions directly with simple mapping
+          console.log('[Main] ==========================================');
+          console.log('[Main] Processing voice result emotion:', emotionToUse);
+          console.log('[Main] setExpressionFunction available:', !!setExpressionFunction);
           
-          // Apply enhanced expressions
           if (setExpressionFunction) {
-            emotionManager.setEmotion(emotionToUse, intensity);
-            const expressionWeights = emotionManager.getExpressionWeights();
-            console.log('[Main] Enhanced expression weights:', expressionWeights);
+            // Simple direct emotion to expression mapping
+            const emotionToExpression: Record<string, string> = {
+              'happy': 'happy',
+              'excited': 'happy', 
+              'sad': 'sad',
+              'angry': 'angry',
+              'surprised': 'surprised',
+              'neutral': 'neutral',
+              'relaxed': 'relaxed',
+              'thoughtful': 'relaxed'
+            };
             
-            Object.entries(expressionWeights).forEach(([expressionName, weight]) => {
-              if (weight > 0.1) {
-                setExpressionFunction(expressionName, weight);
-              }
-            });
+            const expressionName = emotionToExpression[emotionToUse] || 'neutral';
+            console.log(`[Main] Direct mapping: ${emotionToUse} -> ${expressionName}`);
+            console.log(`[Main] Calling setExpressionFunction('${expressionName}', 0.8)`);
+            
+            try {
+              setExpressionFunction(expressionName, 0.8);
+              console.log(`[Main] Successfully called setExpressionFunction`);
+            } catch (error) {
+              console.error(`[Main] Error calling setExpressionFunction:`, error);
+            }
+          } else {
+            console.warn('[Main] setExpressionFunction is not available');
           }
           
           // Cache the response for future use
@@ -575,22 +588,14 @@ export default function Home() {
 
       audio.onended = () => {
         URL.revokeObjectURL(audioUrl);
-        console.log('[Main] Audio ended, resetting character');
+        console.log('[Main] Audio ended');
         
-        // Reset character to neutral after speaking
+        // Reset only the viseme (mouth shape) to closed, but keep the current expression
         if (setVisemeFunction) {
           setVisemeFunction('Closed', 0);
         }
         
-        fetch('/api/character', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'setExpression',
-            expression: 'neutral',
-            transition: true
-          })
-        });
+        // Don't reset expression to neutral - keep the current emotion
       };
 
       await audio.play();
@@ -701,13 +706,16 @@ export default function Home() {
                       setSetVisemeFunction(() => setViseme);
                     }}
                     onExpressionControl={(setExpression) => {
-                      console.log('[Main] Received expression control function');
+                      console.log('[Main] === Received expression control function ===');
+                      console.log('[Main] setExpression function type:', typeof setExpression);
+                      console.log('[Main] setExpression function:', setExpression);
                       setSetExpressionFunction(() => setExpression);
+                      console.log('[Main] setExpressionFunction state updated');
                     }}
                   />
                   
-                  {/* Settings button */}
-                  <div className="absolute top-4 left-4">
+                  {/* Settings and test buttons */}
+                  <div className="absolute top-4 left-4 flex flex-col gap-2">
                     <button
                       onClick={() => setShowSettings(!showSettings)}
                       className="p-3 bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:bg-white transition-colors"
@@ -715,6 +723,7 @@ export default function Home() {
                     >
                       <Settings className="w-6 h-6 text-gray-600" />
                     </button>
+                    
                   </div>
                   
                   {/* Voice interaction controls - only show when not in slide mode */}

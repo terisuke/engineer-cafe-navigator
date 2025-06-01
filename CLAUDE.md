@@ -61,6 +61,7 @@ The application follows a multi-layered architecture:
 ### Key API Endpoints
 
 - **POST /api/voice**: Voice processing (speech recognition, AI response, TTS)
+- **POST /api/voice/enhanced**: Enhanced voice processing with facial expression context
 - **POST /api/marp**: Marp markdown slide rendering
 - **POST /api/slides**: Slide navigation with narration
 - **POST /api/character**: VRM character control
@@ -102,4 +103,6 @@ All tables have Row Level Security (RLS) enabled with service role access.
 - 3D character animations synchronized with voice output
 - Slide presentations with voice narration
 - WebSocket support for external system integration
+- Hybrid voice recognition: Web Speech API (free) with Google Cloud STT fallback
+- Optional facial expression detection for emotion-aware responses
 - No test framework is currently configured

@@ -88,6 +88,8 @@ export default function CharacterAvatar({
   const lipSyncAnalyzerRef = useRef<LipSyncAnalyzer | null>(null);
   const expressionControllerRef = useRef<ExpressionController | null>(null);
   const autoBlinkCleanupRef = useRef<(() => void) | null>(null);
+  const currentExpressionRef = useRef<{ expression: string; weight: number }>({ expression: 'neutral', weight: 1.0 });
+  const expressionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -648,28 +650,70 @@ useEffect(() => {
 
       // Create expression control function
       const setExpression = (expression: string, weight: number) => {
-        console.log(`[CharacterAvatar] Setting expression: ${expression}, weight: ${weight}`);
+        console.log(`[CharacterAvatar] === setExpression called ===`);
+        console.log(`[CharacterAvatar] Expression: ${expression}, Weight: ${weight}`);
+        console.log(`[CharacterAvatar] BlendShape controller available:`, !!blendShapeControllerRef.current);
+        console.log(`[CharacterAvatar] VRM object:`, !!vrm);
+        
+        // Clear existing timeout if any
+        if (expressionTimeoutRef.current) {
+          clearTimeout(expressionTimeoutRef.current);
+          expressionTimeoutRef.current = null;
+        }
+        
         if (blendShapeControllerRef.current) {
           // Use the VRM expression manager to set expressions
           const expressionManager = vrm.expressionManager;
+          console.log(`[CharacterAvatar] Expression manager available:`, !!expressionManager);
+          
           if (expressionManager) {
             // Log available expressions for debugging
             const availableExpressions = Object.keys(expressionManager.expressionMap);
             console.log(`[CharacterAvatar] Available expressions:`, availableExpressions);
+            console.log(`[CharacterAvatar] Current expression values:`, availableExpressions.map(name => ({ 
+              name, 
+              value: expressionManager.getValue(name) 
+            })));
             
             // Reset all expressions first if weight is significant
             if (weight > 0.1) {
+              console.log(`[CharacterAvatar] Resetting all expressions except ${expression}`);
               availableExpressions.forEach(name => {
                 if (name !== expression) {
+                  const oldValue = expressionManager.getValue(name);
                   expressionManager.setValue(name, 0);
+                  console.log(`[CharacterAvatar] Reset ${name}: ${oldValue} -> 0`);
                 }
               });
             }
             
             // Set the target expression
             if (expressionManager.expressionMap[expression]) {
+              const oldValue = expressionManager.getValue(expression);
               expressionManager.setValue(expression, weight);
-              console.log(`[CharacterAvatar] Applied expression ${expression} with weight ${weight}`);
+              console.log(`[CharacterAvatar] Set ${expression}: ${oldValue} -> ${weight}`);
+              console.log(`[CharacterAvatar] Verified ${expression} value:`, expressionManager.getValue(expression));
+              
+              // Store current expression for restoration after lip-sync
+              currentExpressionRef.current = { expression, weight };
+              console.log(`[CharacterAvatar] Stored current expression:`, currentExpressionRef.current);
+              
+              // Set timer to return to neutral after 5 seconds (only for non-neutral expressions)
+              if (expression !== 'neutral' && weight > 0.1) {
+                console.log(`[CharacterAvatar] Setting timer to return to neutral in 5 seconds`);
+                expressionTimeoutRef.current = setTimeout(() => {
+                  console.log(`[CharacterAvatar] Timer triggered: returning to neutral`);
+                  // Gradually transition back to neutral
+                  availableExpressions.forEach(name => {
+                    if (name !== 'neutral') {
+                      expressionManager.setValue(name, 0);
+                    }
+                  });
+                  expressionManager.setValue('neutral', 1.0);
+                  currentExpressionRef.current = { expression: 'neutral', weight: 1.0 };
+                  console.log(`[CharacterAvatar] Returned to neutral expression`);
+                }, 5000);
+              }
             } else {
               console.warn(`[CharacterAvatar] Expression ${expression} not found in VRM model. Available:`, availableExpressions);
               
@@ -681,16 +725,48 @@ useEffect(() => {
               
               if (similarExpression) {
                 console.log(`[CharacterAvatar] Using similar expression: ${similarExpression}`);
+                const oldValue = expressionManager.getValue(similarExpression);
                 expressionManager.setValue(similarExpression, weight);
+                console.log(`[CharacterAvatar] Set ${similarExpression}: ${oldValue} -> ${weight}`);
+                // Store current expression for restoration after lip-sync
+                currentExpressionRef.current = { expression: similarExpression, weight };
+                
+                // Set timer to return to neutral after 5 seconds (only for non-neutral expressions)
+                if (similarExpression !== 'neutral' && weight > 0.1) {
+                  console.log(`[CharacterAvatar] Setting timer to return to neutral in 5 seconds`);
+                  expressionTimeoutRef.current = setTimeout(() => {
+                    console.log(`[CharacterAvatar] Timer triggered: returning to neutral`);
+                    // Gradually transition back to neutral
+                    availableExpressions.forEach(name => {
+                      if (name !== 'neutral') {
+                        expressionManager.setValue(name, 0);
+                      }
+                    });
+                    expressionManager.setValue('neutral', 1.0);
+                    currentExpressionRef.current = { expression: 'neutral', weight: 1.0 };
+                    console.log(`[CharacterAvatar] Returned to neutral expression`);
+                  }, 5000);
+                }
+              } else {
+                console.error(`[CharacterAvatar] No similar expression found for: ${expression}`);
               }
             }
           } else {
-            console.warn('[CharacterAvatar] Expression manager not available');
+            console.error('[CharacterAvatar] Expression manager not available');
           }
         } else {
-          console.warn('[CharacterAvatar] BlendShape controller not available');
+          console.error('[CharacterAvatar] BlendShape controller not available');
         }
+        console.log(`[CharacterAvatar] === setExpression end ===`);
       };
+
+      // Test the expression function immediately after creation
+      console.log('[CharacterAvatar] Testing expression function with "happy"');
+      try {
+        setExpression('happy', 0.8);
+      } catch (error) {
+        console.error('[CharacterAvatar] Error testing expression function:', error);
+      }
 
       onCharacterLoad?.(vrm);
       onEmotionUpdate?.(applyEmotionToCharacter);
@@ -748,14 +824,57 @@ useEffect(() => {
         // Apply expression to VRM model
         const expressionManager = charactersRef.current.expressionManager;
         if (expressionManager) {
-          // Reset all expressions
+          // Map emotion names to VRM expression names if needed
+          const expressionMapping: Record<string, string> = {
+            'neutral': 'neutral',
+            'happy': 'happy',
+            'sad': 'sad',
+            'angry': 'angry',
+            'surprised': 'surprised',
+            'relaxed': 'relaxed',
+            // Additional mappings for character actions
+            'thinking': 'relaxed',
+            'speaking': 'neutral',
+            'listening': 'neutral',
+            'greeting': 'happy',
+            'explaining': 'neutral'
+          };
+          
+          const vrmExpression = expressionMapping[expression] || expression;
+          console.log(`Mapping expression '${expression}' to VRM expression '${vrmExpression}'`);
+          
+          // Get available expressions for debugging
+          const availableExpressions = Object.keys(expressionManager.expressionMap);
+          console.log('Available VRM expressions:', availableExpressions);
+          
+          // Reset all expressions with gradual transition
           Object.keys(expressionManager.expressionMap).forEach(name => {
-            expressionManager.setValue(name, 0);
+            const currentValue = expressionManager.getValue(name) || 0;
+            if (currentValue > 0 && name !== vrmExpression) {
+              // Gradual fade out for smooth transition
+              expressionManager.setValue(name, 0);
+            }
           });
 
-          // Set new expression
-          if (expressionManager.expressionMap[expression]) {
-            expressionManager.setValue(expression, 1);
+          // Set new expression with full intensity
+          if (expressionManager.expressionMap[vrmExpression]) {
+            console.log(`Setting VRM expression '${vrmExpression}' to 1.0`);
+            expressionManager.setValue(vrmExpression, 1);
+            // Store current expression for restoration after lip-sync
+            currentExpressionRef.current = { expression: vrmExpression, weight: 1.0 };
+          } else {
+            console.warn(`VRM expression '${vrmExpression}' not found in model`);
+            // Try to find a similar expression
+            const similarExpression = availableExpressions.find(expr => 
+              expr.toLowerCase().includes(vrmExpression.toLowerCase()) ||
+              vrmExpression.toLowerCase().includes(expr.toLowerCase())
+            );
+            if (similarExpression) {
+              console.log(`Using similar expression: ${similarExpression}`);
+              expressionManager.setValue(similarExpression, 1);
+              // Store current expression for restoration after lip-sync
+              currentExpressionRef.current = { expression: similarExpression, weight: 1.0 };
+            }
           }
         }
 
@@ -913,6 +1032,12 @@ useEffect(() => {
   const cleanup = () => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
+    }
+    
+    // Clear expression timeout
+    if (expressionTimeoutRef.current) {
+      clearTimeout(expressionTimeoutRef.current);
+      expressionTimeoutRef.current = null;
     }
     
     // Stop and clean up animations
