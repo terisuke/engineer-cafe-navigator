@@ -49,7 +49,10 @@ cp .env.example .env.local
 # 必要な環境変数
 GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
 GOOGLE_CLOUD_PROJECT_ID=your-gcp-project
-POSTGRES_URL=your-supabase-db-url
+GOOGLE_CLOUD_CREDENTIALS=./config/service-account-key.json
+NEXT_PUBLIC_SUPABASE_URL=https://project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 NEXTAUTH_SECRET=your-secret-key
 ```
 
@@ -598,105 +601,24 @@ export const executeAgent = async (input: z.infer<typeof AgentInputSchema>) => {
 
 ## 🧪 テスト戦略
 
-### 1. ユニットテスト（Jest + Testing Library）
+### 現在のテスト環境
 
-```typescript
-// __tests__/components/Button.test.tsx
-import { render, screen, fireEvent } from '@testing-library/react';
-import { Button } from '@/components/Button';
+現在、プロジェクトにはテストフレームワークが設定されていません。APIの統合テストのみが利用可能です。
 
-describe('Button', () => {
-  it('renders correctly', () => {
-    render(<Button>Click me</Button>);
-    expect(screen.getByRole('button')).toHaveTextContent('Click me');
-  });
+### APIテストの実行
 
-  it('handles click events', () => {
-    const handleClick = jest.fn();
-    render(<Button onClick={handleClick}>Click me</Button>);
-    
-    fireEvent.click(screen.getByRole('button'));
-    expect(handleClick).toHaveBeenCalledTimes(1);
-  });
-
-  it('applies variant styles correctly', () => {
-    render(<Button variant="primary">Primary</Button>);
-    expect(screen.getByRole('button')).toHaveClass('btn-primary');
-  });
-
-  it('disables when disabled prop is true', () => {
-    render(<Button disabled>Disabled</Button>);
-    expect(screen.getByRole('button')).toBeDisabled();
-  });
-});
+```bash
+# API接続テスト
+pnpm test:api
 ```
 
-### 2. 統合テスト（API）
+このコマンドは`scripts/test-api-connection.ts`を実行し、APIエンドポイントの基本的な動作を確認します。
 
-```typescript
-// __tests__/api/voice.test.ts
-import { POST } from '@/app/api/voice/route';
-import { NextRequest } from 'next/server';
+### 将来のテスト計画
 
-describe('/api/voice', () => {
-  it('processes voice data successfully', async () => {
-    const requestData = {
-      action: 'process_voice',
-      audioData: 'test-audio-data',
-      sessionId: 'test-session-123',
-      language: 'ja',
-    };
-
-    const request = new NextRequest('http://localhost:3000/api/voice', {
-      method: 'POST',
-      body: JSON.stringify(requestData),
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    const response = await POST(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.transcript).toBeDefined();
-    expect(data.response).toBeDefined();
-  });
-
-  it('returns error for invalid request', async () => {
-    const request = new NextRequest('http://localhost:3000/api/voice', {
-      method: 'POST',
-      body: JSON.stringify({ invalid: 'data' }),
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    const response = await POST(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(data.success).toBe(false);
-    expect(data.error).toBeDefined();
-  });
-});
-```
-
-### 3. E2Eテスト（Playwright）
-
-```typescript
-// e2e/voice-interface.spec.ts
-import { test, expect } from '@playwright/test';
-
-test.describe('Voice Interface', () => {
-  test('should start and stop recording', async ({ page }) => {
-    await page.goto('/');
-    
-    // マイクボタンをクリック
-    const micButton = page.getByRole('button', { name: /start recording/i });
-    await micButton.click();
-    
-    // 録音状態の確認
-    await expect(micButton).toHaveClass(/recording/);
-    
-    // 録音停止
+1. **ユニットテスト**: Jest + React Testing Libraryの導入を検討
+2. **E2Eテスト**: Playwrightによるブラウザテストの導入を検討
+3. **APIテスト**: より包括的なテストスイートの構築
     await micButton.click();
     await expect(micButton).not.toHaveClass(/recording/);
   });
@@ -914,14 +836,11 @@ jobs:
       - name: Run linting
         run: pnpm lint
       
-      - name: Run type checking
-        run: pnpm type-check
-      
-      - name: Run tests
-        run: pnpm test
-      
       - name: Build application
         run: pnpm build
+      
+      - name: Run API tests
+        run: pnpm test:api
 
   deploy:
     needs: test

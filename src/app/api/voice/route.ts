@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { getEngineerCafeNavigator } from '@/mastra';
 import { Config } from '@/mastra/types/config';
+import { NextRequest, NextResponse } from 'next/server';
 
 // Configuration (in production, load from environment variables)
 const config: Config = {
@@ -65,15 +65,14 @@ export async function POST(request: NextRequest) {
     const { action, audioData, sessionId, language, text } = body;
 
     switch (action) {
-      case 'start_session':
+      case 'start_session': {
         const newSessionId = await realtimeAgent.startSession(body.visitorId, body.language || 'ja');
-        
         return NextResponse.json({
           success: true,
           sessionId: newSessionId,
         });
-
-      case 'process_voice':
+      }
+      case 'process_voice': {
         // Validate required fields for process_voice
         if (!audioData) {
           console.error('400 Error - Missing audioData for process_voice');
@@ -82,20 +81,15 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        
         // Ensure session is active
         if (sessionId && !realtimeAgent.getCurrentSessionId()) {
           await realtimeAgent.startSession(undefined, language || 'ja');
         }
-        
         // Convert base64 audio to ArrayBuffer
         const audioBuffer = Buffer.from(audioData, 'base64').buffer;
-        
         const result = await realtimeAgent.processVoiceInput(audioBuffer);
-        
         // Convert audio response back to base64
         const audioResponseBase64 = Buffer.from(new Uint8Array(result.audioResponse)).toString('base64');
-        
         return NextResponse.json({
           success: true,
           transcript: result.transcript,
@@ -109,87 +103,76 @@ export async function POST(request: NextRequest) {
           emotionTags: result.emotionTags, // Add emotion tags
           sessionId: realtimeAgent.getCurrentSessionId(),
         });
-
-      case 'end_session':
+      }
+      case 'end_session': {
         await realtimeAgent.endSession();
-        
         return NextResponse.json({
           success: true,
           message: 'Session ended',
         });
-
-      case 'set_language':
+      }
+      case 'set_language': {
         await realtimeAgent.setLanguage(language);
-        
         const languageTool = navigator.getTool('languageSwitch');
-        
         if (languageTool) {
           const switchResult = await languageTool.execute({
             action: 'switchLanguage',
             language,
           });
-          
           return NextResponse.json({
             success: switchResult.success,
             result: switchResult.result,
             error: switchResult.error,
           });
         }
-        
         return NextResponse.json({
           success: true,
           message: 'Language updated',
         });
-
-      case 'get_conversation_state':
+      }
+      case 'get_conversation_state': {
         const state = realtimeAgent.getConversationState();
         const summary = await realtimeAgent.getConversationSummary();
-        
         return NextResponse.json({
           success: true,
           state,
           summary,
         });
-
-      case 'clear_conversation':
+      }
+      case 'clear_conversation': {
         await realtimeAgent.clearConversationHistory();
         await realtimeAgent.setConversationState('idle');
-        
         return NextResponse.json({
           success: true,
           message: 'Conversation cleared',
         });
-
-      case 'handle_interruption':
+      }
+      case 'handle_interruption': {
         await realtimeAgent.handleInterruption();
-        
         return NextResponse.json({
           success: true,
           message: 'Interruption handled',
         });
-
-      case 'text_to_speech':
+      }
+      case 'text_to_speech': {
         // Ensure session is active for TTS
         if (sessionId && !realtimeAgent.getCurrentSessionId()) {
           await realtimeAgent.startSession(undefined, language || 'ja');
         }
-        
         // Set language for TTS
         if (language) {
           await realtimeAgent.setLanguage(language);
         }
-        
         // Generate TTS audio
         const ttsResult = await realtimeAgent.generateTTSAudio(text);
         const ttsAudioBase64 = Buffer.from(ttsResult).toString('base64');
-        
         return NextResponse.json({
           success: true,
           audioResponse: ttsAudioBase64,
           text: text,
         });
-
-      case 'process_text':
+      }
+      case 'process_text': {
         // Process text input with optional streaming
         if (!text) {
           return NextResponse.json(
@@ -197,26 +180,21 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        
         // Ensure session is active
         if (sessionId && !realtimeAgent.getCurrentSessionId()) {
           await realtimeAgent.startSession(undefined, language || 'ja');
         }
-        
         // Check if streaming is requested
         const useStreaming = body.streaming === true;
-        
         if (useStreaming) {
           // Use streaming TTS for better responsiveness
           const streamResult = await realtimeAgent.processTextInputStreaming(text);
-          
           // Collect audio chunks into array for response
           const audioChunks: string[] = [];
           for await (const chunk of streamResult.audioChunks) {
             const chunkBase64 = Buffer.from(chunk.chunk).toString('base64');
             audioChunks.push(chunkBase64);
           }
-          
           return NextResponse.json({
             success: true,
             transcript: text,
@@ -233,7 +211,6 @@ export async function POST(request: NextRequest) {
           // Use regular processing
           const result = await realtimeAgent.processTextInput(text);
           const audioResponseBase64 = Buffer.from(result.audioResponse).toString('base64');
-          
           return NextResponse.json({
             success: true,
             transcript: text,
@@ -246,33 +223,31 @@ export async function POST(request: NextRequest) {
             sessionId: realtimeAgent.getCurrentSessionId(),
           });
         }
-
-      case 'detect_language':
+      }
+      case 'detect_language': {
         const languageSwitch = navigator.getTool('languageSwitch');
-        
         if (languageSwitch) {
           const detection = await languageSwitch.execute({
             action: 'detectLanguage',
             text,
           });
-          
           return NextResponse.json({
             success: detection.success,
             result: detection.result,
             error: detection.error,
           });
         }
-        
         return NextResponse.json(
           { error: 'Language detection tool not available' },
           { status: 500 }
         );
-
-      default:
+      }
+      default: {
         return NextResponse.json(
           { error: `Unknown action: ${action}` },
           { status: 400 }
         );
+      }
     }
   } catch (error) {
     console.error('Voice API error:', error);
