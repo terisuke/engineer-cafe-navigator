@@ -37,7 +37,7 @@ export class AudioQueue {
     // Sort by priority (higher priority first)
     if (item.priority !== undefined) {
       const insertIndex = this.queue.findIndex(
-        queueItem => (queueItem.priority || 0) < (item.priority ?? 0)
+        queueItem => (queueItem.priority ?? 0) < (item.priority ?? 0)
       );
       if (insertIndex === -1) {
         this.queue.push(item);
