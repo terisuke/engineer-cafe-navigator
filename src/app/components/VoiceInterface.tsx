@@ -89,7 +89,7 @@ export default function VoiceInterface({
         audioContextRef.current.close();
       }
       if (audioQueueRef.current) {
-        audioQueueRef.current.stop();
+        audioQueueRef.current.clear();
       }
     };
   }, []);
@@ -330,8 +330,25 @@ export default function VoiceInterface({
         setResponse(result.response);
 
         // Play audio response
+        console.log('Voice processing result:', {
+          hasAudioResponse: !!result.audioResponse,
+          audioResponseLength: result.audioResponse?.length,
+          isMuted,
+          shouldPlayAudio: result.audioResponse && !isMuted
+        });
+        
         if (result.audioResponse && !isMuted) {
+          console.log('Starting audio playback...');
           await playAudioResponse(result.audioResponse);
+        } else {
+          console.log('Audio playback skipped:', {
+            hasAudioResponse: !!result.audioResponse,
+            isMuted,
+            setConversationStateToIdle: true
+          });
+          setConversationState('idle');
+          setIsLoading(false);
+          setLoadingMessage('');
         }
 
         // Update character if needed
@@ -368,47 +385,19 @@ export default function VoiceInterface({
       
       // Initialize audio queue
       if (!audioQueueRef.current) {
-        audioQueueRef.current = new AudioQueue({
-          onChunkStart: (item) => {
-            console.log(`Playing chunk ${item.index + 1}/${audioChunks.length}`);
-            setLoadingMessage('');
-            setIsLoading(false);
-          },
-          onChunkEnd: (item) => {
-            console.log(`Finished chunk ${item.index + 1}/${audioChunks.length}`);
-          },
-          onQueueEmpty: () => {
-            console.log('All chunks played');
-            setIsSpeaking(false);
-            setConversationState('idle');
-            
-            // Auto-listen if enabled
-            if (autoListen && !isMuted) {
-              setTimeout(() => {
-                console.log('Auto-listening after streaming response...');
-                startListening();
-              }, 1000);
-            }
-          },
-          onError: (error, item) => {
-            console.error(`Error playing chunk ${item.index}:`, error);
-            setError(formatError(error, currentLanguage));
-          }
-        });
+        audioQueueRef.current = new AudioQueue();
       }
       
-      // Reset queue for new playback
-      audioQueueRef.current.reset();
+      // Set volume
       audioQueueRef.current.setVolume(volume);
       
       // Enqueue all chunks
       audioChunks.forEach((chunk, index) => {
-        audioQueueRef.current!.enqueue({
+        audioQueueRef.current!.add({
           id: `chunk-${index}`,
           audioData: chunk,
-          text: '',
-          index,
-          isLast: index === audioChunks.length - 1,
+          text: `chunk-${index}`,
+          priority: index,
           emotion: currentEmotion || undefined
         });
       });
@@ -425,6 +414,7 @@ export default function VoiceInterface({
   // Play audio response
   const playAudioResponse = async (audioBase64: string) => {
     try {
+      console.log('playAudioResponse called with audioBase64 length:', audioBase64?.length);
       setIsLoading(true);
       setLoadingMessage(currentLanguage === 'ja' ? '音声を準備中...' : 'Preparing audio...');
       setIsSpeaking(true);
@@ -687,7 +677,7 @@ export default function VoiceInterface({
       
       // Stop audio queue if streaming
       if (audioQueueRef.current) {
-        audioQueueRef.current.stop();
+        audioQueueRef.current.clear();
       }
 
       // Notify backend of interruption

@@ -29,14 +29,23 @@ export class TextChunker {
   static chunkText(text: string, language: 'ja' | 'en' = 'ja'): TextChunk[] {
     // Remove emotion tags first but remember their positions
     const emotionPattern = /\[(happy|sad|angry|surprised|neutral|relaxed|excited|gentle|supportive|confused|apologetic|curious|thoughtful|warm|grateful|knowledgeable|analytical|energetic|confident)\]/g;
-    const emotions: { position: number; emotion: string }[] = [];
+    const emotions: { originalPosition: number; cleanPosition: number; emotion: string }[] = [];
+
+    // 感情タグを見つけて、クリーンテキストでの位置を計算
+    let cleanOffset = 0;
     let match;
-    
+    const matches = [];
     while ((match = emotionPattern.exec(text)) !== null) {
+      matches.push(match);
+    }
+
+    for (const match of matches) {
       emotions.push({
-        position: match.index,
+        originalPosition: match.index!,
+        cleanPosition: match.index! - cleanOffset,
         emotion: match[1]
       });
+      cleanOffset += match[0].length;
     }
     
     // Clean text for chunking
@@ -55,8 +64,10 @@ export class TextChunker {
       currentChunk += char;
       
       // Check for emotion change
-      const emotionAtPosition = emotions.find(e => e.position <= i && e.position > chunkStart);
-      if (emotionAtPosition) {
+      const emotionAtPosition = emotions.find(e => 
+        e.cleanPosition >= chunkStart && e.cleanPosition <= i
+      );
+      if (emotionAtPosition && emotionAtPosition.emotion !== currentEmotion) {
         currentEmotion = emotionAtPosition.emotion;
       }
       
@@ -83,18 +94,30 @@ export class TextChunker {
           }
         }
       }
-      // Priority 3: Max chunk size
+      // Priority 3: Force split if too long
       else if (currentChunk.length >= this.MAX_CHUNK_SIZE) {
+        shouldSplit = true;
+        splitPriority = 1;
+        
         // Try to find a word boundary for English
         if (language === 'en') {
           const lastSpace = currentChunk.lastIndexOf(' ');
           if (lastSpace > this.MIN_CHUNK_SIZE) {
-            currentChunk = currentChunk.slice(0, lastSpace);
-            i = chunkStart + lastSpace - 1;
+            // チャンクを単語境界で分割
+            const splitChunk = currentChunk.slice(0, lastSpace);
+            chunks.push({
+              text: splitChunk.trim(),
+              index: chunks.length,
+              isLast: false,
+              emotion: currentEmotion
+            });
+            
+            // 残りの部分から続行
+            currentChunk = currentChunk.slice(lastSpace + 1);
+            chunkStart = chunkStart + lastSpace + 1;
+            shouldSplit = false; // 既に分割したのでスキップ
           }
         }
-        shouldSplit = true;
-        splitPriority = 1;
       }
       
       // Split if needed

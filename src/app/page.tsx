@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import MarpViewer from './components/MarpViewer';
+import { Maximize, MessageSquare, Presentation, Settings, Sparkles, UserPlus, Volume2, VolumeX } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import BackgroundSelector, { BackgroundOption } from './components/BackgroundSelector';
 import CharacterAvatar from './components/CharacterAvatar';
 import EnvironmentSettings from './components/EnvironmentSettings';
-import BackgroundSelector, { BackgroundOption } from './components/BackgroundSelector';
-import { Sparkles, Settings, UserPlus, Maximize, MessageSquare, Presentation, Volume2, VolumeX } from 'lucide-react';
+import MarpViewer from './components/MarpViewer';
 
 export default function Home() {
   const [showSlideMode, setShowSlideMode] = useState(false);
@@ -256,16 +256,27 @@ export default function Home() {
           
           if (setExpressionFunction) {
             // Simple direct emotion to expression mapping
-            const emotionToExpression: Record<string, string> = {
-              'happy': 'happy',
-              'excited': 'happy', 
-              'sad': 'sad',
-              'angry': 'angry',
-              'surprised': 'surprised',
-              'neutral': 'neutral',
-              'relaxed': 'relaxed',
-              'thoughtful': 'relaxed'
-            };
+const emotionToExpression: Record<string, string> = {
+   'happy': 'happy',
+   'excited': 'happy', 
+   'sad': 'sad',
+   'angry': 'angry',
+   'surprised': 'surprised',
+   'neutral': 'neutral',
+   'relaxed': 'relaxed',
+  'thoughtful': 'relaxed',
+  'confused': 'surprised',
+  'apologetic': 'sad',
+  'curious': 'surprised',
+  'warm': 'happy',
+  'grateful': 'happy',
+  'confident': 'happy',
+  'supportive': 'relaxed',
+  'gentle': 'relaxed',
+  'knowledgeable': 'neutral',
+  'analytical': 'neutral',
+  'energetic': 'happy'
+ };
             
             const expressionName = emotionToExpression[emotionToUse] || 'neutral';
             console.log(`[Main] Direct mapping: ${emotionToUse} -> ${expressionName}`);
