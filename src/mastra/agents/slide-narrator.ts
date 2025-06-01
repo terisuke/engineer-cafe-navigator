@@ -40,7 +40,17 @@ export class SlideNarrator extends Agent {
     try {
       // Load narration JSON for the specified language
       const narrationLoader = this._tools.get('narrationLoader');
-      this.narrationData = await narrationLoader.loadNarration(slideFile, language);
+      const result = await narrationLoader.execute({
+        slideFile,
+        language,
+        action: 'load'
+      });
+      
+      if (!result.success || !result.narrationData) {
+        throw new Error(`Failed to load narration: ${result.error}`);
+      }
+      
+      this.narrationData = result.narrationData;
       this.totalSlides = this.narrationData.slides.length;
       this.currentSlide = 1;
       
@@ -89,7 +99,15 @@ export class SlideNarrator extends Agent {
     } else if (this.memory instanceof Map) {
       language = this.memory.get('language') as SupportedLanguage || 'ja';
     }
-    const audioBuffer = await voiceService.textToSpeech(narration, { language });
+    const ttsResult = await voiceService.textToSpeech(narration, language);
+    
+    if (!ttsResult.success || !ttsResult.audioBase64) {
+      throw new Error(`Text-to-Speech failed: ${ttsResult.error}`);
+    }
+    
+    // Convert base64 to ArrayBuffer
+    const buffer = Buffer.from(ttsResult.audioBase64, 'base64');
+    const audioBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
     
     // Update current slide
     this.currentSlide = targetSlide;

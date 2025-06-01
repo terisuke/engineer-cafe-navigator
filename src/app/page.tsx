@@ -831,7 +831,17 @@ export default function Home() {
                             <span className="text-lg font-semibold">Speak English</span>
                           </button>
                           <button
-                            onClick={() => setShowSlideMode(true)}
+                            onClick={() => {
+                              setShowSlideMode(true);
+                              // Auto-start presentation
+                              setTimeout(() => {
+                                // Find MarpViewer and trigger auto-play
+                                const autoPlayEvent = new CustomEvent('autoStartPresentation', { 
+                                  detail: { autoPlay: true } 
+                                });
+                                window.dispatchEvent(autoPlayEvent);
+                              }, 100);
+                            }}
                             className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
                           >
                             <UserPlus className="w-5 h-5" />
@@ -943,7 +953,11 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="h-[calc(100%-4rem)]">
-                      <MarpViewer />
+                      <MarpViewer 
+                        onVisemeControl={setVisemeFunction}
+                        onExpressionControl={setExpressionFunction}
+                        volume={volume}
+                      />
                     </div>
                   </div>
                 </div>

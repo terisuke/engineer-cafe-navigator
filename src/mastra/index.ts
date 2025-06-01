@@ -83,6 +83,7 @@ export class EngineerCafeNavigator {
     this.tools.set('externalApi', externalApiTool);
     this.tools.set('languageSwitch', languageSwitchTool);
     this.tools.set('pageTransition', pageTransitionTool);
+    this.tools.set('voiceService', this.voiceService);
 
     // Register tools with agents
     this.agents.forEach((agent) => {
