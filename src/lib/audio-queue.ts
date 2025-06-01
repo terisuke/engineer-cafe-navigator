@@ -17,6 +17,7 @@ export class AudioQueue {
   private currentAudio: HTMLAudioElement | null = null;
   private volume = 0.8;
   private onFinishedCallback?: () => void;
+  private isSkipping = false;
 
   constructor() {
     // Initialize audio queue
@@ -93,12 +94,22 @@ export class AudioQueue {
    * Play the next item in the queue
    */
   private async playNext(): Promise<void> {
+    // Prevent concurrent playNext calls during skip operations
+    if (this.isSkipping) {
+      return;
+    }
+    
     if (this.queue.length === 0) {
       this.isPlaying = false;
       // Call finished callback if set
       if (this.onFinishedCallback) {
         this.onFinishedCallback();
       }
+      return;
+    }
+
+    // Prevent multiple concurrent playNext calls
+    if (this.isPlaying) {
       return;
     }
 
@@ -112,6 +123,7 @@ export class AudioQueue {
     }
 
     // Continue with next item
+    this.isPlaying = false; // Reset before recursive call
     this.playNext();
   }
 
@@ -164,11 +176,18 @@ export class AudioQueue {
    */
   skip(): void {
     if (this.currentAudio) {
+      this.isSkipping = true;
       this.currentAudio.pause();
       this.currentAudio = null;
+      
+      // Trigger next playback safely using setTimeout to avoid race conditions
+      setTimeout(() => {
+        this.isSkipping = false;
+        if (!this.isPlaying) {
+          this.playNext();
+        }
+      }, 0);
     }
-    // Manually trigger the next audio since we're not relying on the ended event
-    this.playNext();
   }
 
   /**

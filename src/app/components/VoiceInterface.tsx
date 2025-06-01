@@ -166,7 +166,7 @@ export default function VoiceInterface({
   const processTextInput = async (text: string) => {
     try {
       setIsLoading(true);
-      setLoadingMessage(currentLanguage === 'ja' ? 'テキストを処理中...' : 'Processing text...');
+      setLoadingMessage(currentLanguage === 'ja' ? 'AIが応答を考えています...' : 'AI is thinking...');
       setTranscript(text);
       setConversationState('processing');
       
@@ -193,6 +193,9 @@ export default function VoiceInterface({
 
       if (result.success) {
         setResponse(result.response);
+        
+        // Update loading message for TTS generation
+        setLoadingMessage(currentLanguage === 'ja' ? '音声を生成中...' : 'Generating voice...');
 
         // Update character if needed
         if (result.shouldUpdateCharacter) {
@@ -306,7 +309,7 @@ export default function VoiceInterface({
   const processAudioInput = async (audioBlob: Blob) => {
     try {
       setIsLoading(true);
-      setLoadingMessage(currentLanguage === 'ja' ? '音声を処理中...' : 'Processing audio...');
+      setLoadingMessage(currentLanguage === 'ja' ? '音声を認識中...' : 'Recognizing speech...');
       const audioBuffer = await audioBlob.arrayBuffer();
       const uint8Array = new Uint8Array(audioBuffer);
       const audioBase64 = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
@@ -328,6 +331,9 @@ export default function VoiceInterface({
       if (result.success) {
         setTranscript(result.transcript);
         setResponse(result.response);
+        
+        // Update loading message for TTS generation
+        setLoadingMessage(currentLanguage === 'ja' ? '音声を生成中...' : 'Generating voice...');
 
         // Play audio response
         console.log('Voice processing result:', {
@@ -380,6 +386,8 @@ export default function VoiceInterface({
   // Play streaming audio response
   const playStreamingAudioResponse = async (audioChunks: string[]) => {
     try {
+      setIsLoading(true);
+      setLoadingMessage(currentLanguage === 'ja' ? 'ストリーミング音声を準備中...' : 'Preparing streaming audio...');
       setIsSpeaking(true);
       setConversationState('speaking');
       
@@ -419,6 +427,10 @@ export default function VoiceInterface({
       });
       
       console.log(`Queued ${audioChunks.length} audio chunks for playback`);
+      
+      // Clear loading state once chunks are queued
+      setIsLoading(false);
+      setLoadingMessage('');
     } catch (error: any) {
       console.error('Error playing streaming audio:', error);
       setIsSpeaking(false);
@@ -432,7 +444,7 @@ export default function VoiceInterface({
     try {
       console.log('playAudioResponse called with audioBase64 length:', audioBase64?.length);
       setIsLoading(true);
-      setLoadingMessage(currentLanguage === 'ja' ? '音声を準備中...' : 'Preparing audio...');
+      setLoadingMessage(currentLanguage === 'ja' ? '音声を再生準備中...' : 'Preparing audio playback...');
       setIsSpeaking(true);
       setConversationState('speaking');
 
@@ -788,7 +800,7 @@ export default function VoiceInterface({
               }`} />
             )}
             <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
-              {isLoading ? loadingMessage :
+              {isLoading && loadingMessage ? loadingMessage :
                 conversationState === 'idle' && (currentLanguage === 'ja' ? '待機中' : 'Ready') ||
                 conversationState === 'listening' && (currentLanguage === 'ja' ? '聞いています...' : 'Listening...') ||
                 conversationState === 'processing' && (currentLanguage === 'ja' ? '処理中...' : 'Processing...') ||
@@ -823,8 +835,11 @@ export default function VoiceInterface({
                   ? 'bg-gray-400 text-white cursor-not-allowed'
                   : 'bg-gradient-to-r from-primary to-secondary hover:from-secondary hover:to-primary text-white shadow-lg hover:shadow-xl hover:scale-105'
               }`}
+              title={isLoading && loadingMessage ? loadingMessage : 
+                     isListening ? (currentLanguage === 'ja' ? '停止' : 'Stop') : 
+                     (currentLanguage === 'ja' ? '録音開始' : 'Start recording')}
             >
-              {isLoading ? (
+              {isLoading && !isListening ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : isListening ? (
                 <MicOff className="w-5 h-5" />
@@ -976,7 +991,7 @@ export default function VoiceInterface({
             }`} />
           )}
           <span className="text-sm font-medium text-gray-700">
-            {isLoading ? loadingMessage :
+            {isLoading && loadingMessage ? loadingMessage :
               conversationState === 'idle' && (currentLanguage === 'ja' ? '待機中' : 'Ready') ||
               conversationState === 'listening' && (currentLanguage === 'ja' ? '聞いています...' : 'Listening...') ||
               conversationState === 'processing' && (currentLanguage === 'ja' ? '処理中...' : 'Processing...') ||
@@ -1019,8 +1034,11 @@ export default function VoiceInterface({
               ? 'bg-gray-400 text-white cursor-not-allowed'
               : 'bg-gradient-to-r from-primary to-secondary hover:from-secondary hover:to-primary text-white shadow-lg hover:shadow-xl hover:scale-105'
           }`}
+          title={isLoading && loadingMessage ? loadingMessage : 
+                 isListening ? (currentLanguage === 'ja' ? '停止' : 'Stop') : 
+                 (currentLanguage === 'ja' ? '録音開始' : 'Start recording')}
         >
-          {isLoading ? (
+          {isLoading && !isListening ? (
             <Loader2 className="w-6 h-6 animate-spin" />
           ) : isListening ? (
             <MicOff className="w-6 h-6" />

@@ -60,11 +60,14 @@ export class GoogleCloudVoiceSimple {
       const authClient = await this.auth.getClient();
       const accessToken = await authClient.getAccessToken();
       
-      if (!accessToken.token) {
+      // Handle both old (object) and new (string/null) return formats
+      const token = typeof accessToken === 'string' ? accessToken : accessToken?.token;
+      
+      if (!token) {
         throw new Error('Failed to get access token');
       }
       
-      this.accessToken = accessToken.token;
+      this.accessToken = token;
       this.tokenExpiry = now + 3300 * 1000; // 55 minutes
       
       console.log('Access token obtained successfully');

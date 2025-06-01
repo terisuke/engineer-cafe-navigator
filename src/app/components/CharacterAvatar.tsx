@@ -761,13 +761,11 @@ useEffect(() => {
       };
 
       // Initialize with neutral expression
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[CharacterAvatar] Testing expression function with "happy"');
-        try {
-          setExpression('happy', 0.8);
-        } catch (error) {
-          console.error('[CharacterAvatar] Error testing expression function:', error);
-        }
+      try {
+        setExpression('neutral', 1.0);
+        console.log('[CharacterAvatar] Initialized with neutral expression');
+      } catch (error) {
+        console.error('[CharacterAvatar] Error setting initial neutral expression:', error);
       }
 
       onCharacterLoad?.(vrm);
