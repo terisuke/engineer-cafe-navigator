@@ -1,7 +1,7 @@
 'use client';
 
 import { Maximize, MessageSquare, Presentation, Settings, Sparkles, UserPlus, Volume2, VolumeX } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import BackgroundSelector, { BackgroundOption } from './components/BackgroundSelector';
 import CharacterAvatar from './components/CharacterAvatar';
 import EnvironmentSettings from './components/EnvironmentSettings';
@@ -62,6 +62,12 @@ export default function Home() {
   // Loading state
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingMessage, setProcessingMessage] = useState('');
+
+  // ボイスウェーブの高さ（scaleY）を一度だけ生成して保持
+  const voiceWaveScales = useMemo(() =>
+    Array.from({ length: 5 }, () => Math.random() * 0.5 + 0.5),
+    []
+  );
 
   // Apply selected background to both character and main display
   const handleBackgroundChange = (newBackground: BackgroundOption) => {
@@ -686,14 +692,14 @@ export default function Home() {
               
               {/* Voice wave animation */}
               <div className="flex items-center space-x-1 h-8">
-                {[...Array(5)].map((_, i) => (
+                {voiceWaveScales.map((scale, i) => (
                   <div
                     key={i}
                     className="w-1 bg-blue-500 rounded-full animate-pulse"
                     style={{ 
                       height: '100%',
                       animationDelay: `${i * 0.1}s`,
-                      transform: `scaleY(${Math.random() * 0.5 + 0.5})`
+                      transform: `scaleY(${scale})`
                     }}
                   />
                 ))}

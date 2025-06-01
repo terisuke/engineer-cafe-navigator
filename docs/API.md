@@ -9,7 +9,6 @@
 Engineer Cafe Navigator provides the following RESTful API endpoints:
 
 - **Voice Processing**: Speech recognition, synthesis, and AI response generation
-- **Enhanced Voice Processing**: Voice processing with facial expression context
 - **Emotion Detection**: Real-time emotion analysis from text and voice
 - **Character Control**: VRM character expressions and emotion-driven animations
 - **Slide Control**: Marp slide display and navigation
@@ -87,6 +86,7 @@ The API uses Service Account authentication for Google Cloud services. Session-b
   "success": true,
   "transcript": "エンジニアカフェについて教えてください",
   "response": "エンジニアカフェは福岡市にある...",
+  "responseText": "エンジニアカフェは福岡市にある...",
   "audioResponse": "base64-encoded-mp3-audio",
   "shouldUpdateCharacter": true,
   "characterAction": "greeting",
@@ -96,6 +96,10 @@ The API uses Service Account authentication for Google Cloud services. Session-b
     "confidence": 0.82,
     "duration": 2500
   },
+  "primaryEmotion": "explaining",
+  "emotionTags": [
+    { "tag": "explaining", "intensity": 0.75 }
+  ],
   "sessionId": "uuid-session-id"
 }
 ```
@@ -181,58 +185,34 @@ The API uses Service Account authentication for Google Cloud services. Session-b
 }
 ```
 
-## 🎭 Enhanced Voice API
+## 🏞️ Background API
 
-### POST /api/voice/enhanced
+### GET /api/backgrounds
 
-Voice processing with facial expression context for emotion-aware responses.
+Retrieve available background images for the application.
 
 #### Request
 
-```json
-{
-  "action": "process_text",
-  "text": "エンジニアカフェについて教えてください",
-  "language": "ja",
-  "expression": "happy",
-  "expressionConfidence": 0.85
-}
-```
-
-**Parameters:**
-- `action` (string, required): Must be `process_text`
-- `text` (string, required): User input text
-- `language` (string): Language code (`ja` or `en`)
-- `sessionId` (string): Session identifier
-- `expression` (string): Detected facial expression
-  - Values: `neutral`, `happy`, `sad`, `angry`, `fearful`, `disgusted`, `surprised`, `unknown`
-- `expressionConfidence` (number): Confidence level (0-1)
+No parameters required.
 
 #### Response
 
+**Success (200):**
 ```json
 {
-  "success": true,
-  "transcript": "エンジニアカフェについて教えてください",
-  "response": "[happy]はい、喜んでご説明します！エンジニアカフェは...",
-  "audioResponse": "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAWGluZ...",
-  "shouldUpdateCharacter": true,
-  "characterAction": "greeting",
-  "emotion": "happy",
-  "sessionId": "session_123456",
-  "detectedExpression": "happy",
-  "expressionConfidence": 0.85
+  "images": [
+    "IMG_5573.JPG",
+    "placeholder.svg"
+  ],
+  "total": 2
 }
 ```
 
-**Expression-Based Response Behavior:**
-- **Happy**: Enthusiastic, positive responses
-- **Sad**: Empathetic, supportive responses
-- **Angry**: Calm, understanding responses
-- **Surprised**: Informative, reassuring responses
-- **Neutral/Unknown**: Standard professional tone
-
-For detailed documentation, see [Enhanced Voice API Documentation](./API-ENHANCED-VOICE.md).
+**Notes:**
+- Returns all image files from the `/public/backgrounds` directory
+- Supported formats: `.jpg`, `.jpeg`, `.png`, `.webp`, `.svg`
+- Excludes hidden files (starting with `.`) and README files
+- If the directory doesn't exist, it will be created automatically
 
 ## 📊 スライド API
 
@@ -577,15 +557,15 @@ AIによる質問回答システム
 
 ### エラーコード一覧
 
-| コード | 説明 | HTTPステータス |
-|--------|------|----------------|
-| `VOICE_PROCESSING_ERROR` | 音声処理エラー | 400 |
-| `SLIDE_NOT_FOUND` | スライドが見つからない | 404 |
-| `CHARACTER_ACTION_FAILED` | キャラクター操作失敗 | 500 |
-| `EXTERNAL_SERVICE_ERROR` | 外部サービス連携エラー | 502 |
-| `INVALID_REQUEST` | 無効なリクエスト | 400 |
-| `AUTHENTICATION_REQUIRED` | 認証が必要 | 401 |
-| `RATE_LIMIT_EXCEEDED` | レート制限超過 | 429 |
+| コード                       | 説明            | HTTPステータス |
+|---------------------------|----------------|-----------|
+| `VOICE_PROCESSING_ERROR`  | 音声処理エラー     | 400       |
+| `SLIDE_NOT_FOUND`         | スライドが見つからない    | 404       |
+| `CHARACTER_ACTION_FAILED` | キャラクター操作失敗  | 500       |
+| `EXTERNAL_SERVICE_ERROR`  | 外部サービス連携エラー | 502       |
+| `INVALID_REQUEST`         | 無効なリクエスト      | 400       |
+| `AUTHENTICATION_REQUIRED` | 認証が必要       | 401       |
+| `RATE_LIMIT_EXCEEDED`     | レート制限超過     | 429       |
 
 ### エラーレスポンス形式
 

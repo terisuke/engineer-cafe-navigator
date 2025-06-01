@@ -1,6 +1,6 @@
 import { EmotionData, EmotionManager } from '@/lib/emotion-manager';
 import { EmotionTagParser } from '@/lib/emotion-tag-parser';
-import { PerformanceMonitor } from '@/lib/performance-monitor';
+import { endPerformance, logPerformanceSummary, startPerformance } from '@/lib/performance-monitor';
 import { ConversationManager, SupabaseMemoryAdapter } from '@/lib/supabase-memory';
 import { TextChunker } from '@/lib/text-chunker';
 import { Agent } from '@mastra/core';
@@ -81,9 +81,9 @@ export class RealtimeAgent extends Agent {
       }
 
       // Generate response with emotion tags
-      PerformanceMonitor.start('AI Response Generation (Text)');
+      startPerformance('AI Response Generation (Text)');
       const rawResponse = await this.generateResponse(text);
-      performanceSteps['AI Response Generation'] = PerformanceMonitor.end('AI Response Generation (Text)');
+      performanceSteps['AI Response Generation'] = endPerformance('AI Response Generation (Text)');
       
       // Parse emotion tags from response
       const parsedResponse = EmotionTagParser.parseEmotionTags(rawResponse);
@@ -110,7 +110,7 @@ export class RealtimeAgent extends Agent {
       const characterAction = this.determineCharacterAction(cleanResponse, emotion);
       
       // Log performance summary for text processing
-      PerformanceMonitor.logSummary(performanceSteps);
+      logPerformanceSummary(performanceSteps);
       
       return {
         response: cleanResponse,
@@ -126,7 +126,7 @@ export class RealtimeAgent extends Agent {
       console.error('Error processing text input:', error);
       // Log partial performance data if available
       if (Object.keys(performanceSteps).length > 0) {
-        PerformanceMonitor.logSummary(performanceSteps);
+        logPerformanceSummary(performanceSteps);
       }
       throw error;
     }
@@ -142,6 +142,7 @@ export class RealtimeAgent extends Agent {
     emotion?: EmotionData;
     emotionTags?: any[];
     primaryEmotion?: string;
+    responseText?: string;
     error?: string;
   }> {
     const performanceSteps: Record<string, number> = {};
@@ -153,14 +154,14 @@ export class RealtimeAgent extends Agent {
       if (!this.voiceService) {
         throw new Error('Voice service not initialized');
       }
-      PerformanceMonitor.start('Speech-to-Text');
+      startPerformance('Speech-to-Text');
       // Convert ArrayBuffer to base64 for the API
       const uint8Array = new Uint8Array(audioBuffer);
       const audioBase64 = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
       
       const currentLang = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
       const result = await this.voiceService.speechToText(audioBase64, currentLang);
-      performanceSteps['Speech-to-Text'] = PerformanceMonitor.end('Speech-to-Text');
+      performanceSteps['Speech-to-Text'] = endPerformance('Speech-to-Text');
       
       if (!result.success || !result.transcript || !result.transcript.trim()) {
         this.conversationState = 'idle';
@@ -176,14 +177,14 @@ export class RealtimeAgent extends Agent {
       const transcript = result.transcript;
 
       // Generate response with emotion tags
-      PerformanceMonitor.start('AI Response Generation');
+      startPerformance('AI Response Generation');
       const rawResponse = await this.generateResponse(transcript);
-      performanceSteps['AI Response Generation'] = PerformanceMonitor.end('AI Response Generation');
+      performanceSteps['AI Response Generation'] = endPerformance('AI Response Generation');
       
       // Parse emotion tags from response
-      PerformanceMonitor.start('Emotion Parsing');
+      startPerformance('Emotion Parsing');
       const parsedResponse = EmotionTagParser.parseEmotionTags(rawResponse);
-      performanceSteps['Emotion Parsing'] = PerformanceMonitor.end('Emotion Parsing');
+      performanceSteps['Emotion Parsing'] = endPerformance('Emotion Parsing');
       
       // Use clean text (without emotion tags) for TTS
       const cleanResponse = parsedResponse.cleanText;
@@ -218,7 +219,7 @@ export class RealtimeAgent extends Agent {
       this.storeConversationTurn(transcript, cleanResponse, emotion).catch(console.error);
       
       // Convert CLEAN response to speech (without emotion tags and markdown)
-      PerformanceMonitor.start('Text-to-Speech');
+      startPerformance('Text-to-Speech');
       const cleanedForTTS = this.cleanTextForTTS(cleanResponse);
       
       // Set voice parameters based on emotion
@@ -237,7 +238,7 @@ export class RealtimeAgent extends Agent {
       const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
       const audioResponse = audioData.buffer;
       
-      performanceSteps['Text-to-Speech'] = PerformanceMonitor.end('Text-to-Speech');
+      performanceSteps['Text-to-Speech'] = endPerformance('Text-to-Speech');
       
       // Determine character action based on response content and emotion (simple default)
       const characterAction = 'speaking';
@@ -245,7 +246,7 @@ export class RealtimeAgent extends Agent {
       this.conversationState = 'speaking';
       
       // Log performance summary
-      PerformanceMonitor.logSummary(performanceSteps);
+      logPerformanceSummary(performanceSteps);
       
       return {
         transcript,
@@ -257,13 +258,14 @@ export class RealtimeAgent extends Agent {
         emotion,
         emotionTags: parsedResponse.emotions,
         primaryEmotion: parsedResponse.primaryEmotion,
+        responseText: cleanResponse,
       };
     } catch (error) {
       console.error('Voice processing error:', error);
       this.conversationState = 'idle';
       // Log partial performance data if available
       if (Object.keys(performanceSteps).length > 0) {
-        PerformanceMonitor.logSummary(performanceSteps);
+        logPerformanceSummary(performanceSteps);
       }
       throw error;
     }
@@ -693,14 +695,14 @@ export class RealtimeAgent extends Agent {
       this.conversationState = 'processing';
       
       // Generate response with emotion tags
-      PerformanceMonitor.start('AI Response Generation');
+      startPerformance('AI Response Generation');
       const rawResponse = await this.generateResponse(input);
-      performanceSteps['AI Response Generation'] = PerformanceMonitor.end('AI Response Generation');
+      performanceSteps['AI Response Generation'] = endPerformance('AI Response Generation');
       
       // Parse emotion tags from response
-      PerformanceMonitor.start('Emotion Parsing');
+      startPerformance('Emotion Parsing');
       const parsedResponse = EmotionTagParser.parseEmotionTags(rawResponse);
-      performanceSteps['Emotion Parsing'] = PerformanceMonitor.end('Emotion Parsing');
+      performanceSteps['Emotion Parsing'] = endPerformance('Emotion Parsing');
       
       const cleanResponse = parsedResponse.cleanText;
       const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
@@ -741,7 +743,7 @@ export class RealtimeAgent extends Agent {
       );
       
       // Log performance summary
-      PerformanceMonitor.logSummary(performanceSteps);
+      logPerformanceSummary(performanceSteps);
       
       return {
         transcript: input,

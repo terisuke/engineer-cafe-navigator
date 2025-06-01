@@ -61,17 +61,15 @@ export class TextChunker {
     let currentChunk = '';
     let chunkStart = 0;
     let currentEmotion: string | undefined;
-    
+    let emotionIdx = 0;
+    // emotions配列はcleanPosition順に並んでいる前提
     for (let i = 0; i < cleanText.length; i++) {
       const char = cleanText[i];
       currentChunk += char;
-      
-      // Check for emotion change
-      const emotionAtPosition = emotions.find(e => 
-        e.cleanPosition >= chunkStart && e.cleanPosition <= i
-      );
-      if (emotionAtPosition && emotionAtPosition.emotion !== currentEmotion) {
-        currentEmotion = emotionAtPosition.emotion;
+      // 2ポインタ法で感情タグを反映
+      while (emotionIdx < emotions.length && emotions[emotionIdx].cleanPosition === i) {
+        currentEmotion = emotions[emotionIdx].emotion;
+        emotionIdx++;
       }
       
       // Check if we should split here
