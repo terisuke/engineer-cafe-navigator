@@ -1,0 +1,32 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/update-knowledge-base",
+      "schedule": "0 */6 * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/voice/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/qa/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/knowledge/search/route.ts": {
+      "maxDuration": 10
+    },
+    "src/app/api/cron/update-knowledge-base/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/monitoring/dashboard/route.ts": {
+      "maxDuration": 10
+    }
+  },
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "buildCommand": "pnpm build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "regions": ["hnd1"]
+}
