@@ -40,12 +40,15 @@ export class TextChunker {
     }
 
     for (const match of matches) {
-      emotions.push({
-        originalPosition: match.index!,
-        cleanPosition: match.index! - cleanOffset,
-        emotion: match[1]
-      });
-      cleanOffset += match[0].length;
+      const matchIndex = match.index;
+      if (matchIndex !== undefined) {
+        emotions.push({
+          originalPosition: matchIndex,
+          cleanPosition: matchIndex - cleanOffset,
+          emotion: match[1]
+        });
+        cleanOffset += match[0].length;
+      }
     }
     
     // Clean text for chunking
@@ -87,7 +90,7 @@ export class TextChunker {
             shouldSplit = true;
             splitPriority = 2;
             break;
-          } else if (language === 'en' && cleanText.slice(i - ending.length + 1, i + 1).includes(ending)) {
+          } else if (language === 'en' && cleanText.slice(i - ending.length + 1, i + 1) === ending) {
             shouldSplit = true;
             splitPriority = 2;
             break;
