@@ -16,6 +16,8 @@ import { CharacterControlTool } from './tools/character-control';
 import { ExternalApiTool } from './tools/external-api';
 import { LanguageSwitchTool } from './tools/language-switch';
 import { PageTransitionTool } from './tools/page-transition';
+import { RAGSearchTool } from './tools/rag-search';
+import { ExternalDataFetcherTool } from './tools/external-data-fetcher';
 
 export class EngineerCafeNavigator {
   private mastra: Mastra;
@@ -75,6 +77,8 @@ export class EngineerCafeNavigator {
     const externalApiTool = new ExternalApiTool(this.config.external);
     const languageSwitchTool = new LanguageSwitchTool();
     const pageTransitionTool = new PageTransitionTool();
+    const ragSearchTool = new RAGSearchTool();
+    const externalDataFetcherTool = new ExternalDataFetcherTool(this.config.external);
 
     this.tools.set('slideControl', slideControlTool);
     this.tools.set('marpRenderer', marpRendererTool);
@@ -83,6 +87,8 @@ export class EngineerCafeNavigator {
     this.tools.set('externalApi', externalApiTool);
     this.tools.set('languageSwitch', languageSwitchTool);
     this.tools.set('pageTransition', pageTransitionTool);
+    this.tools.set('ragSearch', ragSearchTool);
+    this.tools.set('externalDataFetcher', externalDataFetcherTool);
     this.tools.set('voiceService', this.voiceService);
 
     // Register tools with agents
