@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Play, Pause, RotateCcw, ExternalLink, MessageCircle, Keyboard, Settings } from 'lucide-react';
 import { useKeyboardControls } from '@/app/hooks/useKeyboardControls';
-import SlideDebugPanel from './SlideDebugPanel';
 import { audioStateManager } from '@/lib/audio-state-manager';
+import { ChevronLeft, ChevronRight, Keyboard, MessageCircle, Pause, Play, RotateCcw, Settings } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import SlideDebugPanel from './SlideDebugPanel';
 
 interface SlideData {
   slideNumber: number;
@@ -1362,7 +1362,7 @@ export default function MarpViewer({
       <div className="h-1 bg-gray-200">
         <div
           className="h-full bg-blue-500 transition-all duration-300"
-          style={{ width: `${(currentSlide / totalSlides) * 100}%` }}
+          style={{ width: `${totalSlides ? (currentSlide / totalSlides) * 100 : 0}%` }}
         />
       </div>
 

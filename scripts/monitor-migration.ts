@@ -5,11 +5,10 @@
  * Run: pnpm tsx scripts/monitor-migration.ts
  */
 
-import { performanceBaseline } from '../src/lib/monitoring/performance-baseline';
-import { ragSearchRouter } from '../src/mastra/tools/rag-search-router';
-import { supabaseAdmin } from '../src/lib/supabase';
 import { config } from 'dotenv';
 import path from 'path';
+import { supabaseAdmin } from '../src/lib/supabase';
+import { ragSearchRouter } from '../src/mastra/tools/rag-search-router';
 
 // Load environment variables
 config({ path: path.join(__dirname, '../.env.local') });
@@ -185,11 +184,12 @@ async function checkErrorRates() {
   log('4. Error Rates', 'info');
   log('-------------', 'info');
   
+  // LIKE句の代わりにilike（大文字小文字無視の部分一致）を使い、SQLインジェクションを防ぐ
   const { data: errors } = await supabaseAdmin
     .from('system_errors')
     .select('*')
     .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
-    .like('error_type', '%rag%');
+    .ilike('error_type', '%rag%');
   
   const v1Errors = errors?.filter(e => e.error_message?.includes('v1')) || [];
   const v2Errors = errors?.filter(e => e.error_message?.includes('v2')) || [];

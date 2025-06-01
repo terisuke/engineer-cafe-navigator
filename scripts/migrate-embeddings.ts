@@ -5,11 +5,11 @@
  * This script handles the gradual migration from 1536-dim to new embedding models
  */
 
-import { supabaseAdmin } from '../src/lib/supabase';
-import { embedMany } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import { embedMany } from 'ai';
 import { config } from 'dotenv';
 import path from 'path';
+import { supabaseAdmin } from '../src/lib/supabase';
 import { MIGRATION_CONFIG } from '../src/mastra/config/mastra-v2';
 
 // Load environment variables
@@ -97,6 +97,8 @@ class EmbeddingMigrator {
       CREATE INDEX idx_kb_v2_migration_status ON knowledge_base_v2(migration_status);
     `;
     
+    // 注意: exec_sqlはSQLインジェクションリスクがあるため、外部入力を絶対に含めないこと。
+    // 本番運用ではsupabaseのマイグレーション機能やSQLファイル管理を推奨。
     if (!this.isDryRun) {
       await supabaseAdmin.rpc('exec_sql', { sql });
       log('✅ Migration table created', 'success');

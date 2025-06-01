@@ -5,11 +5,10 @@
  * Run: pnpm tsx scripts/validate-production.ts
  */
 
-import { performanceBaseline } from '../src/lib/monitoring/performance-baseline';
-import { ragMetrics } from '../src/lib/monitoring/rag-metrics';
-import { supabaseAdmin } from '../src/lib/supabase';
 import { config } from 'dotenv';
 import path from 'path';
+import { ragMetrics } from '../src/lib/monitoring/rag-metrics';
+import { supabaseAdmin } from '../src/lib/supabase';
 
 // Load environment variables
 config({ path: path.join(__dirname, '../.env.local') });
@@ -258,7 +257,7 @@ async function analyzeCostSavings() {
   const v1MonthlyCost = (queriesPerMonth / 1000000) * v1CostPer1M;
   const v2MonthlyCost = (queriesPerMonth / 1000000) * v2CostPer1M;
   const monthlySavings = v1MonthlyCost - v2MonthlyCost;
-  const savingsPercent = ((monthlySavings / v1MonthlyCost) * 100);
+  const savingsPercent = v1MonthlyCost > 0 ? ((monthlySavings / v1MonthlyCost) * 100) : 0;
   
   console.log(`Monthly queries: ${queriesPerMonth.toLocaleString()}`);
   console.log(`V1 cost: $${v1MonthlyCost.toFixed(2)}/month`);

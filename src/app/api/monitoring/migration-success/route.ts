@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ragMetrics } from '@/lib/monitoring/rag-metrics';
+import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * Migration success dashboard endpoint
@@ -174,15 +173,19 @@ async function getQualityMetrics() {
     ? v2Metrics.reduce((sum, m) => sum + m.avg_similarity, 0) / v2Metrics.length
     : 0;
   
-  const similarityImprovement = ((v2AvgSimilarity - v1AvgSimilarity) / v1AvgSimilarity * 100);
+  // ゼロ除算防止
+  const safeV1Avg = isFinite(v1AvgSimilarity) ? v1AvgSimilarity : 0;
+  const safeV2Avg = isFinite(v2AvgSimilarity) ? v2AvgSimilarity : 0;
+  
+  const similarityImprovement = safeV1Avg > 0 ? ((safeV2Avg - safeV1Avg) / safeV1Avg * 100) : 0;
   
   return {
     avgSimilarity: {
-      v1: v1AvgSimilarity.toFixed(3),
-      v2: v2AvgSimilarity.toFixed(3),
+      v1: safeV1Avg.toFixed(3),
+      v2: safeV2Avg.toFixed(3),
       improvement: `${similarityImprovement > 0 ? '+' : ''}${similarityImprovement.toFixed(1)}%`,
     },
-    meetsThreshold: v2AvgSimilarity >= 0.7,
+    meetsThreshold: safeV2Avg >= 0.7,
   };
 }
 

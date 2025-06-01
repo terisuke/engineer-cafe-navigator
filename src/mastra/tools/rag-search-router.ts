@@ -1,9 +1,9 @@
+import { featureFlags } from '@/lib/feature-flags';
+import { FeatureCircuitBreaker } from '@/lib/rollback-manager';
+import { supabaseAdmin as importedSupabaseAdmin } from '@/lib/supabase';
+import { SupportedLanguage } from '../types/config';
 import { ragSearchTool } from './rag-search';
 import { ragSearchV2 } from './rag-search-v2';
-import { featureFlags } from '@/lib/feature-flags';
-import { ragMetrics } from '@/lib/monitoring/rag-metrics';
-import { FeatureCircuitBreaker } from '@/lib/rollback-manager';
-import { SupportedLanguage } from '../types/config';
 
 /**
  * RAG Search Router for A/B testing between V1 and V2 implementations
@@ -12,6 +12,7 @@ import { SupportedLanguage } from '../types/config';
 export class RAGSearchRouter {
   private v1 = ragSearchTool;
   private v2 = ragSearchV2;
+  private supabaseAdmin = importedSupabaseAdmin;
   
   /**
    * Route search to appropriate implementation based on feature flags
@@ -51,17 +52,23 @@ export class RAGSearchRouter {
         const startTime = Date.now();
         
         try {
-          const results = implementation === 'v2'
+          let results = implementation === 'v2'
             ? await this.v2.search(query, options)
             : await this.v1.searchKnowledgeBase(query, (options.language as SupportedLanguage) || 'ja');
-          
           const responseTime = Date.now() - startTime;
           
           // Track implementation-specific metrics
-          const resultsArray = typeof results === 'string' 
-            ? [] // If V1 returns string, no results array available
-            : Array.isArray(results) ? results : [];
-            
+          let resultsArray: any[] = [];
+          if (implementation === 'v1') {
+            if (typeof results === 'string') {
+              resultsArray = results.trim() ? [results] : [];
+            } else if (Array.isArray(results)) {
+              resultsArray = results;
+            }
+          } else {
+            resultsArray = Array.isArray(results) ? results : [];
+          }
+          
           await this.trackImplementationMetrics(
             implementation,
             query,
@@ -88,11 +95,18 @@ export class RAGSearchRouter {
         console.warn('[RAGSearchRouter] Falling back to V1 due to circuit breaker');
         const startTime = Date.now();
         
-        const results = await this.v1.searchKnowledgeBase(query, (options.language as SupportedLanguage) || 'ja');
+        let results = await this.v1.searchKnowledgeBase(query, (options.language as SupportedLanguage) || 'ja');
         const responseTime = Date.now() - startTime;
         
+        let resultsArray: any[] = [];
+        if (typeof results === 'string') {
+          resultsArray = results.trim() ? [results] : [];
+        } else if (Array.isArray(results)) {
+          resultsArray = results;
+        }
+        
         return {
-          results: [],
+          results: resultsArray,
           metadata: {
             implementation: 'v1' as const,
             responseTime,
@@ -168,10 +182,20 @@ export class RAGSearchRouter {
     operation: () => Promise<any>
   ): Promise<{ results: any; responseTime: number }> {
     const startTime = Date.now();
-    const results = await operation();
+    let results = await operation();
+    let resultsArray: any[] = [];
+    if (implementation === 'v1') {
+      if (typeof results === 'string') {
+        resultsArray = results.trim() ? [results] : [];
+      } else if (Array.isArray(results)) {
+        resultsArray = results;
+      }
+    } else {
+      resultsArray = Array.isArray(results) ? results : [];
+    }
     const responseTime = Date.now() - startTime;
     
-    return { results, responseTime };
+    return { results: resultsArray, responseTime };
   }
   
   /**
@@ -185,7 +209,7 @@ export class RAGSearchRouter {
     options: any
   ): Promise<void> {
     // Add implementation tag to metrics
-    await supabaseAdmin
+    await this.supabaseAdmin
       .from('rag_implementation_metrics')
       .insert({
         implementation,
@@ -238,7 +262,7 @@ export class RAGSearchRouter {
     }
     
     // Store comparison
-    await supabaseAdmin
+    await this.supabaseAdmin
       .from('rag_ab_test_results')
       .insert(comparison);
   }
@@ -255,7 +279,7 @@ export class RAGSearchRouter {
     comparison: ComparisonStats;
   }> {
     // Fetch metrics for both implementations
-    const { data: metrics } = await supabaseAdmin
+    const { data: metrics } = await this.supabaseAdmin
       .from('rag_implementation_metrics')
       .select('*')
       .gte('created_at', timeRange.start.toISOString())
@@ -300,15 +324,20 @@ export class RAGSearchRouter {
     }
     
     const responseTimes = metrics.map(m => m.response_time_ms).sort((a, b) => a - b);
-    const p95Index = Math.floor(responseTimes.length * 0.95);
+    let p95ResponseTime = 0;
+    if (responseTimes.length > 0) {
+      let p95Index = Math.floor(responseTimes.length * 0.95);
+      if (p95Index >= responseTimes.length) p95Index = responseTimes.length - 1;
+      p95ResponseTime = responseTimes[p95Index];
+    }
     
     return {
       totalQueries: metrics.length,
-      avgResponseTime: responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length,
-      p95ResponseTime: responseTimes[p95Index],
-      avgResultsCount: metrics.reduce((sum, m) => sum + m.results_count, 0) / metrics.length,
-      avgSimilarity: metrics.reduce((sum, m) => sum + m.avg_similarity, 0) / metrics.length,
-      successRate: 1, // Assuming all stored metrics are from successful queries
+      avgResponseTime: responseTimes.length > 0 ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length : 0,
+      p95ResponseTime,
+      avgResultsCount: metrics.length > 0 ? metrics.reduce((sum, m) => sum + m.results_count, 0) / metrics.length : 0,
+      avgSimilarity: metrics.length > 0 ? metrics.reduce((sum, m) => sum + m.avg_similarity, 0) / metrics.length : 0,
+      successRate: metrics.length > 0 ? 1 : 0, // Assuming all stored metrics are from successful queries
     };
   }
   
@@ -350,9 +379,6 @@ interface ComparisonStats {
   similarityImprovement: number;
   successRateImprovement: number;
 }
-
-// Import for metrics tracking
-import { supabaseAdmin } from '@/lib/supabase';
 
 // Export singleton instance
 export const ragSearchRouter = new RAGSearchRouter();
