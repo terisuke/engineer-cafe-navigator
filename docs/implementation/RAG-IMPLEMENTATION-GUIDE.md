@@ -535,9 +535,9 @@ RAG_SEARCH_LIMIT=5
 RAG_RELEVANCE_THRESHOLD=0.7
 
 # External Data Sources
-CONNPASS_API_KEY=your_connpass_api_key
-GOOGLE_CALENDAR_CLIENT_ID=your_google_calendar_client_id
-GOOGLE_CALENDAR_CLIENT_SECRET=your_google_calendar_client_secret
+CONNPASS_API_KEY=
+GOOGLE_CALENDAR_CLIENT_ID=
+GOOGLE_CALENDAR_CLIENT_SECRET=
 ```
 
 ## Quick Start Guide

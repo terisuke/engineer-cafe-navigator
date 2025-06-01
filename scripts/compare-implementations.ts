@@ -5,10 +5,10 @@
  * Run: pnpm tsx scripts/compare-implementations.ts
  */
 
-import { ragSearchTool } from '../src/mastra/tools/rag-search';
-import { ragSearchV2 } from '../src/mastra/tools/rag-search-v2';
 import { config } from 'dotenv';
 import path from 'path';
+import { ragSearchTool } from '../src/mastra/tools/rag-search';
+import { ragSearchV2 } from '../src/mastra/tools/rag-search-v2';
 
 // Load environment variables
 config({ path: path.join(__dirname, '../.env.local') });
@@ -86,21 +86,20 @@ async function compareImplementations() {
 
 async function runV1(testCase: any) {
   const startTime = Date.now();
-  
   try {
-    const results = await ragSearchTool.searchKnowledgeBase(
+    const result = await ragSearchTool.searchKnowledgeBase(
       testCase.query,
       testCase.language as 'ja' | 'en'
     );
-    
     const responseTime = Date.now() - startTime;
-    
+    // 文字列ならラップ、配列ならそのまま返却
+    const results = typeof result === 'string' ? [{ text: result }] : result;
     return {
       success: true,
       results,
       responseTime,
-      resultCount: 0, // searchKnowledgeBase returns a formatted string, not array
-      avgSimilarity: 0, // searchKnowledgeBase returns a formatted string, not array
+      resultCount: Array.isArray(results) ? results.length : 0,
+      avgSimilarity: Array.isArray(results) ? calculateAvgSimilarity(results) : 0,
     };
   } catch (error) {
     return {
@@ -144,50 +143,48 @@ async function runV2(testCase: any) {
 
 function displayComparison(v1Result: any, v2Result: any) {
   console.log('\n📊 Results:');
-  
   // V1 Results
   console.log('\nV1 (Current - 1536 dims):');
   if (v1Result.success) {
     console.log(`  ✅ Success in ${v1Result.responseTime}ms`);
     console.log(`  • Results: ${v1Result.resultCount}`);
     console.log(`  • Avg Similarity: ${v1Result.avgSimilarity.toFixed(3)}`);
-    if (v1Result.results.length > 0) {
+    if (Array.isArray(v1Result.results) && v1Result.results.length > 0) {
       console.log('  • Top result:');
-      console.log(`    - ${v1Result.results[0].title || 'Untitled'}`);
-      console.log(`    - Similarity: ${v1Result.results[0].similarity.toFixed(3)}`);
+      console.log(`    - ${v1Result.results[0].title || v1Result.results[0].text || 'Untitled'}`);
+      if (v1Result.results[0].similarity !== undefined) {
+        console.log(`    - Similarity: ${v1Result.results[0].similarity.toFixed(3)}`);
+      }
     }
   } else {
     console.log(`  ❌ Failed: ${v1Result.error}`);
   }
-  
   // V2 Results
   console.log('\nV2 (New - 768 dims):');
   if (v2Result.success) {
     console.log(`  ✅ Success in ${v2Result.responseTime}ms`);
     console.log(`  • Results: ${v2Result.resultCount}`);
     console.log(`  • Avg Similarity: ${v2Result.avgSimilarity.toFixed(3)}`);
-    if (v2Result.results.length > 0) {
+    if (Array.isArray(v2Result.results) && v2Result.results.length > 0) {
       console.log('  • Top result:');
-      console.log(`    - ${v2Result.results[0].title || 'Untitled'}`);
-      console.log(`    - Similarity: ${v2Result.results[0].similarity.toFixed(3)}`);
+      console.log(`    - ${v2Result.results[0].title || v2Result.results[0].text || 'Untitled'}`);
+      if (v2Result.results[0].similarity !== undefined) {
+        console.log(`    - Similarity: ${v2Result.results[0].similarity.toFixed(3)}`);
+      }
     }
   } else {
     console.log(`  ❌ Failed: ${v2Result.error}`);
   }
-  
   // Comparison
   if (v1Result.success && v2Result.success) {
     console.log('\n📈 Comparison:');
-    
     const timeDiff = v2Result.responseTime - v1Result.responseTime;
     const timePercent = ((timeDiff / v1Result.responseTime) * 100).toFixed(1);
-    
     if (timeDiff < 0) {
       log(`  • Speed: V2 is ${Math.abs(timeDiff)}ms faster (${Math.abs(parseFloat(timePercent))}% improvement)`, 'success');
     } else {
       log(`  • Speed: V2 is ${timeDiff}ms slower (${timePercent}% degradation)`, 'warning');
     }
-    
     const simDiff = v2Result.avgSimilarity - v1Result.avgSimilarity;
     if (Math.abs(simDiff) < 0.05) {
       log(`  • Accuracy: Similar (diff: ${simDiff.toFixed(3)})`, 'success');
@@ -196,14 +193,12 @@ function displayComparison(v1Result: any, v2Result: any) {
     } else {
       log(`  • Accuracy: V1 is better (${simDiff.toFixed(3)})`, 'warning');
     }
-    
     // Check if results are similar
-    const v1Ids = new Set(v1Result.results.map((r: any) => r.id));
-    const v2Ids = new Set(v2Result.results.map((r: any) => r.id));
+    const v1Ids = new Set(Array.isArray(v1Result.results) ? v1Result.results.map((r: any) => r.id) : []);
+    const v2Ids = new Set(Array.isArray(v2Result.results) ? v2Result.results.map((r: any) => r.id) : []);
     const overlap = [...v1Ids].filter(id => v2Ids.has(id)).length;
-    const overlapPercent = (overlap / Math.max(v1Ids.size, v2Ids.size)) * 100;
-    
-    console.log(`  • Result overlap: ${overlap}/${Math.max(v1Ids.size, v2Ids.size)} (${overlapPercent.toFixed(0)}%)`);
+    const overlapPercent = (overlap / Math.max(v1Ids.size, v2Ids.size || 1)) * 100;
+    console.log(`  • Result overlap: ${overlap}/${Math.max(v1Ids.size, v2Ids.size || 1)} (${overlapPercent.toFixed(0)}%)`);
   }
 }
 

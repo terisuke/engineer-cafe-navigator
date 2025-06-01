@@ -1,5 +1,5 @@
-import { google, calendar_v3 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
+import { calendar_v3, google } from 'googleapis';
 import { withRetry } from '../retry-utils';
 
 /**
@@ -10,11 +10,13 @@ export class GoogleCalendarClient {
   private calendar: calendar_v3.Calendar;
   
   constructor() {
-    this.oauth2Client = new OAuth2Client(
-      process.env.GOOGLE_CALENDAR_CLIENT_ID,
-      process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
-      process.env.GOOGLE_CALENDAR_REDIRECT_URI
-    );
+    const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
+    const redirectUri = process.env.GOOGLE_CALENDAR_REDIRECT_URI;
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new Error('Google Calendar OAuth2 credentials are not fully configured. Please set GOOGLE_CALENDAR_CLIENT_ID, GOOGLE_CALENDAR_CLIENT_SECRET, and GOOGLE_CALENDAR_REDIRECT_URI.');
+    }
+    this.oauth2Client = new OAuth2Client(clientId, clientSecret, redirectUri);
     
     this.calendar = google.calendar({ version: 'v3', auth: this.oauth2Client });
   }
@@ -41,10 +43,13 @@ export class GoogleCalendarClient {
     refresh_token?: string;
   }> {
     const { tokens } = await this.oauth2Client.getToken(code);
+    if (!tokens.access_token) {
+      throw new Error('No access_token returned from Google OAuth2.');
+    }
     this.oauth2Client.setCredentials(tokens);
     
     return {
-      access_token: tokens.access_token!,
+      access_token: tokens.access_token,
       refresh_token: tokens.refresh_token || undefined,
     };
   }
@@ -66,7 +71,7 @@ export class GoogleCalendarClient {
     });
 
     const authClient = await auth.getClient();
-    this.calendar = google.calendar({ version: 'v3', auth: authClient as any });
+    this.calendar = google.calendar({ version: 'v3', auth: authClient as OAuth2Client });
   }
 
   /**

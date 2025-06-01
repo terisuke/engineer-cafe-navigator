@@ -100,13 +100,13 @@
 
 ### Rollout Schedule
 
-| Day | Date | Percentage | Verification |
-|-----|------|-----------|--------------|
-| 8   | Jun 10 | 10% | Monitor 24h, check metrics |
-| 10  | Jun 12 | 25% | Compare V1/V2 performance |
-| 12  | Jun 14 | 50% | Run A/B test analysis |
-| 14  | Jun 16 | 75% | Check cost reduction |
-| 16  | Jun 18 | 100% | Full deployment |
+| Day | Date   | Percentage | Verification               |
+|-----|--------|------------|----------------------------|
+| 8   | Jun 10 | 10%        | Monitor 24h, check metrics |
+| 10  | Jun 12 | 25%        | Compare V1/V2 performance  |
+| 12  | Jun 14 | 50%        | Run A/B test analysis      |
+| 14  | Jun 16 | 75%        | Check cost reduction       |
+| 16  | Jun 18 | 100%       | Full deployment            |
 
 ### Daily Rollout Process
 
@@ -179,7 +179,11 @@
 
 1. **Final Backup**
    ```bash
-   pg_dump -h your-db-host -U postgres -d postgres -t knowledge_base > backup/knowledge_base_v1_final.sql
+   # Supabase推奨: 環境変数やプロジェクト情報に合わせて修正
+   pg_dump -h <your-db-host> -U <your-db-user> -d <your-db-name> -t knowledge_base \
+     --no-owner --no-privileges --format=plain > backup/knowledge_base_v1_final.sql
+   # 例（Supabase CLIで取得した接続情報を利用）
+   # pg_dump -h db.<project>.supabase.co -U postgres -d postgres -t knowledge_base --no-owner --no-privileges --format=plain > backup/knowledge_base_v1_final.sql
    ```
 
 2. **Create Branch**

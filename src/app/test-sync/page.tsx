@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
 import MarpViewer from '@/app/components/MarpViewer';
 import { audioStateManager } from '@/lib/audio-state-manager';
+import { useEffect, useState } from 'react';
 
 export default function TestSyncPage() {
   const [testResults, setTestResults] = useState<string[]>([]);
@@ -38,13 +38,10 @@ export default function TestSyncPage() {
     // Test 1: Check if audio state manager is working
     addTestResult(`🔧 Audio processing status: ${audioStateManager.isAudioProcessing()}`);
     
-    // Test 2: Simulate audio queueing
-    const testAudioBlob = new Blob(['test'], { type: 'audio/mp3' });
-    const testAudioUrl = URL.createObjectURL(testAudioBlob);
-    
+    // Test 2: Simulate audio queueing with有効なMP3ファイルURL（publicディレクトリにtest-audio.mp3を配置しておく）
+    const testAudioUrl = '/test-audio.mp3';
     audioStateManager.queueAudio(testAudioUrl, () => {
       addTestResult('✅ Test audio completed successfully');
-      URL.revokeObjectURL(testAudioUrl);
     });
     
     setTimeout(() => {

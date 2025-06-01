@@ -5,10 +5,10 @@
  * Run: pnpm tsx scripts/create-snapshot.ts --name "pre-v2-deployment"
  */
 
-import { rollbackManager } from '../src/lib/rollback-manager';
-import { supabaseAdmin } from '../src/lib/supabase';
 import { config } from 'dotenv';
 import path from 'path';
+import { rollbackManager } from '../src/lib/rollback-manager';
+import { supabaseAdmin } from '../src/lib/supabase';
 
 // Load environment variables
 config({ path: path.join(__dirname, '../.env.local') });
@@ -61,7 +61,7 @@ async function createSnapshot() {
       .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
       .limit(100);
     
-    const avgResponseTime = recentMetrics
+    const avgResponseTime = recentMetrics && recentMetrics.length > 0
       ? recentMetrics.reduce((sum, m) => sum + m.response_time_ms, 0) / recentMetrics.length
       : 0;
     

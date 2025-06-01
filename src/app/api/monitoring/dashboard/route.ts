@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { ragMetrics } from '@/lib/monitoring/rag-metrics';
 import { supabaseAdmin } from '@/lib/supabase';
+import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * Production monitoring dashboard API
@@ -64,7 +64,9 @@ export async function GET(request: NextRequest) {
         avgResponseTime: `${Math.round(searchStats.avgResponseTime)}ms`,
         cacheHitRate: `${Math.round(searchStats.cacheHitRate * 100)}%`,
         systemStatus: systemHealth.status,
-        errorRate: `${((recentErrors.length / searchStats.totalSearches) * 100).toFixed(2)}%`,
+        errorRate: searchStats.totalSearches > 0
+          ? ((recentErrors.length / searchStats.totalSearches) * 100).toFixed(2) + '%'
+          : '0.00%',
       },
       search: {
         ...searchStats,

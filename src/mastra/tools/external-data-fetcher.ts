@@ -444,6 +444,18 @@ export class ExternalDataFetcherTool {
     error?: string;
     cached?: boolean;
   }> {
+    // 例: 外部HTMLから取得する場合
+    // const html = await fetch('https://engineer-cafe.jp/announcements').then(res => res.text());
+    // const $ = cheerio.load(html);
+    // const announcements = $('.announcement').map((i, el) => ({
+    //   id: $(el).attr('data-id'),
+    //   message: $(el).find('.message').text(),
+    //   createdAt: $(el).find('.date').text(),
+    //   priority: $(el).find('.priority').text() as 'low' | 'medium' | 'high',
+    // })).get();
+    // return { success: true, data: announcements };
+
+    // 既存のFacilityStatusから取得する場合
     const facilityStatus = await this.getFacilityStatus(language);
     if (!facilityStatus.success || !facilityStatus.data) {
       return {
@@ -451,7 +463,19 @@ export class ExternalDataFetcherTool {
         error: 'Failed to fetch announcements',
       };
     }
-
+    // ここでHTMLが入っている場合はcheerioでパースして構造化データにする
+    // 例: facilityStatus.data.announcementsHtml
+    // if (facilityStatus.data.announcementsHtml) {
+    //   const $ = cheerio.load(facilityStatus.data.announcementsHtml);
+    //   const announcements = $('.announcement').map((i, el) => ({
+    //     id: $(el).attr('data-id'),
+    //     message: $(el).find('.message').text(),
+    //     createdAt: $(el).find('.date').text(),
+    //     priority: $(el).find('.priority').text() as 'low' | 'medium' | 'high',
+    //   })).get();
+    //   return { success: true, data: announcements, cached: facilityStatus.cached };
+    // }
+    // 既存の構造化データをそのまま返す
     return {
       success: true,
       data: facilityStatus.data.announcements,

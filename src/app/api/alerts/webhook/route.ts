@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { rollbackManager } from '@/lib/rollback-manager';
 import { supabaseAdmin } from '@/lib/supabase';
+import crypto from 'crypto';
+import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * Webhook endpoint for production alerts
@@ -12,7 +13,16 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     const webhookSecret = process.env.ALERT_WEBHOOK_SECRET;
     
-    if (webhookSecret && authHeader !== `Bearer ${webhookSecret}`) {
+    // 環境変数未設定なら必ず拒否
+    if (!webhookSecret) {
+      return NextResponse.json(
+        { error: 'Unauthorized: webhook secret not set' },
+        { status: 401 }
+      );
+    }
+    // constant-time比較
+    const expected = `Bearer ${webhookSecret}`;
+    if (!authHeader || !timingSafeEqualStr(authHeader, expected)) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -206,4 +216,12 @@ interface AlertResponse {
   action: string;
   automated: boolean;
   timestamp: string;
+}
+
+// constant-time string comparison
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.length !== bBuf.length) return false;
+  return crypto.timingSafeEqual(aBuf, bBuf);
 }

@@ -1,5 +1,5 @@
-import { supabaseAdmin } from './supabase';
 import { featureFlags } from './feature-flags';
+import { supabaseAdmin } from './supabase';
 
 /**
  * Rollback manager for safe production deployments
@@ -21,13 +21,26 @@ export class RollbackManager {
    */
   async createSnapshot(name: string, metadata?: any): Promise<string> {
     try {
+      // metadataバリデーション
+      let safeMetadata: any = {};
+      if (metadata !== undefined) {
+        if (typeof metadata !== 'object' || Array.isArray(metadata)) {
+          throw new Error('Snapshot metadata must be a plain object');
+        }
+        const metaStr = JSON.stringify(metadata);
+        if (metaStr.length > 4096) {
+          throw new Error('Snapshot metadata too large (max 4096 bytes)');
+        }
+        // 必要なら許可キー・型チェックをここに追加
+        safeMetadata = metadata;
+      }
       const snapshot = {
         id: `snapshot-${Date.now()}`,
         name,
         timestamp: new Date().toISOString(),
         feature_flags: featureFlags.getAllFlags(),
         metadata: {
-          ...metadata,
+          ...safeMetadata,
           node_env: process.env.NODE_ENV,
           deployment_id: process.env.VERCEL_DEPLOYMENT_ID,
         },
@@ -206,6 +219,9 @@ export class FeatureCircuitBreaker {
   private static failures = new Map<string, number>();
   private static lastFailureTime = new Map<string, number>();
   private static circuitState = new Map<string, 'closed' | 'open' | 'half-open'>();
+  private static halfOpenSuccesses = new Map<string, number>();
+  private static halfOpenFailures = new Map<string, number>();
+  private static halfOpenAttempts = new Map<string, number>();
   
   private static readonly FAILURE_THRESHOLD = 5;
   private static readonly TIMEOUT_MS = 60000; // 1 minute
@@ -229,6 +245,9 @@ export class FeatureCircuitBreaker {
       if (timeSinceFailure > this.TIMEOUT_MS) {
         // Try half-open state
         this.circuitState.set(featureName, 'half-open');
+        this.halfOpenSuccesses.set(featureName, 0);
+        this.halfOpenFailures.set(featureName, 0);
+        this.halfOpenAttempts.set(featureName, 0);
       } else {
         // Circuit still open, use fallback
         console.warn(`[CircuitBreaker] Circuit open for ${featureName}, using fallback`);
@@ -240,12 +259,29 @@ export class FeatureCircuitBreaker {
       const result = await operation();
       
       // Success - reset failures
-      if (state === 'half-open') {
-        console.log(`[CircuitBreaker] Circuit closing for ${featureName}`);
-        this.circuitState.set(featureName, 'closed');
+      if (this.circuitState.get(featureName) === 'half-open') {
+        const attempts = (this.halfOpenAttempts.get(featureName) || 0) + 1;
+        this.halfOpenAttempts.set(featureName, attempts);
+        const successCount = (this.halfOpenSuccesses.get(featureName) || 0) + 1;
+        this.halfOpenSuccesses.set(featureName, successCount);
+        if (attempts >= this.HALF_OPEN_REQUESTS) {
+          if ((this.halfOpenFailures.get(featureName) || 0) === 0) {
+            // 全て成功
+            console.log(`[CircuitBreaker] Circuit closing for ${featureName}`);
+            this.circuitState.set(featureName, 'closed');
+            this.failures.set(featureName, 0);
+          } else {
+            // 失敗があったのでopenに戻す
+            console.warn(`[CircuitBreaker] Half-open attempts had failures, reopening circuit for ${featureName}`);
+            this.circuitState.set(featureName, 'open');
+          }
+          this.halfOpenSuccesses.delete(featureName);
+          this.halfOpenFailures.delete(featureName);
+          this.halfOpenAttempts.delete(featureName);
+        }
+      } else {
+        this.failures.set(featureName, 0);
       }
-      
-      this.failures.set(featureName, 0);
       return result;
       
     } catch (error) {
@@ -256,12 +292,27 @@ export class FeatureCircuitBreaker {
       
       console.error(`[CircuitBreaker] Feature ${featureName} failed (${failureCount}/${this.FAILURE_THRESHOLD}):`, error);
       
+      // Half-open状態の失敗カウント
+      if (this.circuitState.get(featureName) === 'half-open') {
+        const attempts = (this.halfOpenAttempts.get(featureName) || 0) + 1;
+        this.halfOpenAttempts.set(featureName, attempts);
+        const failCount = (this.halfOpenFailures.get(featureName) || 0) + 1;
+        this.halfOpenFailures.set(featureName, failCount);
+        if (attempts >= this.HALF_OPEN_REQUESTS) {
+          // 失敗があったのでopenに戻す
+          console.warn(`[CircuitBreaker] Half-open attempts had failures, reopening circuit for ${featureName}`);
+          this.circuitState.set(featureName, 'open');
+          this.halfOpenSuccesses.delete(featureName);
+          this.halfOpenFailures.delete(featureName);
+          this.halfOpenAttempts.delete(featureName);
+        }
+        return fallback();
+      }
       // Open circuit if threshold exceeded
       if (failureCount >= this.FAILURE_THRESHOLD) {
         console.warn(`[CircuitBreaker] Opening circuit for ${featureName}`);
         this.circuitState.set(featureName, 'open');
       }
-      
       // Use fallback
       return fallback();
     }

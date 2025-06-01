@@ -1,17 +1,16 @@
-import { createVectorQueryTool } from '@mastra/rag';
-import { featureFlags } from '@/lib/feature-flags';
-import { ragMetrics } from '@/lib/monitoring/rag-metrics';
 import { ragCache } from '@/lib/cache/rag-cache';
-import { createMastraV2Instance } from '../config/mastra-v2';
-import { embedMany } from 'ai';
+import { ragMetrics } from '@/lib/monitoring/rag-metrics';
 import { openai } from '@ai-sdk/openai';
+import { createVectorQueryTool } from '@mastra/rag';
+import { embedMany } from 'ai';
+import { createMastraV2Instance } from '../config/mastra-v2';
 
 /**
  * RAG Search V2 Implementation using Mastra's latest patterns
  * Uses OpenAI text-embedding-3-small (768 dimensions)
  */
 export class RAGSearchV2 {
-  private vectorQueryTool;
+  private vectorQueryTool: ReturnType<typeof createVectorQueryTool>;
   private pgVector;
   
   constructor() {
@@ -36,7 +35,6 @@ export class RAGSearchV2 {
     
     try {
       // Check cache first
-      const cacheKey = JSON.stringify({ query, ...options });
       const cachedResults = await ragCache.getCachedSearchResults(query, options);
       
       if (cachedResults) {

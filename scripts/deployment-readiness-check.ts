@@ -6,8 +6,8 @@
  */
 
 import { config } from 'dotenv';
-import path from 'path';
 import fs from 'fs/promises';
+import path from 'path';
 
 config({ path: path.join(__dirname, '../.env.local') });
 
@@ -404,4 +404,7 @@ async function saveReadinessReport(results: CheckResult[], summary: any) {
 }
 
 // Run the check
-deploymentReadinessCheck().catch(console.error);
+deploymentReadinessCheck().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
