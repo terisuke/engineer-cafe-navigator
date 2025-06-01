@@ -3,7 +3,7 @@ import { EmotionTagParser } from '@/lib/emotion-tag-parser';
 import { endPerformance, logPerformanceSummary, startPerformance } from '@/lib/performance-monitor';
 import { ConversationManager, SupabaseMemoryAdapter } from '@/lib/supabase-memory';
 import { TextChunker } from '@/lib/text-chunker';
-import { Agent } from '@mastra/core';
+import { Agent } from '@mastra/core/agent';
 import { SupportedLanguage } from '../types/config';
 
 export class RealtimeAgent extends Agent {
@@ -155,9 +155,9 @@ export class RealtimeAgent extends Agent {
         throw new Error('Voice service not initialized');
       }
       startPerformance('Speech-to-Text');
-      // Convert ArrayBuffer to base64 for the API
+      // Convert ArrayBuffer to base64 for the API using Buffer to avoid stack overflow
       const uint8Array = new Uint8Array(audioBuffer);
-      const audioBase64 = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
+      const audioBase64 = Buffer.from(uint8Array).toString('base64');
       
       const currentLang = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
       const result = await this.voiceService.speechToText(audioBase64, currentLang);
@@ -651,8 +651,8 @@ export class RealtimeAgent extends Agent {
           throw new Error(result.error || `TTS generation failed for chunk ${chunk.index}`);
         }
         
-        // Convert base64 to ArrayBuffer
-        const audioData = Uint8Array.from(atob(result.audioBase64), c => c.charCodeAt(0));
+        // Convert base64 to ArrayBuffer using Buffer to avoid stack overflow
+        const audioData = new Uint8Array(Buffer.from(result.audioBase64, 'base64'));
         
         return {
           chunk: audioData.buffer,
@@ -760,6 +760,42 @@ export class RealtimeAgent extends Agent {
       this.conversationState = 'idle';
       console.error('Error processing text input with streaming:', error);
       throw error;
+    }
+  }
+
+  // Speech to text only method (for quick transcription)
+  async speechToText(audioBuffer: ArrayBuffer, language: SupportedLanguage = 'ja'): Promise<{
+    success: boolean;
+    transcript?: string;
+    confidence?: number;
+    error?: string;
+  }> {
+    try {
+      if (!this.voiceService) {
+        return {
+          success: false,
+          error: 'Voice service not initialized'
+        };
+      }
+      
+      // Convert ArrayBuffer to base64 for the API using Buffer to avoid stack overflow
+      const uint8Array = new Uint8Array(audioBuffer);
+      const audioBase64 = Buffer.from(uint8Array).toString('base64');
+      
+      const result = await this.voiceService.speechToText(audioBase64, language);
+      
+      return {
+        success: result.success,
+        transcript: result.transcript,
+        confidence: result.confidence,
+        error: result.error
+      };
+    } catch (error) {
+      console.error('Speech-to-text error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 }

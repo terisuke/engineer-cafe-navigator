@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Volume2, VolumeX, Settings, Loader2, AlertCircle } from 'lucide-react';
 import { formatError } from '@/lib/error-messages';
 import { AudioQueue } from '@/lib/audio-queue';
 
 interface VoiceInterfaceProps {
   onLanguageChange?: (language: 'ja' | 'en') => void;
-  onPageTransition?: (page: string) => void;
   layout?: 'vertical' | 'horizontal';
   language?: 'ja' | 'en';
   autoGreeting?: boolean;
@@ -15,7 +14,6 @@ interface VoiceInterfaceProps {
 
 export default function VoiceInterface({ 
   onLanguageChange, 
-  onPageTransition,
   layout = 'vertical',
   language = 'ja',
   autoGreeting = false
@@ -43,7 +41,6 @@ export default function VoiceInterface({
     }
   };
   
-  const [useWebSpeechAPI] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -162,83 +159,7 @@ export default function VoiceInterface({
     }
   };
 
-  // Process text input (from Web Speech API or transcription)
-  const processTextInput = async (text: string) => {
-    try {
-      setIsLoading(true);
-      setLoadingMessage(currentLanguage === 'ja' ? 'AIが応答を考えています...' : 'AI is thinking...');
-      setTranscript(text);
-      setConversationState('processing');
-      
-      // Check if text is long enough to benefit from streaming
-      const shouldStream = text.length > 50; // Threshold for streaming
-      
-      const requestBody: any = {
-        action: 'process_text',
-        text: text,
-        language: currentLanguage,
-        sessionId: generateSessionId(),
-        streaming: shouldStream, // Enable streaming for long text
-      };
-      
-      const response = await fetch('/api/voice', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setResponse(result.response);
-        
-        // Update loading message for TTS generation
-        setLoadingMessage(currentLanguage === 'ja' ? '音声を生成中...' : 'Generating voice...');
-
-        // Update character if needed
-        if (result.shouldUpdateCharacter) {
-          if (result.characterAction) {
-            updateCharacter(result.characterAction);
-          }
-          // Update character expression based on emotion
-          if (result.emotion || result.primaryEmotion) {
-            const emotion = result.primaryEmotion || result.emotion?.emotion || 'neutral';
-            console.log('Setting character emotion from text input:', emotion);
-            setCurrentEmotion(emotion);
-            updateCharacterExpression(emotion);
-          }
-        }
-
-        // Handle audio response
-        if (!isMuted) {
-          if (result.streaming && result.audioChunks) {
-            // Use streaming audio playback
-            await playStreamingAudioResponse(result.audioChunks);
-          } else if (result.audioResponse) {
-            // Use regular audio playback
-            await playAudioResponse(result.audioResponse);
-          }
-        } else {
-          setConversationState('idle');
-          setIsLoading(false);
-          setLoadingMessage('');
-        }
-      } else {
-        setError(result.error || formatError({ code: 'VOICE_PROCESSING_ERROR' }, currentLanguage));
-        setConversationState('idle');
-        setIsLoading(false);
-        setLoadingMessage('');
-      }
-    } catch (error: any) {
-      console.error('Error processing text:', error);
-      setError(formatError(error, currentLanguage));
-      setConversationState('idle');
-      setIsLoading(false);
-      setLoadingMessage('');
-    }
-  };
+  // TODO: Implement processTextInput for Web Speech API integration in the future
 
   // Start voice recording
   const startListening = async () => {
@@ -462,8 +383,8 @@ export default function VoiceInterface({
       audio.volume = volume;
       currentAudioRef.current = audio;
 
-      // Import performance monitor
-      const { PerformanceMonitor } = await import('@/lib/performance-monitor');
+      // Import performance monitor functions
+      const { measurePerformance } = await import('@/lib/performance-monitor');
 
       // Start lip-sync analysis in background (non-blocking)
       const lipSyncPromise = (async () => {
@@ -473,7 +394,7 @@ export default function VoiceInterface({
           // Analyze audio for lip-sync
           const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
           const analyzer = new LipSyncAnalyzer();
-          const lipSyncData = await PerformanceMonitor.measure(
+          const lipSyncData = await measurePerformance(
             'Lip-sync analysis',
             () => analyzer.analyzeLipSync(audioBlob)
           );
