@@ -4,7 +4,6 @@
  */
 
 import { GoogleAuth } from 'google-auth-library';
-import { Buffer } from 'buffer';
 
 interface VoiceSettings {
   language: string;
@@ -26,6 +25,22 @@ interface TextToSpeechResult {
   audioBase64?: string;
   error?: string;
 }
+
+// 感情ごとの音声パラメータ調整マップ（クラス外に定義）
+const EMOTION_VOICE_PARAMS: Record<string, { speed: number; pitch: number; volumeGainDb: number; speaker: string; adjust?: (settings: VoiceSettings) => void }> = {
+  // 日本語
+  'ja:excited':   { speed: 1.3 * 1.1, pitch: 2.5 + 0.3, volumeGainDb: 2.0, speaker: 'ja-JP-Wavenet-B' },
+  'ja:sad':       { speed: 1.3 * 0.9, pitch: 2.5 - 0.5, volumeGainDb: 2.0, speaker: 'ja-JP-Wavenet-B' },
+  'ja:angry':     { speed: 1.3 * 1.05, pitch: 2.5 + 0.2, volumeGainDb: 2.0, speaker: 'ja-JP-Wavenet-B' },
+  'ja:calm':      { speed: 1.3 * 0.95, pitch: 2.5 - 0.2, volumeGainDb: 2.0, speaker: 'ja-JP-Wavenet-B' },
+  'ja:happy':     { speed: 1.3, pitch: 2.5, volumeGainDb: 2.0, speaker: 'ja-JP-Wavenet-B' },
+  // 英語
+  'en:excited':   { speed: 1.05 * 1.1, pitch: 0.3 + 0.3, volumeGainDb: 2.5, speaker: 'en-GB-Standard-F' },
+  'en:sad':       { speed: 1.05 * 0.9, pitch: 0.3 - 0.5, volumeGainDb: 2.5, speaker: 'en-GB-Standard-F' },
+  'en:angry':     { speed: 1.05 * 1.05, pitch: 0.3 + 0.2, volumeGainDb: 2.5, speaker: 'en-GB-Standard-F' },
+  'en:calm':      { speed: 1.05 * 0.95, pitch: 0.3 - 0.2, volumeGainDb: 2.5, speaker: 'en-GB-Standard-F' },
+  'en:happy':     { speed: 1.05, pitch: 0.3, volumeGainDb: 2.5, speaker: 'en-GB-Standard-F' },
+};
 
 export class GoogleCloudVoiceSimple {
   private auth: GoogleAuth;
@@ -253,42 +268,14 @@ export class GoogleCloudVoiceSimple {
   }
 
   setSpeakerByEmotion(emotion: 'happy' | 'sad' | 'excited' | 'calm' | 'angry') {
-    // Keep the original base settings regardless of emotion for better clarity
-    if (this.currentSettings.language === 'ja') {
-      this.currentSettings.speaker = 'ja-JP-Wavenet-B';
-      this.currentSettings.speed = 1.3;
-      this.currentSettings.pitch = 2.5;
-      this.currentSettings.volumeGainDb = 2.0;
-      
-      // Apply emotion-specific adjustments
-      switch (emotion) {
-        case 'excited':
-          this.currentSettings.speed *= 1.1;
-          this.currentSettings.pitch += 0.3;
-          break;
-        case 'sad':
-          this.currentSettings.speed *= 0.9;
-          this.currentSettings.pitch -= 0.5;
-          break;
-        case 'angry':
-          this.currentSettings.speed *= 1.05;
-          this.currentSettings.pitch += 0.2;
-          break;
-        case 'calm':
-          this.currentSettings.speed *= 0.95;
-          this.currentSettings.pitch -= 0.2;
-          break;
-        default:
-          // Keep base settings for 'happy' and others
-          break;
-      }
-    } else {
-      // 英語の場合も同様の調整を追加
-      this.currentSettings.speaker = 'en-GB-Standard-F';
-      this.currentSettings.speed = 1.05;
-      this.currentSettings.pitch = 0.3;
-      this.currentSettings.volumeGainDb = 2.5;
-    }
+    // 言語ごとに感情パラメータを外部マップから参照
+    const lang = this.currentSettings.language === 'ja' ? 'ja' : 'en';
+    const key = `${lang}:${emotion}`;
+    const params = EMOTION_VOICE_PARAMS[key] || EMOTION_VOICE_PARAMS[`${lang}:happy`];
+    this.currentSettings.speaker = params.speaker;
+    this.currentSettings.speed = params.speed;
+    this.currentSettings.pitch = params.pitch;
+    this.currentSettings.volumeGainDb = params.volumeGainDb;
     
     console.log(`[Voice] Using base voice settings for emotion "${emotion}" (${this.currentSettings.language})`);
   }

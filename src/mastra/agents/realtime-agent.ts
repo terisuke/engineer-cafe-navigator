@@ -124,10 +124,12 @@ export class RealtimeAgent extends Agent {
     } catch (error) {
       this.conversationState = 'idle';
       console.error('Error processing text input:', error);
-      // Log partial performance data if available
-      if (Object.keys(performanceSteps).length > 0) {
-        logPerformanceSummary(performanceSteps);
+      // 開始したパフォーマンス計測が未終了ならここで終了させる
+      if (performanceSteps['AI Response Generation'] === undefined) {
+        performanceSteps['AI Response Generation'] = endPerformance('AI Response Generation (Text)');
       }
+      // 他に追加したい計測があれば同様にここでendPerformanceを呼ぶ
+      logPerformanceSummary(performanceSteps);
       throw error;
     }
   }

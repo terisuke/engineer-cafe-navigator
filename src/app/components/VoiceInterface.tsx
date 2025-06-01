@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, Settings, Loader2, AlertCircle } from 'lucide-react';
-import { formatError } from '@/lib/error-messages';
 import { AudioQueue } from '@/lib/audio-queue';
+import { formatError } from '@/lib/error-messages';
+import { AlertCircle, Loader2, Mic, MicOff, Settings, Volume2, VolumeX } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 interface VoiceInterfaceProps {
   onLanguageChange?: (language: 'ja' | 'en') => void;
