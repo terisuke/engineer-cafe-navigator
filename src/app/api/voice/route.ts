@@ -72,6 +72,26 @@ export async function POST(request: NextRequest) {
           sessionId: newSessionId,
         });
       }
+      case 'speech_to_text': {
+        // Validate required fields for speech_to_text
+        if (!audioData) {
+          console.error('400 Error - Missing audioData for speech_to_text');
+          return NextResponse.json(
+            { error: 'Missing required field: audioData' },
+            { status: 400 }
+          );
+        }
+        // Convert base64 audio to ArrayBuffer
+        const audioBuffer = Buffer.from(audioData, 'base64').buffer;
+        const result = await realtimeAgent.speechToText(audioBuffer, language || 'ja');
+        return NextResponse.json({
+          success: result.success,
+          transcript: result.transcript,
+          confidence: result.confidence,
+          error: result.error,
+          startTime: Date.now()
+        });
+      }
       case 'process_voice': {
         // Validate required fields for process_voice
         if (!audioData) {

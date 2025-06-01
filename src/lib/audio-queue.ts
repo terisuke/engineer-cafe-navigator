@@ -181,6 +181,7 @@ export class AudioQueue {
       this.isSkipping = true;
       this.currentAudio.pause();
       this.currentAudio = null;
+      this.isPlaying = false; // Set isPlaying to false immediately after pausing
       
       // Trigger next playback safely using setTimeout to avoid race conditions
       setTimeout(() => {

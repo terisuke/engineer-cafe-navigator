@@ -125,9 +125,18 @@ export class GoogleCloudVoiceSimple {
 
       const result = await response.json();
       
-      if (result.results && result.results.length > 0) {
+      if (result.results && result.results.length > 0 && result.results[0].alternatives && result.results[0].alternatives.length > 0) {
         const transcript = result.results[0].alternatives[0].transcript;
         const confidence = result.results[0].alternatives[0].confidence || 0;
+        
+        // Check if transcript is valid
+        if (!transcript || typeof transcript !== 'string') {
+          console.log('Speech-to-Text: Empty or invalid transcript');
+          return {
+            success: false,
+            error: 'Empty or invalid transcript'
+          };
+        }
         
         console.log(`Speech-to-Text successful: "${transcript}" (confidence: ${confidence})`);
         
