@@ -250,6 +250,84 @@ dig engineer-cafe-navigator.com
 curl -I https://engineer-cafe-navigator.com
 ```
 
+### 6. RAG システム設定
+
+#### データベースマイグレーション
+
+```bash
+# Production環境でRAG関連テーブルとインデックスを作成
+supabase db push
+
+# pgvector拡張の確認
+psql $POSTGRES_URL -c "SELECT * FROM pg_extension WHERE extname = 'vector';"
+
+# RAG検索関数の作成
+psql $POSTGRES_URL -f supabase/migrations/20250601000000_add_knowledge_base_search.sql
+```
+
+#### 初期知識ベースのシード
+
+```bash
+# 本番環境変数を設定
+export NODE_ENV=production
+
+# 知識ベースの初期データを投入
+pnpm seed:knowledge
+
+# 投入データの確認
+pnpm test:rag
+```
+
+#### 外部API設定
+
+```env
+# Connpass API (レート制限: 10回/分)
+CONNPASS_API_ENABLED=true
+
+# Google Calendar API
+GOOGLE_CALENDAR_CLIENT_ID=your-client-id
+GOOGLE_CALENDAR_CLIENT_SECRET=your-client-secret
+GOOGLE_CALENDAR_REDIRECT_URI=https://engineer-cafe-navigator.com/api/auth/google/callback
+ENGINEER_CAFE_CALENDAR_ID=your-calendar-id@group.calendar.google.com
+
+# Web Scraping
+ENGINEER_CAFE_WEBSITE_URL=https://engineer-cafe.jp
+SCRAPING_USER_AGENT=EngineerCafeNavigator/1.0
+
+# Cache設定 (Upstash Redis)
+UPSTASH_REDIS_URL=your-redis-url
+UPSTASH_REDIS_TOKEN=your-redis-token
+```
+
+#### CRON ジョブ設定
+
+```typescript
+// vercel.json に追加
+{
+  "crons": [{
+    "path": "/api/cron/update-knowledge-base",
+    "schedule": "0 */6 * * *"  // 6時間ごと
+  }]
+}
+```
+
+#### RAG パフォーマンス最適化
+
+```sql
+-- IVFFlat インデックスの作成（本番環境）
+CREATE INDEX idx_knowledge_base_embedding_ivfflat 
+ON knowledge_base USING ivfflat (content_embedding vector_cosine_ops)
+WITH (lists = 100);
+
+-- 検索パフォーマンスの確認
+EXPLAIN ANALYZE
+SELECT * FROM search_knowledge_base(
+  '[0.1, 0.2, ...]'::vector(1536),
+  0.7,
+  5
+);
+```
+
 ## ⚙️ 本番環境設定
 
 ### 1. 環境変数
@@ -755,6 +833,9 @@ const memoryUsage = () => {
 - [ ] セキュリティヘッダー確認
 - [ ] SSL/TLS証明書確認
 - [ ] DNS設定確認
+- [ ] RAG検索機能の動作確認
+- [ ] 外部API接続確認（Connpass、Google Calendar）
+- [ ] 知識ベース更新ジョブの稼働確認
 
 ### 緊急時対応
 
