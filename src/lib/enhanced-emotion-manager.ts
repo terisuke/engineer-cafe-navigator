@@ -205,7 +205,7 @@ export class EnhancedEmotionManager {
         happy: ['♪', '嬉しい', '楽しい', 'ありがとう', '良い'],
         supportive: ['大丈夫', '一緒に', '頑張', 'できます', 'きっと'],
         gentle: ['ゆっくり', 'そっと', 'やさしく', '穏やか'],
-        confused: ['？？', 'わからない', '困った', 'うーん'],
+        confused: ['わからない', '困った', 'うーん', '？'],
         apologetic: ['すみません', 'ごめん', '申し訳'],
         knowledgeable: ['なるほど', '確かに', '理解', '分析'],
         enthusiastic: ['頑張ろう', 'やりましょう', 'チャレンジ'],
@@ -216,7 +216,7 @@ export class EnhancedEmotionManager {
         happy: ['great', 'good', 'nice', 'pleased', 'glad'],
         supportive: ['together', 'help', 'support', 'believe', 'can do'],
         gentle: ['gently', 'softly', 'calm', 'peaceful'],
-        confused: ['??', 'confused', 'unclear', 'hmm'],
+        confused: ['confused', 'unclear', 'hmm', '?'],
         apologetic: ['sorry', 'apologize', 'my fault'],
         knowledgeable: ['understand', 'analyze', 'indeed', 'exactly'],
         enthusiastic: ['let\'s go', 'challenge', 'excited'],
@@ -231,7 +231,16 @@ export class EnhancedEmotionManager {
     Object.entries(patterns[language]).forEach(([emotion, keywords]) => {
       let score = 0;
       keywords.forEach(keyword => {
-        const matches = (textLower.match(new RegExp(keyword, 'g')) || []).length;
+        // Use simple string search instead of regex to avoid special character issues
+        const keywordLower = keyword.toLowerCase();
+        let startIndex = 0;
+        let matches = 0;
+        
+        while ((startIndex = textLower.indexOf(keywordLower, startIndex)) !== -1) {
+          matches++;
+          startIndex += keywordLower.length;
+        }
+        
         score += matches;
       });
       emotionScores[emotion] = score;

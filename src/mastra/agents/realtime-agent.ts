@@ -226,39 +226,16 @@ export class RealtimeAgent extends Agent {
         this.voiceService.setSpeakerByEmotion(emotion.emotion);
       }
       
-      // Check if text is short enough for immediate processing
-      let audioResponse: ArrayBuffer;
+      // Always process the full text for better user experience
+      const ttsResult = await this.voiceService.textToSpeech(cleanedForTTS, currentLang, emotion?.emotion);
       
-      if (cleanedForTTS.length <= 100) {
-        // Short response - process immediately
-        const ttsResult = await this.voiceService.textToSpeech(cleanedForTTS, currentLang, emotion?.emotion);
-        
-        if (!ttsResult.success || !ttsResult.audioBase64) {
-          throw new Error(ttsResult.error || 'TTS generation failed');
-        }
-        
-        // Convert base64 to ArrayBuffer
-        const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
-        audioResponse = audioData.buffer;
-      } else {
-        // Long response - use streaming TTS
-        const firstSentence = this.extractFirstSentence(cleanedForTTS);
-        const ttsResult = await this.voiceService.textToSpeech(firstSentence, currentLang, emotion?.emotion);
-        
-        if (!ttsResult.success || !ttsResult.audioBase64) {
-          throw new Error(ttsResult.error || 'TTS generation failed');
-        }
-        
-        // Convert base64 to ArrayBuffer
-        const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
-        audioResponse = audioData.buffer;
-        
-        // Process remaining text in background (non-blocking)
-        const remainingText = cleanedForTTS.substring(firstSentence.length).trim();
-        if (remainingText.length > 0) {
-          this.processRemainingTextAsync(remainingText, currentLang, emotion?.emotion).catch(console.error);
-        }
+      if (!ttsResult.success || !ttsResult.audioBase64) {
+        throw new Error(ttsResult.error || 'TTS generation failed');
       }
+      
+      // Convert base64 to ArrayBuffer
+      const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
+      const audioResponse = audioData.buffer;
       
       performanceSteps['Text-to-Speech'] = PerformanceMonitor.end('Text-to-Speech');
       
@@ -402,7 +379,7 @@ export class RealtimeAgent extends Agent {
          例: "[happy] いかがお手伝いしましょうか？" 短く自然に答えてください。`;
 
     const contextHistory = history.length > 0 
-      ? `Previous: ${history.slice(-2).filter(h => h && h.content).map(h => `${h.role || 'user'}: ${h.content.slice(0, 50)}`).join(' | ')}\n\n`
+      ? `Previous: ${history.slice(-4).filter(h => h && h.content).map(h => `${h.role || 'user'}: ${h.content.slice(0, 50)}`).join(' | ')}\n\n`
       : '';
 
     return `${systemPrompt}\n\n${contextHistory}User: ${input}\nAssistant:`;
@@ -444,8 +421,16 @@ export class RealtimeAgent extends Agent {
   private async getRecentConversationHistory(): Promise<string[]> {
     try {
       // Get the last 3 conversation turns for context
-      const history = await this.supabaseMemory.get('conversationHistory') as string[] || [];
-      return history.slice(-3);
+      const history = await this.supabaseMemory.get('conversationHistory') as any[] || [];
+      return history.slice(-3).map(item => {
+        if (typeof item === 'string') {
+          return item;
+        } else if (item && item.content) {
+          return `${item.role || 'user'}: ${item.content}`;
+        } else {
+          return '';
+        }
+      }).filter(Boolean);
     } catch (error) {
       console.error('Error getting conversation history:', error);
       return [];
@@ -455,14 +440,16 @@ export class RealtimeAgent extends Agent {
   private async storeConversationTurn(userInput: string, aiResponse: string, emotion?: EmotionData): Promise<void> {
     try {
       // Get existing history
-      const history = await this.supabaseMemory.get('conversationHistory') as string[] || [];
+      const history = await this.supabaseMemory.get('conversationHistory') as any[] || [];
       
-      // Add new turn
-      const turn = `User: ${userInput} | AI: ${aiResponse}`;
-      history.push(turn);
+      // Add new turn with consistent object structure
+      history.push(
+        { role: 'user', content: userInput, timestamp: Date.now() },
+        { role: 'assistant', content: aiResponse, timestamp: Date.now() }
+      );
       
-      // Keep only last 10 turns to prevent memory bloat
-      const recentHistory = history.slice(-10);
+      // Keep only last 20 entries (10 turns) to prevent memory bloat
+      const recentHistory = history.slice(-20);
       
       // Store updated history
       await this.supabaseMemory.set('conversationHistory', recentHistory);
