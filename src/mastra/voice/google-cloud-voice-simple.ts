@@ -1,212 +1,236 @@
-import { VoiceSettings } from '../types/config';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as crypto from 'crypto';
-import { withRetry, Retry } from '@/lib/retry-utils';
-
 /**
- * Simplified Google Cloud Voice Service that works with Next.js
- * Uses direct REST API calls instead of google-auth-library
+ * Google Cloud Voice Service - Simple Implementation
+ * Handles speech-to-text and text-to-speech operations
  */
-export class GoogleCloudVoiceServiceSimple {
-  private config: any;
-  private currentSettings: VoiceSettings;
-  private serviceAccountKey: any;
+
+import { GoogleAuth } from 'google-auth-library';
+import { Buffer } from 'buffer';
+
+interface VoiceSettings {
+  language: string;
+  speaker: string;
+  speed: number;
+  pitch: number;
+  volumeGainDb: number;
+}
+
+interface SpeechToTextResult {
+  success: boolean;
+  transcript?: string;
+  confidence?: number;
+  error?: string;
+}
+
+interface TextToSpeechResult {
+  success: boolean;
+  audioBase64?: string;
+  error?: string;
+}
+
+export class GoogleCloudVoiceSimple {
+  private auth: GoogleAuth;
   private accessToken: string | null = null;
   private tokenExpiry: number = 0;
+  private currentSettings: VoiceSettings;
 
-  constructor(config: any) {
-    this.config = config;
+  constructor() {
+    this.auth = new GoogleAuth({
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+      keyFile: 'config/service-account-key.json'
+    });
+    
+    // Default settings
     this.currentSettings = {
       language: 'ja',
       speaker: 'ja-JP-Wavenet-B',
-      speed: 1.3,  // Reduced from 1.5 (slower by 0.2)
-      pitch: 2.5,  // Increased from 0.5 (higher by 2.0)
-      volumeGainDb: 2.0,
+      speed: 1.3,
+      pitch: 2.5,
+      volumeGainDb: 2.0
     };
-    
-    // Load service account key
-    const keyFilePath = path.resolve(process.cwd(), config.credentials);
-    const keyFileContent = fs.readFileSync(keyFilePath, 'utf8');
-    this.serviceAccountKey = JSON.parse(keyFileContent);
-    console.log('Service account loaded:', this.serviceAccountKey.client_email);
   }
 
-  private async getAccessToken(): Promise<string> {
-    // Check if we have a valid token
-    if (this.accessToken && Date.now() < this.tokenExpiry) {
+  async getAccessToken(): Promise<string> {
+    const now = Date.now();
+    
+    if (this.accessToken && now < this.tokenExpiry) {
       return this.accessToken;
     }
 
     try {
-      // Create JWT manually
-      const jwt = this.createJWT();
+      const authClient = await this.auth.getClient();
+      const accessToken = await authClient.getAccessToken();
       
-      // Exchange JWT for access token
-      const response = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-          assertion: jwt,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Token exchange failed: ${error}`);
+      if (!accessToken.token) {
+        throw new Error('Failed to get access token');
       }
-
-      const data = await response.json();
-      this.accessToken = data.access_token;
-      // Set expiry to 50 minutes from now
-      this.tokenExpiry = Date.now() + 50 * 60 * 1000;
+      
+      this.accessToken = accessToken.token;
+      this.tokenExpiry = now + 3300 * 1000; // 55 minutes
       
       console.log('Access token obtained successfully');
-      return this.accessToken!;
+      return this.accessToken;
     } catch (error) {
-      console.error('Error getting access token:', error);
-      throw error;
+      console.error('Failed to get access token:', error);
+      throw new Error('Authentication failed');
     }
   }
 
-  private createJWT(): string {
-    const header = {
-      alg: 'RS256',
-      typ: 'JWT',
-    };
-
-    const now = Math.floor(Date.now() / 1000);
-    const payload = {
-      iss: this.serviceAccountKey.client_email,
-      scope: 'https://www.googleapis.com/auth/cloud-platform',
-      aud: 'https://oauth2.googleapis.com/token',
-      exp: now + 3600, // 1 hour
-      iat: now,
-    };
-
-    const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
-    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
-    
-    const signatureInput = `${encodedHeader}.${encodedPayload}`;
-    
-    const sign = crypto.createSign('RSA-SHA256');
-    sign.update(signatureInput);
-    const signature = sign.sign(this.serviceAccountKey.private_key, 'base64url');
-    
-    return `${signatureInput}.${signature}`;
-  }
-
-  @Retry({
-    maxAttempts: 3,
-    initialDelay: 500,
-    onRetry: (attempt, error) => {
-      console.warn(`STT retry attempt ${attempt}:`, error.message);
-    },
-  })
-  async speechToText(audioBuffer: ArrayBuffer): Promise<string> {
+  async speechToText(audioBase64: string, language: string = 'ja'): Promise<SpeechToTextResult> {
     try {
       const accessToken = await this.getAccessToken();
-      const response = await fetch('https://speech.googleapis.com/v1/speech:recognize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          config: {
-            encoding: 'WEBM_OPUS',
-            languageCode: this.currentSettings.language === 'ja' ? 'ja-JP' : 'en-US',
-            enableAutomaticPunctuation: true,
-            model: 'latest_short',
+      const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
+      
+      if (!projectId) {
+        throw new Error('GOOGLE_CLOUD_PROJECT_ID is not configured');
+      }
+
+      const languageCode = language === 'ja' ? 'ja-JP' : 'en-US';
+      
+      const response = await fetch(
+        `https://speech.googleapis.com/v1/speech:recognize`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
           },
-          audio: {
-            content: Buffer.from(audioBuffer).toString('base64'),
-          },
-        }),
-      });
+          body: JSON.stringify({
+            config: {
+              encoding: 'WEBM_OPUS',
+              sampleRateHertz: 48000,
+              languageCode: languageCode,
+              model: 'latest_long',
+              enableAutomaticPunctuation: true,
+              enableWordTimeOffsets: false,
+              audioChannelCount: 1,
+            },
+            audio: {
+              content: audioBase64
+            }
+          })
+        }
+      );
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Speech-to-Text API error: ${response.status} - ${error}`);
+        const errorText = await response.text();
+        console.error('Speech-to-Text API error:', response.status, errorText);
+        return {
+          success: false,
+          error: `API Error: ${response.status} - ${errorText}`
+        };
       }
 
       const result = await response.json();
-      return result.results?.[0]?.alternatives?.[0]?.transcript || '';
+      
+      if (result.results && result.results.length > 0) {
+        const transcript = result.results[0].alternatives[0].transcript;
+        const confidence = result.results[0].alternatives[0].confidence || 0;
+        
+        console.log(`Speech-to-Text successful: "${transcript}" (confidence: ${confidence})`);
+        
+        return {
+          success: true,
+          transcript: transcript.trim(),
+          confidence
+        };
+      } else {
+        return {
+          success: false,
+          error: 'No transcription results'
+        };
+      }
     } catch (error) {
       console.error('Speech-to-Text error:', error);
-      throw error;
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 
-  @Retry({
-    maxAttempts: 3,
-    initialDelay: 500,
-    onRetry: (attempt, error) => {
-      console.warn(`TTS retry attempt ${attempt}:`, error.message);
-    },
-  })
-  async textToSpeech(text: string, settings?: Partial<VoiceSettings>): Promise<ArrayBuffer> {
-    const currentSettings = { ...this.currentSettings, ...settings };
-    
+  async textToSpeech(text: string, language: string = 'ja', emotion?: string): Promise<TextToSpeechResult> {
     try {
       const accessToken = await this.getAccessToken();
-      const response = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          input: { text },
-          voice: {
-            languageCode: currentSettings.language === 'ja' ? 'ja-JP' : 'en-GB',
-            name: currentSettings.speaker,
+      
+      // Update settings based on language
+      this.setLanguageSettings(language);
+      
+      // Apply emotion if provided
+      if (emotion) {
+        this.setSpeakerByEmotion(emotion as any);
+      }
+      
+      const response = await fetch(
+        'https://texttospeech.googleapis.com/v1/text:synthesize',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
           },
-          audioConfig: {
-            audioEncoding: 'MP3',
-            speakingRate: currentSettings.speed,
-            pitch: currentSettings.pitch,
-            volumeGainDb: currentSettings.volumeGainDb,
-          },
-        }),
-      });
+          body: JSON.stringify({
+            input: { text },
+            voice: {
+              languageCode: this.currentSettings.language === 'ja' ? 'ja-JP' : 'en-GB',
+              name: this.currentSettings.speaker
+            },
+            audioConfig: {
+              audioEncoding: 'MP3',
+              speakingRate: this.currentSettings.speed,
+              pitch: this.currentSettings.pitch,
+              volumeGainDb: this.currentSettings.volumeGainDb,
+              effectsProfileId: ['telephony-class-application']
+            }
+          })
+        }
+      );
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Text-to-Speech API error: ${response.status} - ${error}`);
+        const errorText = await response.text();
+        console.error('Text-to-Speech API error:', response.status, errorText);
+        return {
+          success: false,
+          error: `API Error: ${response.status} - ${errorText}`
+        };
       }
 
       const result = await response.json();
-      const audioContent = result.audioContent;
       
-      if (!audioContent) {
-        throw new Error('No audio content received');
+      if (result.audioContent) {
+        console.log(`Text-to-Speech successful for: "${text.substring(0, 50)}..."`);
+        return {
+          success: true,
+          audioBase64: result.audioContent
+        };
+      } else {
+        return {
+          success: false,
+          error: 'No audio content in response'
+        };
       }
-
-      return Buffer.from(audioContent, 'base64').buffer;
     } catch (error) {
       console.error('Text-to-Speech error:', error);
-      throw error;
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 
-  updateSettings(settings: Partial<VoiceSettings>) {
-    this.currentSettings = { ...this.currentSettings, ...settings };
+  /**
+   * Public method to set language (called by RealtimeAgent)
+   */
+  setLanguage(language: string): void {
+    this.setLanguageSettings(language);
   }
 
-  getSettings(): VoiceSettings {
-    return { ...this.currentSettings };
-  }
-
-  setLanguage(language: 'ja' | 'en') {
+  private setLanguageSettings(language: string): void {
     this.currentSettings.language = language;
+    
     if (language === 'ja') {
       this.currentSettings.speaker = 'ja-JP-Wavenet-B';
-      this.currentSettings.speed = 1.3;  // Reduced from 1.5 (slower by 0.2)
-      this.currentSettings.pitch = 2.5;  // Increased from 0.5 (higher by 2.0)
+      this.currentSettings.speed = 1.3;
+      this.currentSettings.pitch = 2.5;
       this.currentSettings.volumeGainDb = 2.0;
     } else {
       this.currentSettings.speaker = 'en-GB-Standard-F';
@@ -216,14 +240,38 @@ export class GoogleCloudVoiceServiceSimple {
     }
   }
 
-  setSpeakerByEmotion(emotion: string) {
+  setSpeakerByEmotion(emotion: 'happy' | 'sad' | 'excited' | 'calm' | 'angry') {
     // Keep the original base settings regardless of emotion for better clarity
     if (this.currentSettings.language === 'ja') {
       this.currentSettings.speaker = 'ja-JP-Wavenet-B';
       this.currentSettings.speed = 1.3;
       this.currentSettings.pitch = 2.5;
       this.currentSettings.volumeGainDb = 2.0;
+      
+      // Apply emotion-specific adjustments
+      switch (emotion) {
+        case 'excited':
+          this.currentSettings.speed *= 1.1;
+          this.currentSettings.pitch += 0.3;
+          break;
+        case 'sad':
+          this.currentSettings.speed *= 0.9;
+          this.currentSettings.pitch -= 0.5;
+          break;
+        case 'angry':
+          this.currentSettings.speed *= 1.05;
+          this.currentSettings.pitch += 0.2;
+          break;
+        case 'calm':
+          this.currentSettings.speed *= 0.95;
+          this.currentSettings.pitch -= 0.2;
+          break;
+        default:
+          // Keep base settings for 'happy' and others
+          break;
+      }
     } else {
+      // 英語の場合も同様の調整を追加
       this.currentSettings.speaker = 'en-GB-Standard-F';
       this.currentSettings.speed = 1.05;
       this.currentSettings.pitch = 0.3;

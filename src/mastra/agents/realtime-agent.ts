@@ -1,11 +1,10 @@
-import { Agent } from '@mastra/core';
-import { SupportedLanguage } from '../types/config';
-import { SupabaseMemoryAdapter, ConversationManager } from '@/lib/supabase-memory';
-import { EmotionManager, EmotionData } from '@/lib/emotion-manager';
+import { EmotionData, EmotionManager } from '@/lib/emotion-manager';
 import { EmotionTagParser } from '@/lib/emotion-tag-parser';
 import { PerformanceMonitor } from '@/lib/performance-monitor';
+import { ConversationManager, SupabaseMemoryAdapter } from '@/lib/supabase-memory';
 import { TextChunker } from '@/lib/text-chunker';
-import { AudioQueue, AudioQueueItem } from '@/lib/audio-queue';
+import { Agent } from '@mastra/core';
+import { SupportedLanguage } from '../types/config';
 
 export class RealtimeAgent extends Agent {
   private conversationState: 'idle' | 'listening' | 'processing' | 'speaking' = 'idle';
@@ -143,6 +142,7 @@ export class RealtimeAgent extends Agent {
     emotion?: EmotionData;
     emotionTags?: any[];
     primaryEmotion?: string;
+    error?: string;
   }> {
     const performanceSteps: Record<string, number> = {};
     
@@ -154,18 +154,26 @@ export class RealtimeAgent extends Agent {
         throw new Error('Voice service not initialized');
       }
       PerformanceMonitor.start('Speech-to-Text');
-      const transcript = await this.voiceService.speechToText(audioBuffer);
+      // Convert ArrayBuffer to base64 for the API
+      const uint8Array = new Uint8Array(audioBuffer);
+      const audioBase64 = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
+      
+      const currentLang = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      const result = await this.voiceService.speechToText(audioBase64, currentLang);
       performanceSteps['Speech-to-Text'] = PerformanceMonitor.end('Speech-to-Text');
       
-      if (!transcript.trim()) {
+      if (!result.success || !result.transcript || !result.transcript.trim()) {
         this.conversationState = 'idle';
         return {
           transcript: '',
           response: '',
           audioResponse: new ArrayBuffer(0),
           shouldUpdateCharacter: false,
+          error: result.error || 'Speech recognition failed',
         };
       }
+      
+      const transcript = result.transcript;
 
       // Generate response with emotion tags
       PerformanceMonitor.start('AI Response Generation');
@@ -176,7 +184,6 @@ export class RealtimeAgent extends Agent {
       PerformanceMonitor.start('Emotion Parsing');
       const parsedResponse = EmotionTagParser.parseEmotionTags(rawResponse);
       performanceSteps['Emotion Parsing'] = PerformanceMonitor.end('Emotion Parsing');
-      console.log('Parsed response:', parsedResponse);
       
       // Use clean text (without emotion tags) for TTS
       const cleanResponse = parsedResponse.cleanText;
@@ -194,7 +201,6 @@ export class RealtimeAgent extends Agent {
           confidence: 0.9,
           duration: 3000
         };
-        console.log('Using emotion from tags:', emotion);
       } else {
         // Fallback to traditional emotion detection
         emotion = EmotionManager.detectConversationEmotion(
@@ -202,15 +208,14 @@ export class RealtimeAgent extends Agent {
           cleanResponse,
           conversationHistory
         );
-        console.log('Using fallback emotion detection:', emotion);
       }
       
-      // Store emotion for character state
-      await this.supabaseMemory.set('currentEmotion', emotion);
-      await this.supabaseMemory.set('emotionTags', parsedResponse.emotions);
+      // Store emotion for character state (async, non-blocking)
+      this.supabaseMemory.set('currentEmotion', emotion).catch(console.error);
+      this.supabaseMemory.set('emotionTags', parsedResponse.emotions).catch(console.error);
       
-      // Store conversation turn in history
-      await this.storeConversationTurn(transcript, cleanResponse, emotion);
+      // Store conversation turn in history (async, non-blocking)
+      this.storeConversationTurn(transcript, cleanResponse, emotion).catch(console.error);
       
       // Convert CLEAN response to speech (without emotion tags and markdown)
       PerformanceMonitor.start('Text-to-Speech');
@@ -218,15 +223,43 @@ export class RealtimeAgent extends Agent {
       
       // Set voice parameters based on emotion
       if (emotion && this.voiceService.setSpeakerByEmotion) {
-        console.log(`[RealtimeAgent] Setting voice emotion: ${emotion.emotion}`);
         this.voiceService.setSpeakerByEmotion(emotion.emotion);
       }
       
-      const audioResponse = await this.voiceService.textToSpeech(cleanedForTTS, { language });
+      // Check if text is short enough for immediate processing
+      let audioResponse: ArrayBuffer;
+      
+      if (cleanedForTTS.length <= 100) {
+        // Short response - process immediately
+        const ttsResult = await this.voiceService.textToSpeech(cleanedForTTS, currentLang, emotion?.emotion);
+        
+        if (!ttsResult.success || !ttsResult.audioBase64) {
+          throw new Error(ttsResult.error || 'TTS generation failed');
+        }
+        
+        // Convert base64 to ArrayBuffer
+        const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
+        audioResponse = audioData.buffer;
+      } else {
+        // Long response - use streaming TTS
+        const firstSentence = this.extractFirstSentence(cleanedForTTS);
+        const ttsResult = await this.voiceService.textToSpeech(firstSentence, currentLang, emotion?.emotion);
+        
+        if (!ttsResult.success || !ttsResult.audioBase64) {
+          throw new Error(ttsResult.error || 'TTS generation failed');
+        }
+        
+        // Convert base64 to ArrayBuffer
+        const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
+        audioResponse = audioData.buffer;
+        
+        // TODO: Process remaining text in background (for now, just use first sentence)
+      }
+      
       performanceSteps['Text-to-Speech'] = PerformanceMonitor.end('Text-to-Speech');
       
-      // Determine character action based on response content and emotion
-      const characterAction = this.determineCharacterAction(cleanResponse, emotion);
+      // Determine character action based on response content and emotion (simple default)
+      const characterAction = 'speaking';
       
       this.conversationState = 'speaking';
       
@@ -330,6 +363,14 @@ export class RealtimeAgent extends Agent {
       .trim();
   }
 
+  private extractFirstSentence(text: string): string {
+    const sentences = text.split(/[。！？.!?]/);
+    if (sentences.length > 0 && sentences[0].trim()) {
+      return sentences[0].trim() + (text.includes('。') ? '。' : '！');
+    }
+    return text.slice(0, 100); // Fallback to first 100 characters
+  }
+
   private buildContextualPrompt(
     input: string, 
     language: SupportedLanguage, 
@@ -337,37 +378,13 @@ export class RealtimeAgent extends Agent {
     history: any[]
   ): string {
     const systemPrompt = language === 'en'
-      ? `You are assisting a visitor at Engineer Cafe. Current mode: ${mode}. 
-         IMPORTANT: Respond ONLY in English. 
-         
-         EMOTION TAGS: You MUST include emotion tags in your response to express feelings.
-         Available tags: [happy], [excited], [sad], [angry], [surprised], [relaxed], [neutral], [thoughtful]
-         
-         Examples:
-         - "[happy] Great to see you! How can I help you today?"
-         - "[excited] That's amazing! I'd love to hear more about your project!"
-         - "[sad] I'm sorry to hear that you're having trouble."
-         - "[surprised] Oh wow! I didn't expect that!"
-         
-         Use appropriate emotions based on the context. Change emotions within response when appropriate.
-         Respond naturally and helpfully to their voice input in English.`
-      : `エンジニアカフェの来訪者をサポートしています。現在のモード: ${mode}。
-         重要: 日本語のみで応答してください。
-         
-         感情タグ: 応答に必ず感情タグを含めて、感情を表現してください。
-         使用可能なタグ: [happy], [excited], [sad], [angry], [surprised], [relaxed], [neutral], [thoughtful]
-         
-         例:
-         - "[happy] こんにちは！今日はどのようなお手伝いができますか？"
-         - "[excited] それは素晴らしいですね！もっと詳しく聞かせてください！"
-         - "[sad] お困りのようで心配です。"
-         - "[surprised] えっ！それは驚きました！"
-         
-         文脈に応じて適切な感情を使用してください。応答内で感情が変わる場合は、適切に変更してください。
-         音声入力に自然で親切に日本語で応答してください。`;
+      ? `You're an Engineer Cafe assistant. Respond briefly in English with emotion tags: [happy], [neutral], [excited], [relaxed]. 
+         Example: "[happy] How can I help?" Keep responses short and natural.`
+      : `エンジニアカフェのアシスタントです。感情タグ付きで簡潔に日本語で応答: [happy], [neutral], [excited], [relaxed]
+         例: "[happy] いかがお手伝いしましょうか？" 短く自然に答えてください。`;
 
     const contextHistory = history.length > 0 
-      ? `Previous conversation:\n${history.slice(-6).map(h => `${h.role}: ${h.content}`).join('\n')}\n\n`
+      ? `Previous: ${history.slice(-2).filter(h => h && h.content).map(h => `${h.role || 'user'}: ${h.content.slice(0, 50)}`).join(' | ')}\n\n`
       : '';
 
     return `${systemPrompt}\n\n${contextHistory}User: ${input}\nAssistant:`;
@@ -539,8 +556,16 @@ export class RealtimeAgent extends Agent {
     try {
       // Clean markdown formatting before TTS
       const cleanedText = this.cleanTextForTTS(text);
-      const audioBuffer = await this.voiceService.textToSpeech(cleanedText);
-      return audioBuffer;
+      const currentLang = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      const result = await this.voiceService.textToSpeech(cleanedText, currentLang);
+      
+      if (!result.success || !result.audioBase64) {
+        throw new Error(result.error || 'TTS generation failed');
+      }
+      
+      // Convert base64 to ArrayBuffer
+      const audioData = Uint8Array.from(atob(result.audioBase64), c => c.charCodeAt(0));
+      return audioData.buffer;
     } catch (error) {
       console.error('Error generating TTS audio:', error);
       throw error;
@@ -572,9 +597,17 @@ export class RealtimeAgent extends Agent {
     // Check if text needs chunking
     if (!TextChunker.needsChunking(text)) {
       // For short text, just return single chunk
-      const audioResponse = await this.voiceService.textToSpeech(text, { language });
+      const result = await this.voiceService.textToSpeech(text, language);
+      
+      if (!result.success || !result.audioBase64) {
+        throw new Error(result.error || 'TTS generation failed');
+      }
+      
+      // Convert base64 to ArrayBuffer
+      const audioData = Uint8Array.from(atob(result.audioBase64), c => c.charCodeAt(0));
+      
       yield {
-        chunk: audioResponse,
+        chunk: audioData.buffer,
         text,
         index: 0,
         isLast: true,
@@ -603,12 +636,19 @@ export class RealtimeAgent extends Agent {
           this.voiceService.setSpeakerByEmotion(chunkEmotion);
         }
         
-        const audioResponse = await this.voiceService.textToSpeech(chunk.text, { language });
+        const result = await this.voiceService.textToSpeech(chunk.text, language, chunkEmotion);
         const duration = Date.now() - start;
         console.log(`[Streaming TTS] Chunk ${chunk.index} generated in ${duration}ms with emotion: ${chunkEmotion}`);
         
+        if (!result.success || !result.audioBase64) {
+          throw new Error(result.error || `TTS generation failed for chunk ${chunk.index}`);
+        }
+        
+        // Convert base64 to ArrayBuffer
+        const audioData = Uint8Array.from(atob(result.audioBase64), c => c.charCodeAt(0));
+        
         return {
-          chunk: audioResponse,
+          chunk: audioData.buffer,
           text: chunk.text,
           index: chunk.index,
           isLast: chunk.isLast,

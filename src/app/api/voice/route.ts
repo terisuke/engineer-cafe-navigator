@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
         const result = await realtimeAgent.processVoiceInput(audioBuffer);
         
         // Convert audio response back to base64
-        const audioResponseBase64 = Buffer.from(result.audioResponse).toString('base64');
+        const audioResponseBase64 = Buffer.from(new Uint8Array(result.audioResponse)).toString('base64');
         
         return NextResponse.json({
           success: true,

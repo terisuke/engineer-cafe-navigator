@@ -1,43 +1,44 @@
 /**
- * Audio queue system for smooth streaming playback
+ * Audio Queue for managing sequential audio playback
+ * Handles TTS audio streaming and queueing
  */
 
 export interface AudioQueueItem {
   id: string;
-  audioData: string; // base64
-  text: string;
-  index: number;
-  isLast: boolean;
+  audioData: string; // base64 encoded audio
+  text?: string;
+  priority?: number;
   emotion?: string;
-}
-
-export interface AudioQueueCallbacks {
-  onChunkStart?: (item: AudioQueueItem) => void;
-  onChunkEnd?: (item: AudioQueueItem) => void;
-  onQueueEmpty?: () => void;
-  onError?: (error: Error, item: AudioQueueItem) => void;
 }
 
 export class AudioQueue {
   private queue: AudioQueueItem[] = [];
   private isPlaying = false;
   private currentAudio: HTMLAudioElement | null = null;
-  private callbacks: AudioQueueCallbacks;
-  private volume: number = 1.0;
-  private isStopped = false;
+  private volume = 0.8;
 
-  constructor(callbacks: AudioQueueCallbacks = {}) {
-    this.callbacks = callbacks;
+  constructor() {
+    // Initialize audio queue
   }
 
   /**
-   * Add audio chunk to queue
+   * Add audio to the queue
    */
-  enqueue(item: AudioQueueItem): void {
-    if (this.isStopped) return;
-    
-    this.queue.push(item);
-    
+  add(item: AudioQueueItem): void {
+    // Sort by priority (higher priority first)
+    if (item.priority !== undefined) {
+      const insertIndex = this.queue.findIndex(
+        queueItem => (queueItem.priority || 0) < item.priority!
+      );
+      if (insertIndex === -1) {
+        this.queue.push(item);
+      } else {
+        this.queue.splice(insertIndex, 0, item);
+      }
+    } else {
+      this.queue.push(item);
+    }
+
     // Start playing if not already playing
     if (!this.isPlaying) {
       this.playNext();
@@ -45,102 +46,19 @@ export class AudioQueue {
   }
 
   /**
-   * Play next audio in queue
+   * Clear the queue
    */
-  private async playNext(): Promise<void> {
-    if (this.isStopped || this.queue.length === 0) {
-      this.isPlaying = false;
-      this.callbacks.onQueueEmpty?.();
-      return;
-    }
-
-    this.isPlaying = true;
-    const item = this.queue.shift()!;
-
-    try {
-      // Notify chunk start
-      this.callbacks.onChunkStart?.(item);
-
-      // Create audio element
-      const audioData = Uint8Array.from(atob(item.audioData), c => c.charCodeAt(0));
-      const audioBlob = new Blob([audioData], { type: 'audio/mp3' });
-      const audioUrl = URL.createObjectURL(audioBlob);
-
-      const audio = new Audio(audioUrl);
-      audio.volume = this.volume;
-      this.currentAudio = audio;
-
-      // Setup event handlers
-      const playPromise = new Promise<void>((resolve, reject) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          this.currentAudio = null;
-          this.callbacks.onChunkEnd?.(item);
-          resolve();
-        };
-
-        audio.onerror = (error) => {
-          URL.revokeObjectURL(audioUrl);
-          this.currentAudio = null;
-          reject(new Error(`Audio playback error: ${error}`));
-        };
-      });
-
-      // Play audio
-      await audio.play();
-      await playPromise;
-
-      // Add small gap between chunks for natural speech
-      if (!item.isLast && this.queue.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-
-      // Play next chunk
-      this.playNext();
-    } catch (error) {
-      console.error('Audio queue playback error:', error);
-      this.callbacks.onError?.(error as Error, item);
-      
-      // Continue with next item
-      this.playNext();
-    }
-  }
-
-  /**
-   * Stop all playback and clear queue
-   */
-  stop(): void {
-    this.isStopped = true;
+  clear(): void {
     this.queue = [];
-    
     if (this.currentAudio) {
       this.currentAudio.pause();
       this.currentAudio = null;
     }
-    
     this.isPlaying = false;
   }
 
   /**
-   * Pause current playback
-   */
-  pause(): void {
-    if (this.currentAudio && !this.currentAudio.paused) {
-      this.currentAudio.pause();
-    }
-  }
-
-  /**
-   * Resume playback
-   */
-  resume(): void {
-    if (this.currentAudio && this.currentAudio.paused) {
-      this.currentAudio.play();
-    }
-  }
-
-  /**
-   * Set volume (0-1)
+   * Set volume for all audio
    */
   setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1, volume));
@@ -150,21 +68,128 @@ export class AudioQueue {
   }
 
   /**
-   * Get queue status
+   * Get current queue size
    */
-  getStatus(): { isPlaying: boolean; queueLength: number; isStopped: boolean } {
-    return {
-      isPlaying: this.isPlaying,
-      queueLength: this.queue.length,
-      isStopped: this.isStopped
-    };
+  getQueueSize(): number {
+    return this.queue.length;
   }
 
   /**
-   * Reset the queue for reuse
+   * Check if audio is currently playing
    */
-  reset(): void {
-    this.stop();
-    this.isStopped = false;
+  getIsPlaying(): boolean {
+    return this.isPlaying;
+  }
+
+  /**
+   * Play the next item in the queue
+   */
+  private async playNext(): Promise<void> {
+    if (this.queue.length === 0) {
+      this.isPlaying = false;
+      return;
+    }
+
+    this.isPlaying = true;
+    const item = this.queue.shift()!;
+
+    try {
+      await this.playAudio(item);
+    } catch (error) {
+      console.error('Error playing audio:', error);
+    }
+
+    // Continue with next item
+    this.playNext();
+  }
+
+  /**
+   * Play a single audio item
+   */
+  private async playAudio(item: AudioQueueItem): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        // Convert base64 to audio blob
+        let audioData: Uint8Array;
+        try {
+          audioData = Uint8Array.from(atob(item.audioData), c => c.charCodeAt(0));
+        } catch (error) {
+          throw new Error(`Invalid base64 audio data: ${error}`);
+        }
+        
+        const audioBlob = new Blob([audioData.buffer as ArrayBuffer], { type: 'audio/mp3' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        const audio = new Audio(audioUrl);
+        audio.volume = this.volume;
+        this.currentAudio = audio;
+
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          this.currentAudio = null;
+          resolve();
+        };
+
+        audio.onerror = () => {
+          URL.revokeObjectURL(audioUrl);
+          this.currentAudio = null;
+          reject(new Error('Audio playback failed'));
+        };
+
+        audio.play().catch(error => {
+          URL.revokeObjectURL(audioUrl);
+          this.currentAudio = null;
+          reject(error);
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Skip the current audio and play next
+   */
+  skip(): void {
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio = null;
+    }
+    // playNext will be called automatically by the ended event
+  }
+
+  /**
+   * Pause current playback
+   */
+  pause(): void {
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+    }
+  }
+
+  /**
+   * Resume current playback
+   */
+  resume(): void {
+    if (this.currentAudio && this.currentAudio.paused) {
+      this.currentAudio.play().catch(error => {
+        console.error('Error resuming audio:', error);
+      });
+    }
+  }
+
+  /**
+   * Get current playing status
+   */
+  getStatus(): {
+    isPlaying: boolean;
+    queueSize: number;
+    currentItem?: AudioQueueItem;
+  } {
+    return {
+      isPlaying: this.isPlaying,
+      queueSize: this.queue.length,
+      currentItem: this.queue[0]
+    };
   }
 }
