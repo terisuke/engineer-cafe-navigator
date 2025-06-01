@@ -110,7 +110,7 @@ async function finalIntegrationTest() {
 
     // Test 10: VRM Mapping
     const vrmMapping = EmotionManager.mapEmotionToVRM(localEmotion);
-    test('VRM Emotion Mapping', vrmMapping.primary && vrmMapping.weight > 0);
+    test('VRM Emotion Mapping', !!vrmMapping.primary && vrmMapping.weight > 0);
 
     // Test 11: Available Expressions
     const availableExpressions = EmotionManager.getAvailableExpressions();

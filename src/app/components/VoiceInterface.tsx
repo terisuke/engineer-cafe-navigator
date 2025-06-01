@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, Settings, Loader2, AlertCircle } from 'lucide-react';
+import { AudioQueue } from '@/lib/audio-queue';
 import { formatError } from '@/lib/error-messages';
+import { AlertCircle, Loader2, Mic, MicOff, Settings, Volume2, VolumeX } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 interface VoiceInterfaceProps {
   onLanguageChange?: (language: 'ja' | 'en') => void;
-  onPageTransition?: (page: string) => void;
   layout?: 'vertical' | 'horizontal';
   language?: 'ja' | 'en';
   autoGreeting?: boolean;
@@ -14,7 +14,6 @@ interface VoiceInterfaceProps {
 
 export default function VoiceInterface({ 
   onLanguageChange, 
-  onPageTransition,
   layout = 'vertical',
   language = 'ja',
   autoGreeting = false
@@ -24,26 +23,70 @@ export default function VoiceInterface({
   const [isRecording, setIsRecording] = useState(false);
   const [conversationState, setConversationState] = useState<'idle' | 'listening' | 'processing' | 'speaking'>('idle');
   const [currentLanguage, setCurrentLanguage] = useState<'ja' | 'en'>(language);
-  const [volume, setVolume] = useState(0.8);
+  const [volume, setVolumeState] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
+  const [autoListen, setAutoListen] = useState(true); // Auto-listen after response
+  const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
+  
+  // Custom setVolume that also updates audio queue
+  const setVolume = (newVolume: number) => {
+    setVolumeState(newVolume);
+    if (audioQueueRef.current) {
+      audioQueueRef.current.setVolume(newVolume);
+    }
+  };
+  
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioQueueRef = useRef<AudioQueue | null>(null);
+  
 
-  // Initialize audio context
+  // Initialize audio context with user gesture handling
   useEffect(() => {
-    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const initAudioContext = () => {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        console.log('AudioContext initialized, state:', audioContextRef.current.state);
+      }
+      
+      // Resume audio context if it's suspended
+      if (audioContextRef.current?.state === 'suspended') {
+        audioContextRef.current.resume().then(() => {
+          console.log('AudioContext resumed');
+        });
+      }
+    };
+    
+    // Initialize on mount
+    initAudioContext();
+    
+    // Also initialize on first user interaction
+    const handleUserInteraction = () => {
+      initAudioContext();
+      // Remove listener after first interaction
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+    
+    document.addEventListener('click', handleUserInteraction);
+    document.addEventListener('touchstart', handleUserInteraction);
     
     return () => {
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
       if (audioContextRef.current) {
         audioContextRef.current.close();
+      }
+      if (audioQueueRef.current) {
+        audioQueueRef.current.clear();
       }
     };
   }, []);
@@ -67,6 +110,14 @@ export default function VoiceInterface({
       : 'Hello there! How can I help you today?';
     
     try {
+      // Wait a bit to ensure audio context can be initialized
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Ensure audio context is ready
+      if (audioContextRef.current?.state === 'suspended') {
+        console.log('AudioContext suspended for greeting, will play on user interaction');
+      }
+      
       setConversationState('speaking');
       setResponse(greetingText);
       setIsLoading(true);
@@ -108,10 +159,19 @@ export default function VoiceInterface({
     }
   };
 
+  // TODO: Implement processTextInput for Web Speech API integration in the future
+
   // Start voice recording
   const startListening = async () => {
     try {
       setError(null);
+      
+      // Ensure audio context is initialized and running
+      if (audioContextRef.current?.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+      
+      // Use Google Cloud STT
       setIsLoading(true);
       setLoadingMessage(currentLanguage === 'ja' ? 'マイクにアクセス中...' : 'Accessing microphone...');
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -170,7 +230,7 @@ export default function VoiceInterface({
   const processAudioInput = async (audioBlob: Blob) => {
     try {
       setIsLoading(true);
-      setLoadingMessage(currentLanguage === 'ja' ? '音声を処理中...' : 'Processing audio...');
+      setLoadingMessage(currentLanguage === 'ja' ? '音声を認識中...' : 'Recognizing speech...');
       const audioBuffer = await audioBlob.arrayBuffer();
       const uint8Array = new Uint8Array(audioBuffer);
       const audioBase64 = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
@@ -192,15 +252,44 @@ export default function VoiceInterface({
       if (result.success) {
         setTranscript(result.transcript);
         setResponse(result.response);
+        
+        // Update loading message for TTS generation
+        setLoadingMessage(currentLanguage === 'ja' ? '音声を生成中...' : 'Generating voice...');
 
         // Play audio response
+        console.log('Voice processing result:', {
+          hasAudioResponse: !!result.audioResponse,
+          audioResponseLength: result.audioResponse?.length,
+          isMuted,
+          shouldPlayAudio: result.audioResponse && !isMuted
+        });
+        
         if (result.audioResponse && !isMuted) {
+          console.log('Starting audio playback...');
           await playAudioResponse(result.audioResponse);
+        } else {
+          console.log('Audio playback skipped:', {
+            hasAudioResponse: !!result.audioResponse,
+            isMuted,
+            setConversationStateToIdle: true
+          });
+          setConversationState('idle');
+          setIsLoading(false);
+          setLoadingMessage('');
         }
 
         // Update character if needed
-        if (result.shouldUpdateCharacter && result.characterAction) {
-          updateCharacter(result.characterAction);
+        if (result.shouldUpdateCharacter) {
+          if (result.characterAction) {
+            updateCharacter(result.characterAction);
+          }
+          // Update character expression based on emotion
+          if (result.emotion || result.primaryEmotion) {
+            const emotion = result.primaryEmotion || result.emotion?.emotion || 'neutral';
+            console.log('Setting character emotion from text input:', emotion);
+            setCurrentEmotion(emotion);
+            updateCharacterExpression(emotion);
+          }
         }
       } else {
         setError(result.error || formatError({ code: 'VOICE_PROCESSING_ERROR' }, currentLanguage));
@@ -215,11 +304,68 @@ export default function VoiceInterface({
     }
   };
 
+  // Play streaming audio response
+  const playStreamingAudioResponse = async (audioChunks: string[]) => {
+    try {
+      setIsLoading(true);
+      setLoadingMessage(currentLanguage === 'ja' ? 'ストリーミング音声を準備中...' : 'Preparing streaming audio...');
+      setIsSpeaking(true);
+      setConversationState('speaking');
+      
+      // Initialize audio queue
+      if (!audioQueueRef.current) {
+        audioQueueRef.current = new AudioQueue();
+      }
+      
+      // Set volume
+      audioQueueRef.current.setVolume(volume);
+      
+      // Set callback for when streaming finishes
+      audioQueueRef.current.setOnFinished(() => {
+        setIsSpeaking(false);
+        setConversationState('idle');
+        setIsLoading(false);
+        setLoadingMessage('');
+        
+        // Auto-listen if enabled
+        if (autoListen && !isMuted) {
+          setTimeout(() => {
+            console.log('Auto-listening after streaming response...');
+            startListening();
+          }, 1000);
+        }
+      });
+      
+      // Enqueue all chunks
+      audioChunks.forEach((chunk, index) => {
+        audioQueueRef.current!.add({
+          id: `chunk-${index}`,
+          audioData: chunk,
+          text: `chunk-${index}`,
+          priority: index,
+          emotion: currentEmotion || undefined
+        });
+      });
+      
+      console.log(`Queued ${audioChunks.length} audio chunks for playback`);
+      
+      // Clear loading state once chunks are queued
+      setIsLoading(false);
+      setLoadingMessage('');
+    } catch (error: any) {
+      console.error('Error playing streaming audio:', error);
+      setIsSpeaking(false);
+      setConversationState('idle');
+      setError(formatError(error, currentLanguage));
+    }
+  };
+
   // Play audio response
   const playAudioResponse = async (audioBase64: string) => {
     try {
+      console.log('playAudioResponse called with audioBase64 length:', audioBase64?.length);
       setIsLoading(true);
-      setLoadingMessage(currentLanguage === 'ja' ? '音声を準備中...' : 'Preparing audio...');
+      setLoadingMessage(currentLanguage === 'ja' ? '音声を再生準備中...' : 'Preparing audio playback...');
       setIsSpeaking(true);
       setConversationState('speaking');
 
@@ -237,67 +383,76 @@ export default function VoiceInterface({
       audio.volume = volume;
       currentAudioRef.current = audio;
 
-      // Start lip-sync analysis with the audio
-      let lipSyncCleanup: (() => void) | null = null;
-      try {
-        console.log('Starting lip-sync analysis for audio blob:', audioBlob.size, 'bytes');
-        
-        // Analyze audio for lip-sync
-        const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
-        const analyzer = new LipSyncAnalyzer();
-        const lipSyncData = await analyzer.analyzeLipSync(audioBlob);
-        
-        console.log('Lip-sync analysis complete:', lipSyncData.frames.length, 'frames, duration:', lipSyncData.duration);
-        
-        // Apply lip-sync to character
-        const startLipSyncResponse = await fetch('/api/character', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'startLipSync',
-            lipSyncData,
-          }),
-        });
-        console.log('Start lip-sync API response:', await startLipSyncResponse.json());
+      // Import performance monitor functions
+      const { measurePerformance } = await import('@/lib/performance-monitor');
 
-        // Schedule viseme updates
-        let frameIndex = 0;
-        const updateLipSync = () => {
-          if (frameIndex < lipSyncData.frames.length && currentAudioRef.current) {
-            const frame = lipSyncData.frames[frameIndex];
-            
-            console.log(`Lip-sync frame ${frameIndex}:`, frame.mouthShape, 'intensity:', frame.mouthOpen);
-            
-            // Send viseme to character
-            fetch('/api/character', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: 'setViseme',
-                viseme: frame.mouthShape,
-                intensity: frame.mouthOpen,
-              }),
-            }).then(response => response.json())
-              .then(result => console.log('Viseme API response:', result))
-              .catch(console.error);
-            
-            frameIndex++;
-            setTimeout(updateLipSync, 50); // 20fps
-          } else {
-            console.log('Lip-sync animation complete or audio stopped');
+      // Start lip-sync analysis in background (non-blocking)
+      const lipSyncPromise = (async () => {
+        try {
+          console.log('Starting lip-sync analysis for audio blob:', audioBlob.size, 'bytes');
+          
+          // Analyze audio for lip-sync
+          const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
+          const analyzer = new LipSyncAnalyzer();
+          const lipSyncData = await measurePerformance(
+            'Lip-sync analysis',
+            () => analyzer.analyzeLipSync(audioBlob)
+          );
+          
+          console.log('Lip-sync analysis complete:', lipSyncData.frames.length, 'frames, duration:', lipSyncData.duration);
+          
+          // Apply lip-sync to character
+          const startLipSyncResponse = await fetch('/api/character', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'startLipSync',
+              lipSyncData,
+            }),
+          });
+          console.log('Start lip-sync API response:', await startLipSyncResponse.json());
+
+          // Schedule viseme updates
+          let frameIndex = 0;
+          const updateLipSync = () => {
+            if (frameIndex < lipSyncData.frames.length && currentAudioRef.current) {
+              const frame = lipSyncData.frames[frameIndex];
+              
+              console.log(`Lip-sync frame ${frameIndex}:`, frame.mouthShape, 'intensity:', frame.mouthOpen);
+              
+              // Send viseme to character
+              fetch('/api/character', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'setViseme',
+                  viseme: frame.mouthShape,
+                  intensity: frame.mouthOpen,
+                }),
+              }).then(response => response.json())
+                .then(result => console.log('Viseme API response:', result))
+                .catch(console.error);
+              
+              frameIndex++;
+              setTimeout(updateLipSync, 50); // 20fps
+            } else {
+              console.log('Lip-sync animation complete or audio stopped');
+            }
+          };
+          
+          // Wait for audio to start playing before beginning lip-sync
+          if (currentAudioRef.current) {
+            currentAudioRef.current.addEventListener('play', () => {
+              console.log('Audio started playing, beginning lip-sync animation');
+              updateLipSync();
+            }, { once: true });
           }
-        };
-        
-        // Start lip-sync updates when audio starts playing
-        audio.onplay = () => {
-          console.log('Audio started playing, beginning lip-sync animation');
-          updateLipSync();
-        };
 
-        analyzer.dispose();
-      } catch (lipSyncError) {
-        console.warn('Lip-sync analysis failed, continuing with audio playback:', lipSyncError);
-      }
+          analyzer.dispose();
+        } catch (lipSyncError) {
+          console.warn('Lip-sync analysis failed, continuing with audio playback:', lipSyncError);
+        }
+      })();
 
       audio.onended = () => {
         setIsSpeaking(false);
@@ -315,6 +470,22 @@ export default function VoiceInterface({
             action: 'stopLipSync',
           }),
         }).catch(console.error);
+        
+        // Restore emotion expression after lip-sync if needed
+        if (currentEmotion && currentEmotion !== 'neutral') {
+          console.log('Restoring emotion after speech:', currentEmotion);
+          setTimeout(() => {
+            updateCharacterExpression(currentEmotion);
+          }, 200);
+        }
+        
+        // Auto-listen if enabled
+        if (autoListen && !isMuted) {
+          setTimeout(() => {
+            console.log('Auto-listening after response...');
+            startListening();
+          }, 1000); // 1 second delay before auto-listening
+        }
       };
 
       audio.onerror = () => {
@@ -336,9 +507,58 @@ export default function VoiceInterface({
         }).catch(console.error);
       };
 
-      await audio.play();
+      // Ensure audio context is running before playing
+      if (audioContextRef.current?.state === 'suspended') {
+        console.log('AudioContext suspended, resuming...');
+        await audioContextRef.current.resume();
+      }
+      
+      // Set loading state to false before playing audio (UI becomes responsive)
       setIsLoading(false);
       setLoadingMessage('');
+      
+      // Play audio with retry on autoplay failure
+      try {
+        await audio.play();
+        console.log('Audio playback started successfully');
+        
+        // Start lip-sync processing in background (non-blocking)
+        lipSyncPromise.catch(error => {
+          console.warn('Lip-sync processing error (non-critical):', error);
+        });
+      } catch (playError: any) {
+        console.error('Audio playback failed:', playError);
+        
+        // If autoplay was blocked, show a message and retry on next user interaction
+        if (playError.name === 'NotAllowedError') {
+          console.log('Autoplay blocked, waiting for user interaction...');
+          
+          // Create a one-time click handler to retry playback
+          const retryPlayback = async () => {
+            try {
+              if (audioContextRef.current?.state === 'suspended') {
+                await audioContextRef.current.resume();
+              }
+              await audio.play();
+              console.log('Audio playback started after user interaction');
+            } catch (retryError) {
+              console.error('Retry playback failed:', retryError);
+            }
+            document.removeEventListener('click', retryPlayback);
+            document.removeEventListener('touchstart', retryPlayback);
+          };
+          
+          document.addEventListener('click', retryPlayback, { once: true });
+          document.addEventListener('touchstart', retryPlayback, { once: true });
+          
+          // Update UI to show user needs to click
+          setError(currentLanguage === 'ja' 
+            ? '音声を再生するには画面をクリックしてください' 
+            : 'Click anywhere to play audio');
+        } else {
+          throw playError;
+        }
+      }
     } catch (error: any) {
       console.error('Error playing audio:', error);
       setIsSpeaking(false);
@@ -367,6 +587,28 @@ export default function VoiceInterface({
       console.error('Error updating character:', error);
     }
   };
+  
+  // Update character expression
+  const updateCharacterExpression = async (expression: string) => {
+    try {
+      console.log('Updating character expression to:', expression);
+      const response = await fetch('/api/character', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'setExpression',
+          expression: expression,
+          transition: true,
+        }),
+      });
+      const result = await response.json();
+      console.log('Character expression update result:', result);
+    } catch (error) {
+      console.error('Error updating character expression:', error);
+    }
+  };
 
   // Generate session ID
   const generateSessionId = () => {
@@ -380,6 +622,11 @@ export default function VoiceInterface({
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
         currentAudioRef.current = null;
+      }
+      
+      // Stop audio queue if streaming
+      if (audioQueueRef.current) {
+        audioQueueRef.current.clear();
       }
 
       // Notify backend of interruption
@@ -459,6 +706,7 @@ export default function VoiceInterface({
   if (layout === 'horizontal') {
     return (
       <div className="glass rounded-2xl p-4 shadow-2xl border border-white/30">
+        
         <div className="flex items-center gap-6">
           {/* Status Indicator */}
           <div className="flex items-center space-x-3">
@@ -473,7 +721,7 @@ export default function VoiceInterface({
               }`} />
             )}
             <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
-              {isLoading ? loadingMessage :
+              {isLoading && loadingMessage ? loadingMessage :
                 conversationState === 'idle' && (currentLanguage === 'ja' ? '待機中' : 'Ready') ||
                 conversationState === 'listening' && (currentLanguage === 'ja' ? '聞いています...' : 'Listening...') ||
                 conversationState === 'processing' && (currentLanguage === 'ja' ? '処理中...' : 'Processing...') ||
@@ -508,8 +756,11 @@ export default function VoiceInterface({
                   ? 'bg-gray-400 text-white cursor-not-allowed'
                   : 'bg-gradient-to-r from-primary to-secondary hover:from-secondary hover:to-primary text-white shadow-lg hover:shadow-xl hover:scale-105'
               }`}
+              title={isLoading && loadingMessage ? loadingMessage : 
+                     isListening ? (currentLanguage === 'ja' ? '停止' : 'Stop') : 
+                     (currentLanguage === 'ja' ? '録音開始' : 'Start recording')}
             >
-              {isLoading ? (
+              {isLoading && !isListening ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : isListening ? (
                 <MicOff className="w-5 h-5" />
@@ -646,6 +897,7 @@ export default function VoiceInterface({
   // Original vertical layout
   return (
     <div className="glass rounded-2xl p-6 max-w-md shadow-2xl border border-white/30">
+      
       {/* Status Indicator */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
@@ -660,7 +912,7 @@ export default function VoiceInterface({
             }`} />
           )}
           <span className="text-sm font-medium text-gray-700">
-            {isLoading ? loadingMessage :
+            {isLoading && loadingMessage ? loadingMessage :
               conversationState === 'idle' && (currentLanguage === 'ja' ? '待機中' : 'Ready') ||
               conversationState === 'listening' && (currentLanguage === 'ja' ? '聞いています...' : 'Listening...') ||
               conversationState === 'processing' && (currentLanguage === 'ja' ? '処理中...' : 'Processing...') ||
@@ -668,10 +920,12 @@ export default function VoiceInterface({
             }
           </span>
         </div>
-        <div className="px-2 py-1 bg-primary/10 rounded-full">
-          <span className="text-xs font-semibold text-primary">
-            {currentLanguage.toUpperCase()}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="px-2 py-1 bg-primary/10 rounded-full">
+            <span className="text-xs font-semibold text-primary">
+              {currentLanguage.toUpperCase()}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -701,8 +955,11 @@ export default function VoiceInterface({
               ? 'bg-gray-400 text-white cursor-not-allowed'
               : 'bg-gradient-to-r from-primary to-secondary hover:from-secondary hover:to-primary text-white shadow-lg hover:shadow-xl hover:scale-105'
           }`}
+          title={isLoading && loadingMessage ? loadingMessage : 
+                 isListening ? (currentLanguage === 'ja' ? '停止' : 'Stop') : 
+                 (currentLanguage === 'ja' ? '録音開始' : 'Start recording')}
         >
-          {isLoading ? (
+          {isLoading && !isListening ? (
             <Loader2 className="w-6 h-6 animate-spin" />
           ) : isListening ? (
             <MicOff className="w-6 h-6" />
@@ -776,7 +1033,9 @@ export default function VoiceInterface({
               <span className="text-xs text-primary font-semibold">
                 {currentLanguage === 'ja' ? 'あなた:' : 'You:'}
               </span>
-              <p className="text-sm text-gray-800 mt-1">{transcript}</p>
+              <p className="text-sm text-gray-800 mt-1">
+                {transcript}
+              </p>
             </div>
           )}
           {response && (
@@ -808,27 +1067,52 @@ export default function VoiceInterface({
       )}
 
       {/* Action Buttons */}
-      <div className="flex space-x-2">
-        <button
-          onClick={toggleLanguage}
-          className="btn-primary flex-1"
-        >
-          {currentLanguage === 'ja' ? 'English' : '日本語'}
-        </button>
+      <div className="flex flex-col gap-2">
+        {/* Main actions */}
+        <div className="flex space-x-2">
+          <button
+            onClick={toggleLanguage}
+            className="btn-primary flex-1"
+          >
+            {currentLanguage === 'ja' ? 'English' : '日本語'}
+          </button>
+          
+          <button
+            onClick={clearConversation}
+            className="btn-secondary flex-1"
+          >
+            {currentLanguage === 'ja' ? 'リセット' : 'Clear'}
+          </button>
+          
+          <button
+            className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-smooth"
+            title={currentLanguage === 'ja' ? '設定' : 'Settings'}
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
         
-        <button
-          onClick={clearConversation}
-          className="btn-secondary flex-1"
-        >
-          {currentLanguage === 'ja' ? 'リセット' : 'Clear'}
-        </button>
-        
-        <button
-          className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-smooth"
-          title={currentLanguage === 'ja' ? '設定' : 'Settings'}
-        >
-          <Settings className="w-4 h-4" />
-        </button>
+        {/* Auto-listen toggle */}
+        <div className="flex items-center justify-center space-x-2">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoListen}
+              onChange={(e) => setAutoListen(e.target.checked)}
+              className="sr-only"
+            />
+            <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              autoListen ? 'bg-primary' : 'bg-gray-300'
+            }`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                autoListen ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </div>
+            <span className="ml-2 text-sm text-gray-700">
+              {currentLanguage === 'ja' ? '自動リスニング' : 'Auto-listen'}
+            </span>
+          </label>
+        </div>
       </div>
 
       {/* Instructions */}

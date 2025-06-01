@@ -1,8 +1,10 @@
-import { Agent } from '@mastra/core';
-import { SupportedLanguage } from '../types/config';
-import { SupabaseMemoryAdapter, ConversationManager } from '@/lib/supabase-memory';
-import { EmotionManager, EmotionData } from '@/lib/emotion-manager';
+import { EmotionData, EmotionManager } from '@/lib/emotion-manager';
 import { EmotionTagParser } from '@/lib/emotion-tag-parser';
+import { endPerformance, logPerformanceSummary, startPerformance } from '@/lib/performance-monitor';
+import { ConversationManager, SupabaseMemoryAdapter } from '@/lib/supabase-memory';
+import { TextChunker } from '@/lib/text-chunker';
+import { Agent } from '@mastra/core/agent';
+import { SupportedLanguage } from '../types/config';
 
 export class RealtimeAgent extends Agent {
   private conversationState: 'idle' | 'listening' | 'processing' | 'speaking' = 'idle';
@@ -56,6 +58,82 @@ export class RealtimeAgent extends Agent {
     this._tools.set(name, tool);
   }
 
+  async processTextInput(text: string): Promise<{
+    response: string;
+    rawResponse?: string;
+    shouldUpdateCharacter: boolean;
+    characterAction?: string;
+    emotion?: EmotionData;
+    emotionTags?: any[];
+    primaryEmotion?: string;
+  }> {
+    const performanceSteps: Record<string, number> = {};
+    
+    try {
+      this.conversationState = 'processing';
+      
+      if (!text.trim()) {
+        this.conversationState = 'idle';
+        return {
+          response: '',
+          shouldUpdateCharacter: false,
+        };
+      }
+
+      // Generate response with emotion tags
+      startPerformance('AI Response Generation (Text)');
+      const rawResponse = await this.generateResponse(text);
+      performanceSteps['AI Response Generation'] = endPerformance('AI Response Generation (Text)');
+      
+      // Parse emotion tags from response
+      const parsedResponse = EmotionTagParser.parseEmotionTags(rawResponse);
+      console.log('Parsed response:', parsedResponse);
+      
+      // Use clean text (without emotion tags) for TTS
+      const cleanResponse = parsedResponse.cleanText;
+      
+      // Get conversation context for additional emotion detection
+      const conversationHistory = await this.getRecentConversationHistory();
+      
+      // Get emotion data with enhanced analysis
+      const emotion = EmotionManager.detectConversationEmotion(
+        text,
+        cleanResponse,
+        conversationHistory
+      );
+      
+      // Store conversation turn with emotion
+      await this.storeConversationTurn(text, cleanResponse, emotion);
+      
+      this.conversationState = 'speaking';
+      
+      const characterAction = this.determineCharacterAction(cleanResponse, emotion);
+      
+      // Log performance summary for text processing
+      logPerformanceSummary(performanceSteps);
+      
+      return {
+        response: cleanResponse,
+        rawResponse: rawResponse,
+        shouldUpdateCharacter: true,
+        characterAction,
+        emotion,
+        emotionTags: parsedResponse.emotions,
+        primaryEmotion: parsedResponse.primaryEmotion
+      };
+    } catch (error) {
+      this.conversationState = 'idle';
+      console.error('Error processing text input:', error);
+      // 開始したパフォーマンス計測が未終了ならここで終了させる
+      if (performanceSteps['AI Response Generation'] === undefined) {
+        performanceSteps['AI Response Generation'] = endPerformance('AI Response Generation (Text)');
+      }
+      // 他に追加したい計測があれば同様にここでendPerformanceを呼ぶ
+      logPerformanceSummary(performanceSteps);
+      throw error;
+    }
+  }
+
   async processVoiceInput(audioBuffer: ArrayBuffer): Promise<{
     transcript: string;
     response: string;
@@ -66,7 +144,11 @@ export class RealtimeAgent extends Agent {
     emotion?: EmotionData;
     emotionTags?: any[];
     primaryEmotion?: string;
+    responseText?: string;
+    error?: string;
   }> {
+    const performanceSteps: Record<string, number> = {};
+    
     try {
       this.conversationState = 'processing';
       
@@ -74,24 +156,37 @@ export class RealtimeAgent extends Agent {
       if (!this.voiceService) {
         throw new Error('Voice service not initialized');
       }
-      const transcript = await this.voiceService.speechToText(audioBuffer);
+      startPerformance('Speech-to-Text');
+      // Convert ArrayBuffer to base64 for the API using Buffer to avoid stack overflow
+      const uint8Array = new Uint8Array(audioBuffer);
+      const audioBase64 = Buffer.from(uint8Array).toString('base64');
       
-      if (!transcript.trim()) {
+      const currentLang = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      const result = await this.voiceService.speechToText(audioBase64, currentLang);
+      performanceSteps['Speech-to-Text'] = endPerformance('Speech-to-Text');
+      
+      if (!result.success || !result.transcript || !result.transcript.trim()) {
         this.conversationState = 'idle';
         return {
           transcript: '',
           response: '',
           audioResponse: new ArrayBuffer(0),
           shouldUpdateCharacter: false,
+          error: result.error || 'Speech recognition failed',
         };
       }
+      
+      const transcript = result.transcript;
 
       // Generate response with emotion tags
+      startPerformance('AI Response Generation');
       const rawResponse = await this.generateResponse(transcript);
+      performanceSteps['AI Response Generation'] = endPerformance('AI Response Generation');
       
       // Parse emotion tags from response
+      startPerformance('Emotion Parsing');
       const parsedResponse = EmotionTagParser.parseEmotionTags(rawResponse);
-      console.log('Parsed response:', parsedResponse);
+      performanceSteps['Emotion Parsing'] = endPerformance('Emotion Parsing');
       
       // Use clean text (without emotion tags) for TTS
       const cleanResponse = parsedResponse.cleanText;
@@ -109,7 +204,6 @@ export class RealtimeAgent extends Agent {
           confidence: 0.9,
           duration: 3000
         };
-        console.log('Using emotion from tags:', emotion);
       } else {
         // Fallback to traditional emotion detection
         emotion = EmotionManager.detectConversationEmotion(
@@ -117,23 +211,44 @@ export class RealtimeAgent extends Agent {
           cleanResponse,
           conversationHistory
         );
-        console.log('Using fallback emotion detection:', emotion);
       }
       
-      // Store emotion for character state
-      await this.supabaseMemory.set('currentEmotion', emotion);
-      await this.supabaseMemory.set('emotionTags', parsedResponse.emotions);
+      // Store emotion for character state (async, non-blocking)
+      this.supabaseMemory.set('currentEmotion', emotion).catch(console.error);
+      this.supabaseMemory.set('emotionTags', parsedResponse.emotions).catch(console.error);
       
-      // Store conversation turn in history
-      await this.storeConversationTurn(transcript, cleanResponse, emotion);
+      // Store conversation turn in history (async, non-blocking)
+      this.storeConversationTurn(transcript, cleanResponse, emotion).catch(console.error);
       
-      // Convert CLEAN response to speech (without emotion tags)
-      const audioResponse = await this.voiceService.textToSpeech(cleanResponse, { language });
+      // Convert CLEAN response to speech (without emotion tags and markdown)
+      startPerformance('Text-to-Speech');
+      const cleanedForTTS = this.cleanTextForTTS(cleanResponse);
       
-      // Determine character action based on response content and emotion
-      const characterAction = this.determineCharacterAction(cleanResponse, emotion);
+      // Set voice parameters based on emotion
+      if (emotion && this.voiceService.setSpeakerByEmotion) {
+        this.voiceService.setSpeakerByEmotion(emotion.emotion);
+      }
+      
+      // Always process the full text for better user experience
+      const ttsResult = await this.voiceService.textToSpeech(cleanedForTTS, currentLang, emotion?.emotion);
+      
+      if (!ttsResult.success || !ttsResult.audioBase64) {
+        throw new Error(ttsResult.error || 'TTS generation failed');
+      }
+      
+      // Convert base64 to ArrayBuffer
+      const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
+      const audioResponse = audioData.buffer;
+      
+      performanceSteps['Text-to-Speech'] = endPerformance('Text-to-Speech');
+      
+      // Determine character action based on response content and emotion (simple default)
+      const characterAction = 'speaking';
       
       this.conversationState = 'speaking';
+      
+      // Log performance summary
+      logPerformanceSummary(performanceSteps);
       
       return {
         transcript,
@@ -145,10 +260,15 @@ export class RealtimeAgent extends Agent {
         emotion,
         emotionTags: parsedResponse.emotions,
         primaryEmotion: parsedResponse.primaryEmotion,
+        responseText: cleanResponse,
       };
     } catch (error) {
       console.error('Voice processing error:', error);
       this.conversationState = 'idle';
+      // Log partial performance data if available
+      if (Object.keys(performanceSteps).length > 0) {
+        logPerformanceSummary(performanceSteps);
+      }
       throw error;
     }
   }
@@ -215,6 +335,41 @@ export class RealtimeAgent extends Agent {
     return responseText;
   }
 
+  private cleanTextForTTS(text: string): string {
+    return text
+      .replace(/\*\*/g, '')        // Remove bold markers
+      .replace(/\*/g, '')          // Remove italic/list markers
+      .replace(/^[\s\-\*]+/gm, '') // Remove list prefixes
+      .replace(/_/g, '')           // Remove underscores
+      .replace(/`/g, '')           // Remove code markers
+      .replace(/#+\s/g, '')        // Remove headings
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Convert links to text
+      .replace(/\n\s*\n/g, '\n')   // Remove extra line breaks
+      .trim();
+  }
+
+  private extractFirstSentence(text: string): string {
+    const sentences = text.split(/[。！？.!?]/);
+    if (sentences.length > 0 && sentences[0].trim()) {
+      return sentences[0].trim() + (text.includes('。') ? '。' : '！');
+    }
+    return text.slice(0, 100); // Fallback to first 100 characters
+  }
+
+  private async processRemainingTextAsync(remainingText: string, language: string, emotion?: string): Promise<void> {
+    try {
+      // Generate TTS for remaining text
+      const result = await this.voiceService.textToSpeech(remainingText, language, emotion);
+      
+      if (result.success && result.audioBase64) {
+        // TODO: Send remaining audio to frontend via WebSocket or store for later retrieval
+        console.log(`Background TTS completed for remaining text (${remainingText.length} chars)`);
+      }
+    } catch (error) {
+      console.error('Background TTS processing failed:', error);
+    }
+  }
+
   private buildContextualPrompt(
     input: string, 
     language: SupportedLanguage, 
@@ -222,15 +377,13 @@ export class RealtimeAgent extends Agent {
     history: any[]
   ): string {
     const systemPrompt = language === 'en'
-      ? `You are assisting a visitor at Engineer Cafe. Current mode: ${mode}. 
-         IMPORTANT: Respond ONLY in English. Use emotion tags like [happy], [neutral], [relaxed], etc.
-         Respond naturally and helpfully to their voice input in English.`
-      : `エンジニアカフェの来訪者をサポートしています。現在のモード: ${mode}。
-         重要: 日本語のみで応答してください。[happy]、[neutral]、[relaxed]などの感情タグを使用してください。
-         音声入力に自然で親切に日本語で応答してください。`;
+      ? `You're an Engineer Cafe assistant. Respond briefly in English with emotion tags: [happy], [neutral], [excited], [relaxed]. 
+         Example: "[happy] How can I help?" Keep responses short and natural.`
+      : `エンジニアカフェのアシスタントです。感情タグ付きで簡潔に日本語で応答: [happy], [neutral], [excited], [relaxed]
+         例: "[happy] いかがお手伝いしましょうか？" 短く自然に答えてください。`;
 
     const contextHistory = history.length > 0 
-      ? `Previous conversation:\n${history.slice(-6).map(h => `${h.role}: ${h.content}`).join('\n')}\n\n`
+      ? `Previous: ${history.slice(-4).filter(h => h && h.content).map(h => `${h.role || 'user'}: ${h.content.slice(0, 50)}`).join(' | ')}\n\n`
       : '';
 
     return `${systemPrompt}\n\n${contextHistory}User: ${input}\nAssistant:`;
@@ -272,8 +425,16 @@ export class RealtimeAgent extends Agent {
   private async getRecentConversationHistory(): Promise<string[]> {
     try {
       // Get the last 3 conversation turns for context
-      const history = await this.supabaseMemory.get('conversationHistory') as string[] || [];
-      return history.slice(-3);
+      const history = await this.supabaseMemory.get('conversationHistory') as any[] || [];
+      return history.slice(-3).map(item => {
+        if (typeof item === 'string') {
+          return item;
+        } else if (item && item.content) {
+          return `${item.role || 'user'}: ${item.content}`;
+        } else {
+          return '';
+        }
+      }).filter(Boolean);
     } catch (error) {
       console.error('Error getting conversation history:', error);
       return [];
@@ -283,14 +444,16 @@ export class RealtimeAgent extends Agent {
   private async storeConversationTurn(userInput: string, aiResponse: string, emotion?: EmotionData): Promise<void> {
     try {
       // Get existing history
-      const history = await this.supabaseMemory.get('conversationHistory') as string[] || [];
+      const history = await this.supabaseMemory.get('conversationHistory') as any[] || [];
       
-      // Add new turn
-      const turn = `User: ${userInput} | AI: ${aiResponse}`;
-      history.push(turn);
+      // Add new turn with consistent object structure
+      history.push(
+        { role: 'user', content: userInput, timestamp: Date.now() },
+        { role: 'assistant', content: aiResponse, timestamp: Date.now() }
+      );
       
-      // Keep only last 10 turns to prevent memory bloat
-      const recentHistory = history.slice(-10);
+      // Keep only last 20 entries (10 turns) to prevent memory bloat
+      const recentHistory = history.slice(-20);
       
       // Store updated history
       await this.supabaseMemory.set('conversationHistory', recentHistory);
@@ -400,11 +563,241 @@ export class RealtimeAgent extends Agent {
     }
 
     try {
-      const audioBuffer = await this.voiceService.textToSpeech(text);
-      return audioBuffer;
+      // Clean markdown formatting before TTS
+      const cleanedText = this.cleanTextForTTS(text);
+      const currentLang = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      const result = await this.voiceService.textToSpeech(cleanedText, currentLang);
+      
+      if (!result.success || !result.audioBase64) {
+        throw new Error(result.error || 'TTS generation failed');
+      }
+      
+      // Convert base64 to ArrayBuffer
+      const audioData = Uint8Array.from(atob(result.audioBase64), c => c.charCodeAt(0));
+      return audioData.buffer;
     } catch (error) {
       console.error('Error generating TTS audio:', error);
       throw error;
+    }
+  }
+
+  // Generate streaming audio response (returns chunks for immediate playback)
+  async *generateStreamingTTSAudio(
+    text: string, 
+    language: SupportedLanguage = 'ja',
+    emotion?: EmotionData
+  ): AsyncGenerator<{
+    chunk: ArrayBuffer;
+    text: string;
+    index: number;
+    isLast: boolean;
+    emotion?: string;
+  }> {
+    if (!this.voiceService) {
+      throw new Error('Voice service not initialized');
+    }
+
+    // Set voice parameters based on emotion
+    if (emotion && this.voiceService.setSpeakerByEmotion) {
+      console.log(`[RealtimeAgent] Setting streaming voice emotion: ${emotion.emotion}`);
+      this.voiceService.setSpeakerByEmotion(emotion.emotion);
+    }
+
+    // Check if text needs chunking
+    if (!TextChunker.needsChunking(text)) {
+      // For short text, just return single chunk
+      const result = await this.voiceService.textToSpeech(text, language);
+      
+      if (!result.success || !result.audioBase64) {
+        throw new Error(result.error || 'TTS generation failed');
+      }
+      
+      // Convert base64 to ArrayBuffer
+      const audioData = Uint8Array.from(atob(result.audioBase64), c => c.charCodeAt(0));
+      
+      yield {
+        chunk: audioData.buffer,
+        text,
+        index: 0,
+        isLast: true,
+        emotion: emotion?.emotion
+      };
+      return;
+    }
+
+    // Split text into chunks for streaming
+    const chunks = TextChunker.chunkText(text, language);
+    console.log(`[Streaming TTS] Splitting text into ${chunks.length} chunks`);
+
+    // Process chunks in parallel batches for better performance
+    const BATCH_SIZE = 2; // Process 2 chunks at a time
+    
+    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+      const batch = chunks.slice(i, Math.min(i + BATCH_SIZE, chunks.length));
+      
+      // Generate TTS for batch in parallel
+      const batchPromises = batch.map(async (chunk) => {
+        const start = Date.now();
+        
+        // Use chunk-specific emotion if available, otherwise use the overall emotion
+        const chunkEmotion = chunk.emotion || emotion?.emotion;
+        if (chunkEmotion && this.voiceService.setSpeakerByEmotion) {
+          this.voiceService.setSpeakerByEmotion(chunkEmotion);
+        }
+        
+        const result = await this.voiceService.textToSpeech(chunk.text, language, chunkEmotion);
+        const duration = Date.now() - start;
+        console.log(`[Streaming TTS] Chunk ${chunk.index} generated in ${duration}ms with emotion: ${chunkEmotion}`);
+        
+        if (!result.success || !result.audioBase64) {
+          throw new Error(result.error || `TTS generation failed for chunk ${chunk.index}`);
+        }
+        
+        // Convert base64 to ArrayBuffer using Buffer to avoid stack overflow
+        const audioData = new Uint8Array(Buffer.from(result.audioBase64, 'base64'));
+        
+        return {
+          chunk: audioData.buffer,
+          text: chunk.text,
+          index: chunk.index,
+          isLast: chunk.isLast,
+          emotion: chunkEmotion
+        };
+      });
+
+      // Yield results as they complete
+      const results = await Promise.all(batchPromises);
+      for (const result of results) {
+        yield result;
+      }
+    }
+  }
+
+  // Process text input with streaming TTS support
+  async processTextInputStreaming(input: string): Promise<{
+    transcript: string;
+    response: string;
+    rawResponse?: string;
+    audioChunks: AsyncGenerator<{
+      chunk: ArrayBuffer;
+      text: string;
+      index: number;
+      isLast: boolean;
+      emotion?: string;
+    }>;
+    shouldUpdateCharacter: boolean;
+    characterAction?: string;
+    emotion?: EmotionData;
+    emotionTags?: any[];
+    primaryEmotion?: string;
+  }> {
+    const performanceSteps: Record<string, number> = {};
+    
+    try {
+      this.conversationState = 'processing';
+      
+      // Generate response with emotion tags
+      startPerformance('AI Response Generation');
+      const rawResponse = await this.generateResponse(input);
+      performanceSteps['AI Response Generation'] = endPerformance('AI Response Generation');
+      
+      // Parse emotion tags from response
+      startPerformance('Emotion Parsing');
+      const parsedResponse = EmotionTagParser.parseEmotionTags(rawResponse);
+      performanceSteps['Emotion Parsing'] = endPerformance('Emotion Parsing');
+      
+      const cleanResponse = parsedResponse.cleanText;
+      const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      
+      // Create emotion data
+      let emotion: EmotionData;
+      if (parsedResponse.primaryEmotion) {
+        emotion = {
+          emotion: parsedResponse.primaryEmotion,
+          intensity: parsedResponse.emotions[0]?.intensity || 0.8,
+          confidence: 0.9,
+          duration: 3000
+        };
+      } else {
+        const conversationHistory = await this.getRecentConversationHistory();
+        emotion = EmotionManager.detectConversationEmotion(
+          input,
+          cleanResponse,
+          conversationHistory
+        );
+      }
+      
+      // Store emotion and conversation turn
+      await this.supabaseMemory.set('currentEmotion', emotion);
+      await this.supabaseMemory.set('emotionTags', parsedResponse.emotions);
+      await this.storeConversationTurn(input, cleanResponse, emotion);
+      
+      // Determine character action
+      const characterAction = this.determineCharacterAction(cleanResponse, emotion);
+      
+      this.conversationState = 'speaking';
+      
+      // Create streaming audio generator
+      const audioChunks = this.generateStreamingTTSAudio(
+        this.cleanTextForTTS(cleanResponse),
+        language,
+        emotion
+      );
+      
+      // Log performance summary
+      logPerformanceSummary(performanceSteps);
+      
+      return {
+        transcript: input,
+        response: cleanResponse,
+        rawResponse,
+        audioChunks,
+        shouldUpdateCharacter: true,
+        characterAction,
+        emotion,
+        emotionTags: parsedResponse.emotions,
+        primaryEmotion: parsedResponse.primaryEmotion
+      };
+    } catch (error) {
+      this.conversationState = 'idle';
+      console.error('Error processing text input with streaming:', error);
+      throw error;
+    }
+  }
+
+  // Speech to text only method (for quick transcription)
+  async speechToText(audioBuffer: ArrayBuffer, language: SupportedLanguage = 'ja'): Promise<{
+    success: boolean;
+    transcript?: string;
+    confidence?: number;
+    error?: string;
+  }> {
+    try {
+      if (!this.voiceService) {
+        return {
+          success: false,
+          error: 'Voice service not initialized'
+        };
+      }
+      
+      // Convert ArrayBuffer to base64 for the API using Buffer to avoid stack overflow
+      const uint8Array = new Uint8Array(audioBuffer);
+      const audioBase64 = Buffer.from(uint8Array).toString('base64');
+      
+      const result = await this.voiceService.speechToText(audioBase64, language);
+      
+      return {
+        success: result.success,
+        transcript: result.transcript,
+        confidence: result.confidence,
+        error: result.error
+      };
+    } catch (error) {
+      console.error('Speech-to-text error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 }

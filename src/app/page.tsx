@@ -1,11 +1,34 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import MarpViewer from './components/MarpViewer';
+import { Maximize, MessageSquare, Presentation, Settings, Sparkles, UserPlus, Volume2, VolumeX } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import BackgroundSelector, { BackgroundOption } from './components/BackgroundSelector';
 import CharacterAvatar from './components/CharacterAvatar';
 import EnvironmentSettings from './components/EnvironmentSettings';
-import BackgroundSelector, { BackgroundOption } from './components/BackgroundSelector';
-import { Sparkles, Settings, UserPlus, Maximize, MessageSquare, Presentation, Volume2, VolumeX } from 'lucide-react';
+import MarpViewer from './components/MarpViewer';
+
+// Emotion to expression mapping - used across the component
+const EMOTION_TO_EXPRESSION: Record<string, string> = {
+  'happy': 'happy',
+  'excited': 'happy', 
+  'sad': 'sad',
+  'angry': 'angry',
+  'surprised': 'surprised',
+  'neutral': 'neutral',
+  'relaxed': 'relaxed',
+  'thoughtful': 'relaxed',
+  'confused': 'surprised',
+  'apologetic': 'sad',
+  'curious': 'surprised',
+  'warm': 'happy',
+  'grateful': 'happy',
+  'confident': 'happy',
+  'supportive': 'relaxed',
+  'gentle': 'relaxed',
+  'knowledgeable': 'neutral',
+  'analytical': 'neutral',
+  'energetic': 'happy'
+};
 
 export default function Home() {
   const [showSlideMode, setShowSlideMode] = useState(false);
@@ -35,6 +58,16 @@ export default function Home() {
   const [isInitializingRecorder, setIsInitializingRecorder] = useState(false);
   const [setVisemeFunction, setSetVisemeFunction] = useState<((viseme: string, intensity: number) => void) | null>(null);
   const [setExpressionFunction, setSetExpressionFunction] = useState<((expression: string, weight: number) => void) | null>(null);
+  
+  // Loading state
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('');
+
+  // ボイスウェーブの高さ（scaleY）を一度だけ生成して保持
+  const voiceWaveScales = useMemo(() =>
+    Array.from({ length: 5 }, () => Math.random() * 0.5 + 0.5),
+    []
+  );
 
   // Apply selected background to both character and main display
   const handleBackgroundChange = (newBackground: BackgroundOption) => {
@@ -63,6 +96,8 @@ export default function Home() {
   // Handle language-based voice interaction start
   const handleLanguageVoiceStart = async (language: 'ja' | 'en') => {
     setCurrentLanguage(language);
+    setIsProcessing(true);
+    setProcessingMessage(language === 'ja' ? '挨拶を準備中...' : 'Preparing greeting...');
     
     // Start voice interaction directly with the character
     try {
@@ -83,6 +118,8 @@ export default function Home() {
       if (cachedGreeting.audioBase64) {
         // Use cached audio for instant playback
         console.log('[Main] Using cached greeting audio');
+        setIsProcessing(false);
+        setProcessingMessage('');
         await playAudioWithLipSync(cachedGreeting.audioBase64);
         
         // Apply emotion tags from cached greeting
@@ -128,6 +165,8 @@ export default function Home() {
           });
           
           // Play greeting audio with lip-sync
+          setIsProcessing(false);
+          setProcessingMessage('');
           await playAudioWithLipSync(result.audioResponse);
         }
       }
@@ -145,6 +184,8 @@ export default function Home() {
 
     } catch (error) {
       console.error('Error starting voice interaction:', error);
+      setIsProcessing(false);
+      setProcessingMessage('');
     }
   };
 
@@ -192,6 +233,8 @@ export default function Home() {
     try {
       setIsListening(false);
       setIsRecording(false);
+      setIsProcessing(true);
+      setProcessingMessage(currentLanguage === 'ja' ? '音声を認識中...' : 'Recognizing speech...');
       
       // First try to get speech-to-text for quick response check
       const audioBuffer = await audioBlob.arrayBuffer();
@@ -212,6 +255,7 @@ export default function Home() {
       
       // Check for quick cached responses
       if (speechResult.success && speechResult.transcript) {
+        setProcessingMessage(currentLanguage === 'ja' ? 'AIが考えています...' : 'AI is thinking...');
         const { ResponseCache } = await import('@/lib/response-cache');
         const { EnhancedEmotionManager } = await import('@/lib/enhanced-emotion-manager');
         const { ConversationMemory } = await import('@/lib/conversation-memory');
@@ -249,36 +293,34 @@ export default function Home() {
           const emotionToUse = quickResponse.emotion || emotionAnalysis.emotion;
           console.log('[Main] Setting enhanced emotion:', emotionToUse, 'intensity:', emotionAnalysis.intensity);
           
-          // Update character with enhanced emotion
-          await fetch('/api/character', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'setEmotion',
-              emotion: emotionToUse,
-              intensity: emotionAnalysis.intensity,
-              transition: true
-            })
-          });
+          // Apply expressions directly with simple mapping
+          console.log('[Main] ==========================================');
+          console.log('[Main] Processing cached response emotion:', emotionToUse);
+          console.log('[Main] setExpressionFunction available:', !!setExpressionFunction);
           
-          // Apply enhanced expressions
           if (setExpressionFunction) {
-            emotionManager.setEmotion(emotionToUse, emotionAnalysis.intensity);
-            const expressionWeights = emotionManager.getExpressionWeights();
-            console.log('[Main] Enhanced expression weights:', expressionWeights);
+            // Simple direct emotion to expression mapping
+            const expressionName = EMOTION_TO_EXPRESSION[emotionToUse] || 'neutral';
+            console.log(`[Main] Direct mapping: ${emotionToUse} -> ${expressionName}`);
+            console.log(`[Main] Calling setExpressionFunction('${expressionName}', 0.8)`);
             
-            // Apply multiple expressions with proper weights
-            Object.entries(expressionWeights).forEach(([expressionName, weight]) => {
-              if (weight > 0.1) {
-                setExpressionFunction(expressionName, weight);
-              }
-            });
+            try {
+              setExpressionFunction(expressionName, 0.8);
+              console.log(`[Main] Successfully called setExpressionFunction`);
+            } catch (error) {
+              console.error(`[Main] Error calling setExpressionFunction:`, error);
+            }
+          } else {
+            console.warn('[Main] setExpressionFunction is not available');
           }
           
           // If we have cached audio, use it; otherwise generate TTS
           if (quickResponse.audioBase64) {
+            setIsProcessing(false);
+            setProcessingMessage('');
             await playAudioWithLipSync(quickResponse.audioBase64);
           } else {
+            setProcessingMessage(currentLanguage === 'ja' ? '音声を生成中...' : 'Generating voice...');
             // Generate TTS for the quick response
             const ttsResponse = await fetch('/api/voice', {
               method: 'POST',
@@ -304,6 +346,8 @@ export default function Home() {
                 category: 'common'
               });
               
+              setIsProcessing(false);
+              setProcessingMessage('');
               await playAudioWithLipSync(ttsResult.audioResponse);
             }
           }
@@ -323,6 +367,7 @@ export default function Home() {
       }
       
       // If no quick response, proceed with full AI processing
+      setProcessingMessage(currentLanguage === 'ja' ? 'AIが応答を生成中...' : 'AI is generating response...');
       const response = await fetch('/api/voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -353,29 +398,25 @@ export default function Home() {
           
           console.log('[Main] Enhanced emotion analysis:', { emotionToUse, intensity, confidence: emotionAnalysis.confidence });
           
-          // Update character with enhanced emotion
-          await fetch('/api/character', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'setEmotion',
-              emotion: emotionToUse,
-              intensity: intensity,
-              transition: true
-            })
-          });
+          // Apply expressions directly with simple mapping
+          console.log('[Main] ==========================================');
+          console.log('[Main] Processing voice result emotion:', emotionToUse);
+          console.log('[Main] setExpressionFunction available:', !!setExpressionFunction);
           
-          // Apply enhanced expressions
           if (setExpressionFunction) {
-            emotionManager.setEmotion(emotionToUse, intensity);
-            const expressionWeights = emotionManager.getExpressionWeights();
-            console.log('[Main] Enhanced expression weights:', expressionWeights);
+            // Simple direct emotion to expression mapping
+            const expressionName = EMOTION_TO_EXPRESSION[emotionToUse] || 'neutral';
+            console.log(`[Main] Direct mapping: ${emotionToUse} -> ${expressionName}`);
+            console.log(`[Main] Calling setExpressionFunction('${expressionName}', 0.8)`);
             
-            Object.entries(expressionWeights).forEach(([expressionName, weight]) => {
-              if (weight > 0.1) {
-                setExpressionFunction(expressionName, weight);
-              }
-            });
+            try {
+              setExpressionFunction(expressionName, 0.8);
+              console.log(`[Main] Successfully called setExpressionFunction`);
+            } catch (error) {
+              console.error(`[Main] Error calling setExpressionFunction:`, error);
+            }
+          } else {
+            console.warn('[Main] setExpressionFunction is not available');
           }
           
           // Cache the response for future use
@@ -405,9 +446,14 @@ export default function Home() {
         
         // Play response audio with lip-sync
         if (result.audioResponse) {
+          setProcessingMessage(currentLanguage === 'ja' ? '音声を準備中...' : 'Preparing audio...');
+          setIsProcessing(false);
+          setProcessingMessage('');
           await playAudioWithLipSync(result.audioResponse);
         }
       }
+      setIsProcessing(false);
+      setProcessingMessage('');
     } catch (error) {
       console.error('Error processing voice input:', error);
       
@@ -439,6 +485,8 @@ export default function Home() {
           console.error('Error generating error response TTS:', ttsError);
         }
       }
+      setIsProcessing(false);
+      setProcessingMessage('');
     }
   };
 
@@ -575,22 +623,14 @@ export default function Home() {
 
       audio.onended = () => {
         URL.revokeObjectURL(audioUrl);
-        console.log('[Main] Audio ended, resetting character');
+        console.log('[Main] Audio ended');
         
-        // Reset character to neutral after speaking
+        // Reset only the viseme (mouth shape) to closed, but keep the current expression
         if (setVisemeFunction) {
           setVisemeFunction('Closed', 0);
         }
         
-        fetch('/api/character', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'setExpression',
-            expression: 'neutral',
-            transition: true
-          })
-        });
+        // Don't reset expression to neutral - keep the current emotion
       };
 
       await audio.play();
@@ -625,7 +665,50 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="min-h-screen" style={getBackgroundStyle()}>
+    <main className="min-h-screen relative" style={getBackgroundStyle()}>
+      {/* Loading Overlay */}
+      {isProcessing && (
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl p-8 max-w-md mx-4">
+            <div className="flex flex-col items-center space-y-4">
+              {/* Animated loader */}
+              <div className="relative">
+                <div className="w-20 h-20 border-4 border-blue-200 rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 w-20 h-20 border-4 border-blue-500 rounded-full animate-spin border-t-transparent"></div>
+              </div>
+              
+              {/* Loading message */}
+              <h2 className="text-xl font-semibold text-gray-800">
+                {processingMessage}
+              </h2>
+              
+              {/* Sub-message */}
+              <p className="text-sm text-gray-600 text-center">
+                {currentLanguage === 'ja' 
+                  ? 'しばらくお待ちください...' 
+                  : 'Please wait a moment...'
+                }
+              </p>
+              
+              {/* Voice wave animation */}
+              <div className="flex items-center space-x-1 h-8">
+                {voiceWaveScales.map((scale, i) => (
+                  <div
+                    key={i}
+                    className="w-1 bg-blue-500 rounded-full animate-pulse"
+                    style={{ 
+                      height: '100%',
+                      animationDelay: `${i * 0.1}s`,
+                      transform: `scaleY(${scale})`
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-sm">
         <div 
@@ -701,13 +784,16 @@ export default function Home() {
                       setSetVisemeFunction(() => setViseme);
                     }}
                     onExpressionControl={(setExpression) => {
-                      console.log('[Main] Received expression control function');
+                      console.log('[Main] === Received expression control function ===');
+                      console.log('[Main] setExpression function type:', typeof setExpression);
+                      console.log('[Main] setExpression function:', setExpression);
                       setSetExpressionFunction(() => setExpression);
+                      console.log('[Main] setExpressionFunction state updated');
                     }}
                   />
                   
-                  {/* Settings button */}
-                  <div className="absolute top-4 left-4">
+                  {/* Settings and test buttons */}
+                  <div className="absolute top-4 left-4 flex flex-col gap-2">
                     <button
                       onClick={() => setShowSettings(!showSettings)}
                       className="p-3 bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:bg-white transition-colors"
@@ -715,6 +801,7 @@ export default function Home() {
                     >
                       <Settings className="w-6 h-6 text-gray-600" />
                     </button>
+                    
                   </div>
                   
                   {/* Voice interaction controls - only show when not in slide mode */}

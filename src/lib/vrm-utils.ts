@@ -1,5 +1,5 @@
+import { VRM, VRMLoaderPlugin } from '@pixiv/three-vrm';
 import * as THREE from 'three';
-import { VRM, VRMLoaderPlugin, VRMExpressionManager, VRMHumanoid, VRMLookAt } from '@pixiv/three-vrm';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export interface VRMAnimationClip {
@@ -39,7 +39,7 @@ export class VRMUtils {
   ];
 
   // Lip-sync viseme mapping
-  private static visemeMapping = {
+  public static visemeMapping = {
     'A': 'aa',
     'I': 'ih', 
     'U': 'ou',
@@ -708,8 +708,7 @@ export class VRMBlendShapeController {
    * Apply lip-sync frame data
    */
   applyLipSyncFrame(frame: import('./lip-sync-analyzer').LipSyncFrame): void {
-    const visemeMap = VRMUtils.visemeMapping;
-    const vrmViseme = visemeMap[frame.mouthShape as keyof typeof visemeMap] || 'neutral';
+    const vrmViseme = VRMUtils.visemeMapping[frame.mouthShape as keyof typeof VRMUtils.visemeMapping] || 'neutral';
     
     this.setViseme(vrmViseme, frame.mouthOpen);
   }
@@ -718,7 +717,18 @@ export class VRMBlendShapeController {
    * Apply expression data
    */
   applyExpressionData(expressionData: import('./expression-controller').ExpressionData): void {
-    this.setExpressions(expressionData);
+    // ExpressionData型はRecord<string, number>と互換性があるため、型ガードで安全性を担保
+    if (expressionData && typeof expressionData === 'object') {
+      const record: Record<string, number> = {};
+      for (const key in expressionData) {
+        if (typeof (expressionData as any)[key] === 'number') {
+          record[key] = (expressionData as any)[key];
+        }
+      }
+      this.setExpressions(record);
+    } else {
+      console.warn('Invalid expressionData:', expressionData);
+    }
   }
 
   /**

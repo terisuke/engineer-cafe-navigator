@@ -9,6 +9,7 @@
 Engineer Cafe Navigatorは以下のRESTful APIエンドポイントを提供します：
 
 - **音声処理**: 音声認識、合成、AI応答生成
+- **感情検出**: テキストと音声からのリアルタイム感情分析
 - **スライド制御**: Marpスライドの表示とナビゲーション
 - **キャラクター制御**: VRMキャラクターの表情とアニメーション
 - **外部連携**: WebSocket受付システム統合
@@ -85,6 +86,12 @@ APIはGoogle CloudサービスにService Account認証を使用します。ク�
   "audioResponse": "base64エンコードされたMP3音声",
   "shouldUpdateCharacter": true,
   "characterAction": "greeting",
+  "emotion": {
+    "emotion": "explaining",
+    "intensity": 0.75,
+    "confidence": 0.82,
+    "duration": 2500
+  },
   "sessionId": "セッションID"
 }
 ```
@@ -399,32 +406,34 @@ RAG（検索拡張生成）による質問応答
 - `getReceptionStatus`: 受付状況取得
 - `websocket`: WebSocketイベント送信
 
-## 🌄 背景API
+## 🏞️ 背景API
 
 ### GET /api/backgrounds
 
-利用可能な背景の取得
+アプリケーションで利用可能な背景画像を取得します。
+
+#### リクエスト
+
+パラメータは不要です。
 
 #### レスポンス
+
+**成功 (200):**
 ```json
 {
-  "success": true,
-  "backgrounds": [
-    {
-      "id": "gradient-blue",
-      "name": "Blue Gradient",
-      "type": "gradient",
-      "preview": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-    },
-    {
-      "id": "IMG_5573",
-      "name": "IMG_5573.JPG",
-      "type": "image",
-      "url": "/backgrounds/IMG_5573.JPG",
-      "preview": "/backgrounds/IMG_5573.JPG"
-    }
-  ]
+  "images": [
+    "IMG_5573.JPG",
+    "placeholder.svg"
+  ],
+  "total": 2
 }
+```
+
+**注記:**
+- `/public/backgrounds` ディレクトリ内のすべての画像ファイルを返します
+- サポート形式: `.jpg`, `.jpeg`, `.png`, `.webp`, `.svg`
+- 隠しファイル（`.`で始まる）とREADMEファイルは除外されます
+- ディレクトリが存在しない場合は自動的に作成されます
 ```
 
 ## 🚨 エラー処理
@@ -578,6 +587,7 @@ curl http://localhost:3000/api/voice?action=supported_languages
 - Supabaseメモリアダプタ統合
 - マルチターン会話のサポート
 - セッション管理の改善
+- 感情検出機能の追加
 
 ### v1.2.0 (2024-01-30)
 - 背景制御API追加

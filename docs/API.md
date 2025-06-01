@@ -86,6 +86,7 @@ The API uses Service Account authentication for Google Cloud services. Session-b
   "success": true,
   "transcript": "エンジニアカフェについて教えてください",
   "response": "エンジニアカフェは福岡市にある...",
+  "responseText": "エンジニアカフェは福岡市にある...",
   "audioResponse": "base64-encoded-mp3-audio",
   "shouldUpdateCharacter": true,
   "characterAction": "greeting",
@@ -95,6 +96,10 @@ The API uses Service Account authentication for Google Cloud services. Session-b
     "confidence": 0.82,
     "duration": 2500
   },
+  "primaryEmotion": "explaining",
+  "emotionTags": [
+    { "tag": "explaining", "intensity": 0.75 }
+  ],
   "sessionId": "uuid-session-id"
 }
 ```
@@ -179,6 +184,35 @@ The API uses Service Account authentication for Google Cloud services. Session-b
   ]
 }
 ```
+
+## 🏞️ Background API
+
+### GET /api/backgrounds
+
+Retrieve available background images for the application.
+
+#### Request
+
+No parameters required.
+
+#### Response
+
+**Success (200):**
+```json
+{
+  "images": [
+    "IMG_5573.JPG",
+    "placeholder.svg"
+  ],
+  "total": 2
+}
+```
+
+**Notes:**
+- Returns all image files from the `/public/backgrounds` directory
+- Supported formats: `.jpg`, `.jpeg`, `.png`, `.webp`, `.svg`
+- Excludes hidden files (starting with `.`) and README files
+- If the directory doesn't exist, it will be created automatically
 
 ## 📊 スライド API
 
@@ -523,15 +557,15 @@ AIによる質問回答システム
 
 ### エラーコード一覧
 
-| コード | 説明 | HTTPステータス |
-|--------|------|----------------|
-| `VOICE_PROCESSING_ERROR` | 音声処理エラー | 400 |
-| `SLIDE_NOT_FOUND` | スライドが見つからない | 404 |
-| `CHARACTER_ACTION_FAILED` | キャラクター操作失敗 | 500 |
-| `EXTERNAL_SERVICE_ERROR` | 外部サービス連携エラー | 502 |
-| `INVALID_REQUEST` | 無効なリクエスト | 400 |
-| `AUTHENTICATION_REQUIRED` | 認証が必要 | 401 |
-| `RATE_LIMIT_EXCEEDED` | レート制限超過 | 429 |
+| コード                       | 説明            | HTTPステータス |
+|---------------------------|----------------|-----------|
+| `VOICE_PROCESSING_ERROR`  | 音声処理エラー     | 400       |
+| `SLIDE_NOT_FOUND`         | スライドが見つからない    | 404       |
+| `CHARACTER_ACTION_FAILED` | キャラクター操作失敗  | 500       |
+| `EXTERNAL_SERVICE_ERROR`  | 外部サービス連携エラー | 502       |
+| `INVALID_REQUEST`         | 無効なリクエスト      | 400       |
+| `AUTHENTICATION_REQUIRED` | 認証が必要       | 401       |
+| `RATE_LIMIT_EXCEEDED`     | レート制限超過     | 429       |
 
 ### エラーレスポンス形式
 

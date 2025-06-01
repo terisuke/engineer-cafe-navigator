@@ -1,7 +1,7 @@
 import { Mastra } from '@mastra/core';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { Config } from './types/config';
-import { GoogleCloudVoiceServiceSimple } from './voice/google-cloud-voice-simple';
+import { GoogleCloudVoiceSimple } from './voice/google-cloud-voice-simple';
 import { WelcomeAgent } from './agents/welcome-agent';
 import { QAAgent } from './agents/qa-agent';
 import { RealtimeAgent } from './agents/realtime-agent';
@@ -22,7 +22,7 @@ export class EngineerCafeNavigator {
   private config: Config;
   private agents: Map<string, any> = new Map();
   private tools: Map<string, any> = new Map();
-  private voiceService!: GoogleCloudVoiceServiceSimple;
+  private voiceService!: GoogleCloudVoiceSimple;
 
   constructor(config: Config) {
     this.config = config;
@@ -37,7 +37,7 @@ export class EngineerCafeNavigator {
 
   private initializeServices() {
     // Initialize Google Cloud Voice Service
-    this.voiceService = new GoogleCloudVoiceServiceSimple(this.config.googleCloud);
+    this.voiceService = new GoogleCloudVoiceSimple();
   }
 
   private initializeAgents() {

@@ -36,7 +36,9 @@ Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福
 | 機能カテゴリ          | 機能詳細                       |
 |-------------------|----------------------------|
 | 🎤 **音声対話**   | リアルタイム音声認識・合成、割り込み対応 |
+| 🌐 **Web Speech API** | ブラウザネイティブ音声認識（コスト削減）|
 | 🎭 **感情認識**   | テキスト解析による感情検出、VRM表情制御 |
+| 😊 **テキスト感情認識**   | 会話内容からの感情分析とVRM表情制御 |
 | 📊 **動的スライド**   | Marp Markdown、音声ナレーション連動   |
 | 🤖 **3Dキャラクター**   | VRMアバター、感情連動表情・動作制御      |
 | 🌐 **多言語対応** | 日本語・英語切り替え、多言語感情認識    |
@@ -172,6 +174,10 @@ NEXTAUTH_SECRET=your-secret-key
 # 🔌 External Integration
 WEBSOCKET_URL=ws://localhost:8080
 RECEPTION_API_URL=http://localhost:8080/api
+
+# 🎛️ Feature Toggles (計画中)
+# NEXT_PUBLIC_ENABLE_FACIAL_EXPRESSION=false
+# NEXT_PUBLIC_USE_WEB_SPEECH_API=false
 ```
 
 #### Service Account 設定
@@ -331,6 +337,32 @@ engineer-cafe-navigator/
 └── tsconfig.json
 ```
 
+## 🎯 ハイブリッド音声認識アプローチ
+
+### 概要
+Engineer Cafe NavigatorはGoogle Cloud STTとWeb Speech APIのハイブリッドアプローチを採用し、コスト削減と品質向上を実現しています。
+
+### 音声認識の実装
+- **Google Cloud STT（Service Account認証）**: 高精度な音声認識を提供（実装済み）
+- **MediaRecorder API**: WebM/Opus形式での高品質音声録音（実装済み）
+
+### テキストベースの感情認識 (実装済み)
+- **EmotionManager**: 日本語・英語のキーワード分析による感情検出
+- **VRM表情制御**: 6種類の感情表現（neutral, happy, sad, angry, relaxed, surprised）
+- **コンテキスト連動**: 会話履歴を考慮した感情判定
+
+### 未実装機能
+以下の機能はドキュメントに記載されていますが、実際には実装されていません：
+
+- **Web Speech API**: ブラウザネイティブ音声認識
+- **表情認識**: face-api.jsを使ったカメラベースの表情検出
+- **Enhanced Voice API**: `/api/voice/enhanced`エンドポイント
+
+### ブラウザ互換性
+- **Google Cloud STT**: すべてのモダンブラウザで動作
+- **MediaRecorder API**: Chrome, Firefox, Edgeで完全対応、Safariで部分対応
+- **Three.js VRM**: 全モダンブラウザ対応
+
 ## 🎮 使用方法
 
 ### 基本的な操作フロー
@@ -461,8 +493,11 @@ Vercelダッシュボードで以下を設定：
 
 ```bash
 GOOGLE_CLOUD_PROJECT_ID=prod-project-id
+GOOGLE_CLOUD_CREDENTIALS=./config/service-account-key.json
 GOOGLE_GENERATIVE_AI_API_KEY=prod-gemini-key
-POSTGRES_URL=postgresql://prod-db-url
+NEXT_PUBLIC_SUPABASE_URL=https://project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 NEXTAUTH_SECRET=secure-production-secret
 ```
 
@@ -582,9 +617,11 @@ curl http://localhost:3000/api/character?action=health
 curl http://localhost:3000/api/marp?action=health
 
 # ログの確認
-pnpm run logs:voice     # 音声処理ログ
-pnpm run logs:character # キャラクターログ  
-pnpm run logs:marp      # スライドログ
+# 現在利用可能なコマンド
+pnpm run dev         # 開発サーバー起動
+pnpm run build       # ビルド
+pnpm run lint        # ESLintチェック
+pnpm run test:api    # APIテスト
 ```
 
 ## 🔐 セキュリティ

@@ -18,13 +18,16 @@ pnpm lint                   # Run Next.js linting
 
 # CSS Dependencies
 pnpm install:css            # Install correct Tailwind CSS v3 dependencies
+
+# Testing
+pnpm test:api               # Run API endpoint tests
 ```
 
 ## ⚠️ CRITICAL: Tailwind CSS Version
 
-**This project uses Tailwind CSS v3.4.14. DO NOT upgrade to v4.**
+**This project uses Tailwind CSS v3.4.17. DO NOT upgrade to v4.**
 - Tailwind CSS v4 has breaking changes and is incompatible
-- Always use: `tailwindcss@3.4.14`, `postcss@8.4.47`, `autoprefixer@10.4.20`
+- Always use: `tailwindcss@3.4.17`, `postcss@8.4.47`, `autoprefixer@10.4.20`
 - PostCSS config must use `tailwindcss: {}`, NOT `@tailwindcss/postcss: {}`
 
 ## High-Level Architecture
@@ -61,6 +64,7 @@ The application follows a multi-layered architecture:
 ### Key API Endpoints
 
 - **POST /api/voice**: Voice processing (speech recognition, AI response, TTS)
+- **GET /api/backgrounds**: Get available background images
 - **POST /api/marp**: Marp markdown slide rendering
 - **POST /api/slides**: Slide navigation with narration
 - **POST /api/character**: VRM character control
@@ -72,7 +76,8 @@ The application follows a multi-layered architecture:
 Required environment variables:
 - `GOOGLE_CLOUD_PROJECT_ID`: GCP project for speech services
 - `GOOGLE_GENERATIVE_AI_API_KEY`: Gemini API key
-- `SUPABASE_URL` & `SUPABASE_ANON_KEY`: Database connection
+- `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Public Supabase access
+- `SUPABASE_SERVICE_ROLE_KEY`: Server-side Supabase access
 - Service account key at `config/service-account-key.json`
 
 ### Database Schema
@@ -102,4 +107,7 @@ All tables have Row Level Security (RLS) enabled with service role access.
 - 3D character animations synchronized with voice output
 - Slide presentations with voice narration
 - WebSocket support for external system integration
+- Voice recognition using Google Cloud STT with Service Account authentication
+- Emotion detection from text for character expression control
 - No test framework is currently configured
+- Enhanced voice API with facial expression is planned but not yet implemented
