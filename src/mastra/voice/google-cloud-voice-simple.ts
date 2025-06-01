@@ -20,8 +20,8 @@ export class GoogleCloudVoiceServiceSimple {
     this.currentSettings = {
       language: 'ja',
       speaker: 'ja-JP-Wavenet-B',
-      speed: 1.5,
-      pitch: 0.5,
+      speed: 1.3,  // Reduced from 1.5 (slower by 0.2)
+      pitch: 2.5,  // Increased from 0.5 (higher by 2.0)
       volumeGainDb: 2.0,
     };
     
@@ -205,8 +205,8 @@ export class GoogleCloudVoiceServiceSimple {
     this.currentSettings.language = language;
     if (language === 'ja') {
       this.currentSettings.speaker = 'ja-JP-Wavenet-B';
-      this.currentSettings.speed = 1.5;
-      this.currentSettings.pitch = 0.5;
+      this.currentSettings.speed = 1.3;  // Reduced from 1.5 (slower by 0.2)
+      this.currentSettings.pitch = 2.5;  // Increased from 0.5 (higher by 2.0)
       this.currentSettings.volumeGainDb = 2.0;
     } else {
       this.currentSettings.speaker = 'en-GB-Standard-F';
@@ -216,48 +216,21 @@ export class GoogleCloudVoiceServiceSimple {
     }
   }
 
-  setSpeakerByEmotion(emotion: 'neutral' | 'friendly' | 'explaining') {
+  setSpeakerByEmotion(emotion: string) {
+    // Keep the original base settings regardless of emotion for better clarity
     if (this.currentSettings.language === 'ja') {
-      // Always use Wavenet-B for Japanese but adjust tone with speed and pitch
       this.currentSettings.speaker = 'ja-JP-Wavenet-B';
-      switch (emotion) {
-        case 'neutral':
-          this.currentSettings.speed = 1.5;
-          this.currentSettings.pitch = 0.5;
-          this.currentSettings.volumeGainDb = 2.0;
-          break;
-        case 'friendly':
-          this.currentSettings.speed = 1.5;
-          this.currentSettings.pitch = 0.5;
-          this.currentSettings.volumeGainDb = 2.5;
-          break;
-        case 'explaining':
-          this.currentSettings.speed = 1.5;
-          this.currentSettings.pitch = 0.5;
-          this.currentSettings.volumeGainDb = 2.0;
-          break;
-      }
+      this.currentSettings.speed = 1.3;
+      this.currentSettings.pitch = 2.5;
+      this.currentSettings.volumeGainDb = 2.0;
     } else {
-      // Always use GB-Standard-F for English but adjust tone with speed and pitch
       this.currentSettings.speaker = 'en-GB-Standard-F';
-      switch (emotion) {
-        case 'neutral':
-          this.currentSettings.speed = 1.05;
-          this.currentSettings.pitch = 0.3;
-          this.currentSettings.volumeGainDb = 2.5;
-          break;
-        case 'friendly':
-          this.currentSettings.speed = 1.1;
-          this.currentSettings.pitch = 0.5;
-          this.currentSettings.volumeGainDb = 3.0;
-          break;
-        case 'explaining':
-          this.currentSettings.speed = 1.0;
-          this.currentSettings.pitch = 0.2;
-          this.currentSettings.volumeGainDb = 2.2;
-          break;
-      }
+      this.currentSettings.speed = 1.05;
+      this.currentSettings.pitch = 0.3;
+      this.currentSettings.volumeGainDb = 2.5;
     }
+    
+    console.log(`[Voice] Using base voice settings for emotion "${emotion}" (${this.currentSettings.language})`);
   }
 
   // Stub for streaming - not implemented in simple version

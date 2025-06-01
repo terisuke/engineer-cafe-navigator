@@ -708,7 +708,14 @@ export class VRMBlendShapeController {
    * Apply lip-sync frame data
    */
   applyLipSyncFrame(frame: import('./lip-sync-analyzer').LipSyncFrame): void {
-    const visemeMap = VRMUtils.visemeMapping;
+    const visemeMap = {
+      'A': 'aa',
+      'I': 'ih', 
+      'U': 'ou',
+      'E': 'ee',
+      'O': 'oh',
+      'Closed': 'neutral'
+    };
     const vrmViseme = visemeMap[frame.mouthShape as keyof typeof visemeMap] || 'neutral';
     
     this.setViseme(vrmViseme, frame.mouthOpen);
@@ -718,7 +725,7 @@ export class VRMBlendShapeController {
    * Apply expression data
    */
   applyExpressionData(expressionData: import('./expression-controller').ExpressionData): void {
-    this.setExpressions(expressionData);
+    this.setExpressions(expressionData as unknown as Record<string, number>);
   }
 
   /**

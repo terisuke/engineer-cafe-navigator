@@ -100,7 +100,11 @@ export class ResponseCache {
 
   static getCacheKey(text: string, language: 'ja' | 'en'): string {
     const normalizedText = text.toLowerCase().trim();
-    return `${this.CACHE_PREFIX}${language}_${btoa(normalizedText).replace(/[=+/]/g, '')}`;
+    // Use encodeURIComponent for Unicode support instead of btoa
+    const encoded = encodeURIComponent(normalizedText).replace(/[.!'()*]/g, (c) => {
+      return '%' + c.charCodeAt(0).toString(16);
+    });
+    return `${this.CACHE_PREFIX}${language}_${encoded}`;
   }
 
   static async cacheResponse(response: Omit<CachedResponse, 'timestamp' | 'useCount'>): Promise<void> {

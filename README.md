@@ -36,7 +36,9 @@ Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福
 | 機能カテゴリ          | 機能詳細                       |
 |-------------------|----------------------------|
 | 🎤 **音声対話**   | リアルタイム音声認識・合成、割り込み対応 |
+| 🌐 **Web Speech API** | ブラウザネイティブ音声認識（コスト削減）|
 | 🎭 **感情認識**   | テキスト解析による感情検出、VRM表情制御 |
+| 😊 **表情認識**   | face-api.jsによるリアルタイム表情検出 |
 | 📊 **動的スライド**   | Marp Markdown、音声ナレーション連動   |
 | 🤖 **3Dキャラクター**   | VRMアバター、感情連動表情・動作制御      |
 | 🌐 **多言語対応** | 日本語・英語切り替え、多言語感情認識    |
@@ -172,6 +174,10 @@ NEXTAUTH_SECRET=your-secret-key
 # 🔌 External Integration
 WEBSOCKET_URL=ws://localhost:8080
 RECEPTION_API_URL=http://localhost:8080/api
+
+# 🎛️ Feature Toggles
+NEXT_PUBLIC_ENABLE_FACIAL_EXPRESSION=false
+NEXT_PUBLIC_USE_WEB_SPEECH_API=false
 ```
 
 #### Service Account 設定
@@ -330,6 +336,31 @@ engineer-cafe-navigator/
 ├── next.config.js
 └── tsconfig.json
 ```
+
+## 🎯 ハイブリッド音声認識アプローチ
+
+### 概要
+Engineer Cafe NavigatorはGoogle Cloud STTとWeb Speech APIのハイブリッドアプローチを採用し、コスト削減と品質向上を実現しています。
+
+### 音声認識の優先順位
+1. **Web Speech API（無料）**: 環境変数で有効化された場合、優先的に使用
+2. **Google Cloud STT（有料）**: Web Speech API未対応時のフォールバック
+
+### 表情認識による感情コンテキスト
+- **face-api.js**: リアルタイム表情検出（オプション機能）
+- **感情連動応答**: ユーザーの表情に応じた適切な応答生成
+- **プライバシー配慮**: カメラアクセスは明示的な許可制
+
+### 機能の有効化
+```bash
+# .envファイルで設定
+NEXT_PUBLIC_ENABLE_FACIAL_EXPRESSION=true  # 表情認識を有効化
+NEXT_PUBLIC_USE_WEB_SPEECH_API=true       # Web Speech APIを有効化
+```
+
+### ブラウザ互換性
+- **Web Speech API**: Chrome, Edge（完全対応）、Safari（部分対応）
+- **face-api.js**: 全モダンブラウザ対応
 
 ## 🎮 使用方法
 

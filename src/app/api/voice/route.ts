@@ -32,6 +32,26 @@ const config: Config = {
 
 export async function POST(request: NextRequest) {
   try {
+    // Parse and log request body
+    const body = await request.json();
+    console.log('Voice API Request:', {
+      action: body.action,
+      hasAudioData: !!body.audioData,
+      sessionId: body.sessionId,
+      language: body.language,
+      hasText: !!body.text,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Validate required action field
+    if (!body.action) {
+      console.error('400 Error - Missing action field');
+      return NextResponse.json(
+        { error: 'Missing required field: action' },
+        { status: 400 }
+      );
+    }
+    
     const navigator = getEngineerCafeNavigator(config);
     const realtimeAgent = navigator.getAgent('realtime');
     
@@ -42,7 +62,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
     const { action, audioData, sessionId, language, text } = body;
 
     switch (action) {
@@ -55,6 +74,15 @@ export async function POST(request: NextRequest) {
         });
 
       case 'process_voice':
+        // Validate required fields for process_voice
+        if (!audioData) {
+          console.error('400 Error - Missing audioData for process_voice');
+          return NextResponse.json(
+            { error: 'Missing required field: audioData' },
+            { status: 400 }
+          );
+        }
+        
         // Ensure session is active
         if (sessionId && !realtimeAgent.getCurrentSessionId()) {
           await realtimeAgent.startSession(undefined, language || 'ja');
@@ -72,10 +100,13 @@ export async function POST(request: NextRequest) {
           success: true,
           transcript: result.transcript,
           response: result.response,
+          responseText: result.response, // Add for compatibility with page.tsx
           audioResponse: audioResponseBase64,
           shouldUpdateCharacter: result.shouldUpdateCharacter,
           characterAction: result.characterAction,
           emotion: result.emotion,
+          primaryEmotion: result.primaryEmotion, // Add primaryEmotion from agent
+          emotionTags: result.emotionTags, // Add emotion tags
           sessionId: realtimeAgent.getCurrentSessionId(),
         });
 
@@ -157,6 +188,64 @@ export async function POST(request: NextRequest) {
           audioResponse: ttsAudioBase64,
           text: text,
         });
+
+      case 'process_text':
+        // Process text input with optional streaming
+        if (!text) {
+          return NextResponse.json(
+            { error: 'Missing required field: text' },
+            { status: 400 }
+          );
+        }
+        
+        // Ensure session is active
+        if (sessionId && !realtimeAgent.getCurrentSessionId()) {
+          await realtimeAgent.startSession(undefined, language || 'ja');
+        }
+        
+        // Check if streaming is requested
+        const useStreaming = body.streaming === true;
+        
+        if (useStreaming) {
+          // Use streaming TTS for better responsiveness
+          const streamResult = await realtimeAgent.processTextInputStreaming(text);
+          
+          // Collect audio chunks into array for response
+          const audioChunks: string[] = [];
+          for await (const chunk of streamResult.audioChunks) {
+            const chunkBase64 = Buffer.from(chunk.chunk).toString('base64');
+            audioChunks.push(chunkBase64);
+          }
+          
+          return NextResponse.json({
+            success: true,
+            transcript: text,
+            response: streamResult.response,
+            audioChunks, // Array of base64 audio chunks
+            shouldUpdateCharacter: streamResult.shouldUpdateCharacter,
+            characterAction: streamResult.characterAction,
+            emotion: streamResult.emotion,
+            primaryEmotion: streamResult.primaryEmotion,
+            sessionId: realtimeAgent.getCurrentSessionId(),
+            streaming: true,
+          });
+        } else {
+          // Use regular processing
+          const result = await realtimeAgent.processTextInput(text);
+          const audioResponseBase64 = Buffer.from(result.audioResponse).toString('base64');
+          
+          return NextResponse.json({
+            success: true,
+            transcript: text,
+            response: result.response,
+            audioResponse: audioResponseBase64,
+            shouldUpdateCharacter: result.shouldUpdateCharacter,
+            characterAction: result.characterAction,
+            emotion: result.emotion,
+            primaryEmotion: result.primaryEmotion,
+            sessionId: realtimeAgent.getCurrentSessionId(),
+          });
+        }
 
       case 'detect_language':
         const languageSwitch = navigator.getTool('languageSwitch');
