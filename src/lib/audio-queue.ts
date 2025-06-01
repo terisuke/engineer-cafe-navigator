@@ -114,7 +114,11 @@ export class AudioQueue {
     }
 
     this.isPlaying = true;
-    const item = this.queue.shift()!;
+    const item = this.queue.shift();
+    if (!item) {
+      this.isPlaying = false;
+      return;
+    }
 
     try {
       await this.playAudio(item);
@@ -143,7 +147,8 @@ export class AudioQueue {
           throw new Error(`Invalid base64 audio data: ${error}`);
         }
         
-        const audioBlob = new Blob([audioData.buffer as ArrayBuffer], { type: 'audio/mp3' });
+        const audioBuffer = new Uint8Array(audioData).buffer;
+        const audioBlob = new Blob([audioBuffer], { type: 'audio/mp3' });
         const audioUrl = URL.createObjectURL(audioBlob);
 
         const audio = new Audio(audioUrl);
