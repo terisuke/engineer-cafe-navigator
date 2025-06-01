@@ -760,12 +760,14 @@ useEffect(() => {
         console.log(`[CharacterAvatar] === setExpression end ===`);
       };
 
-      // Test the expression function immediately after creation
-      console.log('[CharacterAvatar] Testing expression function with "happy"');
-      try {
-        setExpression('happy', 0.8);
-      } catch (error) {
-        console.error('[CharacterAvatar] Error testing expression function:', error);
+      // Initialize with neutral expression
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[CharacterAvatar] Testing expression function with "happy"');
+        try {
+          setExpression('happy', 0.8);
+        } catch (error) {
+          console.error('[CharacterAvatar] Error testing expression function:', error);
+        }
       }
 
       onCharacterLoad?.(vrm);

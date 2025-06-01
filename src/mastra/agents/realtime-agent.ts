@@ -253,7 +253,11 @@ export class RealtimeAgent extends Agent {
         const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
         audioResponse = audioData.buffer;
         
-        // TODO: Process remaining text in background (for now, just use first sentence)
+        // Process remaining text in background (non-blocking)
+        const remainingText = cleanedForTTS.substring(firstSentence.length).trim();
+        if (remainingText.length > 0) {
+          this.processRemainingTextAsync(remainingText, currentLang, emotion?.emotion).catch(console.error);
+        }
       }
       
       performanceSteps['Text-to-Speech'] = PerformanceMonitor.end('Text-to-Speech');
@@ -369,6 +373,20 @@ export class RealtimeAgent extends Agent {
       return sentences[0].trim() + (text.includes('。') ? '。' : '！');
     }
     return text.slice(0, 100); // Fallback to first 100 characters
+  }
+
+  private async processRemainingTextAsync(remainingText: string, language: string, emotion?: string): Promise<void> {
+    try {
+      // Generate TTS for remaining text
+      const result = await this.voiceService.textToSpeech(remainingText, language, emotion);
+      
+      if (result.success && result.audioBase64) {
+        // TODO: Send remaining audio to frontend via WebSocket or store for later retrieval
+        console.log(`Background TTS completed for remaining text (${remainingText.length} chars)`);
+      }
+    } catch (error) {
+      console.error('Background TTS processing failed:', error);
+    }
   }
 
   private buildContextualPrompt(

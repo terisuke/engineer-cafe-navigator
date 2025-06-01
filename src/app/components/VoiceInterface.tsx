@@ -391,6 +391,22 @@ export default function VoiceInterface({
       // Set volume
       audioQueueRef.current.setVolume(volume);
       
+      // Set callback for when streaming finishes
+      audioQueueRef.current.setOnFinished(() => {
+        setIsSpeaking(false);
+        setConversationState('idle');
+        setIsLoading(false);
+        setLoadingMessage('');
+        
+        // Auto-listen if enabled
+        if (autoListen && !isMuted) {
+          setTimeout(() => {
+            console.log('Auto-listening after streaming response...');
+            startListening();
+          }, 1000);
+        }
+      });
+      
       // Enqueue all chunks
       audioChunks.forEach((chunk, index) => {
         audioQueueRef.current!.add({

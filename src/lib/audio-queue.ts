@@ -16,9 +16,17 @@ export class AudioQueue {
   private isPlaying = false;
   private currentAudio: HTMLAudioElement | null = null;
   private volume = 0.8;
+  private onFinishedCallback?: () => void;
 
   constructor() {
     // Initialize audio queue
+  }
+
+  /**
+   * Set callback for when queue finishes playing
+   */
+  setOnFinished(callback: () => void): void {
+    this.onFinishedCallback = callback;
   }
 
   /**
@@ -87,6 +95,10 @@ export class AudioQueue {
   private async playNext(): Promise<void> {
     if (this.queue.length === 0) {
       this.isPlaying = false;
+      // Call finished callback if set
+      if (this.onFinishedCallback) {
+        this.onFinishedCallback();
+      }
       return;
     }
 
@@ -155,7 +167,8 @@ export class AudioQueue {
       this.currentAudio.pause();
       this.currentAudio = null;
     }
-    // playNext will be called automatically by the ended event
+    // Manually trigger the next audio since we're not relying on the ended event
+    this.playNext();
   }
 
   /**

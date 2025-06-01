@@ -7,6 +7,29 @@ import CharacterAvatar from './components/CharacterAvatar';
 import EnvironmentSettings from './components/EnvironmentSettings';
 import MarpViewer from './components/MarpViewer';
 
+// Emotion to expression mapping - used across the component
+const EMOTION_TO_EXPRESSION: Record<string, string> = {
+  'happy': 'happy',
+  'excited': 'happy', 
+  'sad': 'sad',
+  'angry': 'angry',
+  'surprised': 'surprised',
+  'neutral': 'neutral',
+  'relaxed': 'relaxed',
+  'thoughtful': 'relaxed',
+  'confused': 'surprised',
+  'apologetic': 'sad',
+  'curious': 'surprised',
+  'warm': 'happy',
+  'grateful': 'happy',
+  'confident': 'happy',
+  'supportive': 'relaxed',
+  'gentle': 'relaxed',
+  'knowledgeable': 'neutral',
+  'analytical': 'neutral',
+  'energetic': 'happy'
+};
+
 export default function Home() {
   const [showSlideMode, setShowSlideMode] = useState(false);
   const [characterBackground, setCharacterBackground] = useState<BackgroundOption>({
@@ -256,29 +279,7 @@ export default function Home() {
           
           if (setExpressionFunction) {
             // Simple direct emotion to expression mapping
-const emotionToExpression: Record<string, string> = {
-   'happy': 'happy',
-   'excited': 'happy', 
-   'sad': 'sad',
-   'angry': 'angry',
-   'surprised': 'surprised',
-   'neutral': 'neutral',
-   'relaxed': 'relaxed',
-  'thoughtful': 'relaxed',
-  'confused': 'surprised',
-  'apologetic': 'sad',
-  'curious': 'surprised',
-  'warm': 'happy',
-  'grateful': 'happy',
-  'confident': 'happy',
-  'supportive': 'relaxed',
-  'gentle': 'relaxed',
-  'knowledgeable': 'neutral',
-  'analytical': 'neutral',
-  'energetic': 'happy'
- };
-            
-            const expressionName = emotionToExpression[emotionToUse] || 'neutral';
+            const expressionName = EMOTION_TO_EXPRESSION[emotionToUse] || 'neutral';
             console.log(`[Main] Direct mapping: ${emotionToUse} -> ${expressionName}`);
             console.log(`[Main] Calling setExpressionFunction('${expressionName}', 0.8)`);
             
@@ -377,18 +378,7 @@ const emotionToExpression: Record<string, string> = {
           
           if (setExpressionFunction) {
             // Simple direct emotion to expression mapping
-            const emotionToExpression: Record<string, string> = {
-              'happy': 'happy',
-              'excited': 'happy', 
-              'sad': 'sad',
-              'angry': 'angry',
-              'surprised': 'surprised',
-              'neutral': 'neutral',
-              'relaxed': 'relaxed',
-              'thoughtful': 'relaxed'
-            };
-            
-            const expressionName = emotionToExpression[emotionToUse] || 'neutral';
+            const expressionName = EMOTION_TO_EXPRESSION[emotionToUse] || 'neutral';
             console.log(`[Main] Direct mapping: ${emotionToUse} -> ${expressionName}`);
             console.log(`[Main] Calling setExpressionFunction('${expressionName}', 0.8)`);
             
