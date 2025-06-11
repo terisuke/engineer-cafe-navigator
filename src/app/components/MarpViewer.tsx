@@ -65,6 +65,7 @@ export default function MarpViewer({
 }: MarpViewerProps) {
   const [slides, setSlides] = useState<SlideData[]>([]);
   const [narrationData, setNarrationData] = useState<NarrationData | null>(null);
+  const [currentLanguage, setCurrentLanguage] = useState<'ja' | 'en'>(language);
   const [currentSlide, setCurrentSlide] = useState(1);
   const [totalSlides, setTotalSlides] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,7 +77,6 @@ export default function MarpViewer({
   const [questionText, setQuestionText] = useState('');
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [isNarrating, setIsNarrating] = useState(false);
-  const [pendingSlideAdvance, setPendingSlideAdvance] = useState(false);
   const [audioCache, setAudioCache] = useState<Map<number, string>>(new Map());
   const [showSettings, setShowSettings] = useState(false);
   // Load settings from localStorage
@@ -108,9 +108,9 @@ export default function MarpViewer({
   });
   const [retryCount, setRetryCount] = useState(0);
   const [presentationStartTime, setPresentationStartTime] = useState<number | null>(null);
-  const [slideViewTimes, setSlideViewTimes] = useState<Map<number, number>>(new Map());
   const [showAudioPermissionPrompt, setShowAudioPermissionPrompt] = useState(false);
   const [isNarrationInProgress, setIsNarrationInProgress] = useState(false);
+  const [slideViewTimes, setSlideViewTimes] = useState<Map<number, number>>(new Map());
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -141,7 +141,7 @@ export default function MarpViewer({
           });
           
           const shouldContinue = window.confirm(
-            language === 'ja' 
+            currentLanguage === 'ja' 
               ? 'ナレーションが利用できません。音声なしで続行しますか？' 
               : 'Narration unavailable. Continue without audio?'
           );
@@ -216,14 +216,17 @@ export default function MarpViewer({
   // Listen for auto-start presentation event from parent
   useEffect(() => {
     const handleAutoStartPresentation = (event: CustomEvent) => {
-      console.log('[MarpViewer] Received auto-start presentation event');
       if (event.detail?.autoPlay && !isPlaying) {
         // Set character to neutral expression for slide presentation
         if (onExpressionControl) {
           onExpressionControl('neutral', 1.0);
-          console.log('[MarpViewer] Set character to neutral for slide presentation');
         }
-        setIsPlaying(true);
+        
+        // Load slides with specified language
+        const eventLanguage = event.detail?.language || 'ja';
+        loadSlideData(eventLanguage).then(() => {
+          setIsPlaying(true);
+        });
       }
     };
 
@@ -263,7 +266,6 @@ export default function MarpViewer({
           previousSlide();
         }
       } else if (event.data.type === 'marp-ready') {
-        console.log('Marp ready with', event.data.slideCount, 'slides');
         // Delay to ensure rendering is complete
         setTimeout(() => {
           updateIframeSlide(currentSlide);
@@ -288,10 +290,14 @@ export default function MarpViewer({
   }, [currentSlide, renderedHtml]);
 
 
-  const loadSlideData = async () => {
+  const loadSlideData = async (language: string = 'ja') => {
     try {
       setIsLoading(true);
       setError(null);
+      setCurrentLanguage(language as 'ja' | 'en'); // Update current language state
+
+      // Determine the slide file path based on language
+      const languageSlideFile = language === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
 
       // Render slides with narration
       const response = await fetch('/api/marp', {
@@ -301,9 +307,10 @@ export default function MarpViewer({
         },
         body: JSON.stringify({
           action: 'render_with_narration',
-          slideFile,
+          slideFile: languageSlideFile, // Use language-specific slide file
           theme: 'engineer-cafe',
           outputFormat: 'both',
+          language: language, // Add language parameter
           options: {
             // Ensure proper Marp rendering options
             html: true,
@@ -320,11 +327,9 @@ export default function MarpViewer({
         if (result.slideData && result.slideData.slides) {
           setSlides(result.slideData.slides);
           setTotalSlides(result.slideData.slides.length);
-          console.log(`Loaded ${result.slideData.slides.length} slides from slideData`);
         } else if (result.slideCount) {
           // Fallback to slideCount if slideData is not available
           setTotalSlides(result.slideCount);
-          console.log(`Set total slides to ${result.slideCount} from slideCount`);
         }
 
         if (result.narrationData) {
@@ -436,60 +441,42 @@ export default function MarpViewer({
     }
     
     setIsNarrationInProgress(true);
-    
-    const startTime = performance.now();
     setIsNarrating(true);
     
     try {
       let result: any = null;
       
-      const apiStartTime = performance.now();
-      console.log(`[DEBUG] Making API call for slide ${currentSlide}`);
+      // Determine the slide file path based on current language
+      const languageSlideFile = currentLanguage === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
+      
       const response = await fetch('/api/slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'narrate_current',
           slideNumber: currentSlide,
-          slideFile,
-          language,
+          slideFile: languageSlideFile, // Use language-specific slide file
+          language: currentLanguage, // Use current language state instead of prop
         }),
       });
       
-      const apiEndTime = performance.now();
-      console.log(`[Performance] API call for slide ${currentSlide} took ${apiEndTime - apiStartTime}ms`);
-      
       result = await response.json();
-      console.log(`[DEBUG] API response for slide ${currentSlide}:`, { 
-        success: result.success, 
-        hasAudio: !!result.audioResponse,
-        slideNumber: result.slideNumber 
-      });
       
       
       if (result.audioResponse) {
-        console.log(`[DEBUG] Playing audio with lip-sync for slide ${currentSlide}, isPlaying: ${isPlaying}`);
-        
         // Add small delay to ensure audio is properly loaded before playing
         setTimeout(async () => {
           try {
             await playAudioWithLipSync(result.audioResponse);
-            
-            const totalTime = performance.now() - startTime;
-            console.log(`[Performance] Slide ${currentSlide} narration took ${totalTime}ms total`);
-            console.log(`[MarpViewer] Slide ${currentSlide} narration complete`);
-            console.log(`[DEBUG] Audio complete, isPlaying: ${isPlaying}, currentSlide: ${currentSlide}, totalSlides: ${totalSlides}`);
             setIsNarrating(false);
             setIsNarrationInProgress(false);
             
             // Directly advance to next slide if still playing
             if (isPlaying && currentSlide < totalSlides) {
-              console.log(`[DEBUG] Directly advancing to slide ${currentSlide + 1}`);
               const nextSlide = currentSlide + 1;
               setCurrentSlide(nextSlide);
               onSlideChange?.(nextSlide);
             } else if (currentSlide >= totalSlides) {
-              console.log(`[DEBUG] Presentation completed`);
               setIsPlaying(false);
               trackPresentationEvent('presentation_completed', {
                 totalDuration: presentationStartTime ? Date.now() - presentationStartTime : 0
@@ -510,40 +497,14 @@ export default function MarpViewer({
       } else {
         setIsNarrating(false);
         setIsNarrationInProgress(false);
-        console.log(`[Performance] Slide ${currentSlide} narration failed after ${performance.now() - startTime}ms`);
       }
     } catch (error) {
       console.error('[MarpViewer] Error narrating slide:', error);
-      console.log(`[Performance] Slide ${currentSlide} narration error after ${performance.now() - startTime}ms`);
       setIsNarrating(false);
       setIsNarrationInProgress(false);
     }
   };
 
-  const createAudioUrlFromBase64 = (audioBase64: string): string => {
-    try {
-      console.log(`[DEBUG] Converting base64 audio, length: ${audioBase64.length}`);
-      
-      // Convert base64 to binary data
-      const binaryString = atob(audioBase64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      
-      // Create blob with proper MIME type and ensure it's treated as audio
-      const audioBlob = new Blob([bytes], { 
-        type: 'audio/mpeg' // Use audio/mpeg instead of audio/mp3 for better compatibility
-      });
-      
-      const audioUrl = URL.createObjectURL(audioBlob);
-      console.log(`[DEBUG] Created audio blob URL: ${audioUrl}, size: ${audioBlob.size} bytes`);
-      return audioUrl;
-    } catch (error) {
-      console.error('[DEBUG] Error creating audio URL:', error);
-      throw error;
-    }
-  };
 
   // Fast audio playback without lip sync analysis
   const playAudioFast = async (audioBase64: string): Promise<void> => {
@@ -685,7 +646,6 @@ export default function MarpViewer({
     }
     setIsNarrating(false);
     setIsNarrationInProgress(false);
-    setPendingSlideAdvance(false);
     audioStateManager.stopAll();
     
     // Reset viseme to closed mouth when stopping
@@ -715,6 +675,9 @@ export default function MarpViewer({
         return;
       }
       
+      // Determine the slide file path based on current language
+      const languageSlideFile = currentLanguage === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
+      
       const response = await fetch('/api/slides', {
         method: 'POST',
         headers: {
@@ -723,8 +686,8 @@ export default function MarpViewer({
         body: JSON.stringify({
           action,
           slideNumber: targetSlide || currentSlide,
-          slideFile,
-          language,
+          slideFile: languageSlideFile,
+          language: currentLanguage,
         }),
       });
 
@@ -1017,6 +980,9 @@ export default function MarpViewer({
     if (!questionText.trim()) return;
 
     try {
+      // Determine the slide file path based on current language
+      const languageSlideFile = currentLanguage === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
+      
       const response = await fetch('/api/slides', {
         method: 'POST',
         headers: {
@@ -1025,8 +991,8 @@ export default function MarpViewer({
         body: JSON.stringify({
           action: 'answer_question',
           question: questionText,
-          slideFile,
-          language,
+          slideFile: languageSlideFile,
+          language: currentLanguage,
         }),
       });
 
@@ -1057,7 +1023,7 @@ export default function MarpViewer({
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <p className="text-gray-600">
-            {language === 'ja' ? 'スライドを読み込んでいます...' : 'Loading slides...'}
+            {currentLanguage === 'ja' ? 'スライドを読み込んでいます...' : 'Loading slides...'}
           </p>
         </div>
       </div>
@@ -1070,10 +1036,10 @@ export default function MarpViewer({
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={loadSlideData}
+            onClick={() => loadSlideData()}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
           >
-            {language === 'ja' ? '再試行' : 'Retry'}
+            {currentLanguage === 'ja' ? '再試行' : 'Retry'}
           </button>
         </div>
       </div>
@@ -1123,7 +1089,7 @@ export default function MarpViewer({
             <div className="flex items-center space-x-2 px-3 py-1 bg-blue-100 rounded">
               <div className="animate-pulse w-2 h-2 bg-blue-500 rounded-full" />
               <span className="text-sm text-blue-700">
-                {language === 'ja' ? 'ナレーション中...' : 'Narrating...'}
+                {currentLanguage === 'ja' ? 'ナレーション中...' : 'Narrating...'}
               </span>
             </div>
           )}
@@ -1134,7 +1100,7 @@ export default function MarpViewer({
             className={`p-2 rounded transition-colors ${
               questionMode ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-500 hover:bg-gray-600'
             } text-white`}
-            title={language === 'ja' ? '質問する' : 'Ask Question'}
+            title={currentLanguage === 'ja' ? '質問する' : 'Ask Question'}
           >
             <MessageCircle className="w-4 h-4" />
           </button>
@@ -1143,7 +1109,7 @@ export default function MarpViewer({
           <button
             onClick={() => gotoSlide(1)}
             className="p-2 rounded bg-gray-500 text-white hover:bg-gray-600 transition-colors"
-            title={language === 'ja' ? '最初から' : 'Start Over'}
+            title={currentLanguage === 'ja' ? '最初から' : 'Start Over'}
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -1190,16 +1156,16 @@ export default function MarpViewer({
               type="text"
               value={questionText}
               onChange={(e) => setQuestionText(e.target.value)}
-              placeholder={language === 'ja' ? 'スライドについて質問してください...' : 'Ask a question about this slide...'}
+              placeholder={currentLanguage === 'ja' ? 'スライドについて質問してください...' : 'Ask a question about this slide...'}
               className="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              onKeyPress={(e) => e.key === 'Enter' && handleQuestionSubmit()}
+              onKeyDown={(e) => e.key === 'Enter' && handleQuestionSubmit()}
             />
             <button
               onClick={handleQuestionSubmit}
               disabled={!questionText.trim()}
               className="px-4 py-2 bg-blue-500 text-white rounded disabled:bg-gray-300 hover:bg-blue-600 transition-colors"
             >
-              {language === 'ja' ? '送信' : 'Send'}
+              {currentLanguage === 'ja' ? '送信' : 'Send'}
             </button>
           </div>
         </div>

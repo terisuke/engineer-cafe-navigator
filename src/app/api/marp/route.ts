@@ -42,7 +42,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { action, slideFile, theme, outputFormat, slideNumber } = await request.json();
+    const body = await request.json();
+    const { action, slideFile, theme, outputFormat, slideNumber } = body;
 
     switch (action) {
       case 'render':
@@ -53,8 +54,11 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        // Handle language-specific slide files
+        const slideFilePath = slideFile.endsWith('.md') ? `src/slides/${slideFile}` : `src/slides/${slideFile}.md`;
+        
         const renderResult = await marpTool.execute({
-          slideFile: `src/slides/${slideFile}.md`,
+          slideFile: slideFilePath,
           theme,
           outputFormat: outputFormat || 'html',
         });
@@ -77,8 +81,11 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        // Handle language-specific slide files
+        const previewSlideFilePath = slideFile.endsWith('.md') ? `src/slides/${slideFile}` : `src/slides/${slideFile}.md`;
+        
         const previewResult = await marpTool.renderSlidePreview(
-          `src/slides/${slideFile}.md`,
+          previewSlideFilePath,
           slideNumber
         );
         
@@ -96,7 +103,10 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const listResult = await marpTool.getSlideList(`src/slides/${slideFile}.md`);
+        // Handle language-specific slide files
+        const listSlideFilePath = slideFile.endsWith('.md') ? `src/slides/${slideFile}` : `src/slides/${slideFile}.md`;
+        
+        const listResult = await marpTool.getSlideList(listSlideFilePath);
         
         return NextResponse.json({
           success: listResult.success,
@@ -113,8 +123,11 @@ export async function POST(request: NextRequest) {
         }
 
         // Render slides
+        // Handle language-specific slide files (e.g., "en/engineer-cafe" -> "src/slides/en/engineer-cafe.md")
+        const narrationSlideFilePath = slideFile.endsWith('.md') ? `src/slides/${slideFile}` : `src/slides/${slideFile}.md`;
+        
         const slidesResult = await marpTool.execute({
-          slideFile: `src/slides/${slideFile}.md`,
+          slideFile: narrationSlideFilePath,
           theme,
           outputFormat: 'both',
         });
@@ -133,15 +146,24 @@ export async function POST(request: NextRequest) {
         let narrationData = null;
         
         if (narrationTool) {
-          const language = 'ja'; // Default to Japanese, could be parameterized
+          const language = body.language || 'ja'; // Use language from request body, default to Japanese
+          console.log(`[MARP API] Received request body:`, body);
+          console.log(`[MARP API] Loading narration for language: ${language}`);
+          console.log(`[MARP API] Slide file: ${slideFile}`);
+          
           const narrationResult = await narrationTool.execute({
             slideFile,
             language,
             action: 'load',
           });
           
+          console.log(`[MARP API] Narration loading result:`, narrationResult);
+          
           if (narrationResult.success) {
             narrationData = narrationResult.narrationData;
+            console.log(`[MARP API] Successfully loaded narration for ${language}`);
+          } else {
+            console.error(`[MARP API] Failed to load narration:`, narrationResult.error);
           }
         }
 
@@ -200,8 +222,11 @@ export async function GET(request: NextRequest) {
         const theme = searchParams.get('theme') || undefined;
         const outputFormat = searchParams.get('outputFormat') || 'html';
 
+        // Handle language-specific slide files
+        const getSlideFilePath = slideFile.endsWith('.md') ? `src/slides/${slideFile}` : `src/slides/${slideFile}.md`;
+
         const renderResult = await marpTool.execute({
-          slideFile: `src/slides/${slideFile}.md`,
+          slideFile: getSlideFilePath,
           theme,
           outputFormat: outputFormat as 'html' | 'json' | 'both',
         });
@@ -232,8 +257,11 @@ export async function GET(request: NextRequest) {
           );
         }
 
+        // Handle language-specific slide files
+        const getPreviewSlideFilePath = slideFile.endsWith('.md') ? `src/slides/${slideFile}` : `src/slides/${slideFile}.md`;
+        
         const previewResult = await marpTool.renderSlidePreview(
-          `src/slides/${slideFile}.md`,
+          getPreviewSlideFilePath,
           parseInt(slideNumber)
         );
         
@@ -251,7 +279,10 @@ export async function GET(request: NextRequest) {
           );
         }
 
-        const listResult = await marpTool.getSlideList(`src/slides/${slideFile}.md`);
+        // Handle language-specific slide files
+        const getListSlideFilePath = slideFile.endsWith('.md') ? `src/slides/${slideFile}` : `src/slides/${slideFile}.md`;
+        
+        const listResult = await marpTool.getSlideList(getListSlideFilePath);
         
         return NextResponse.json({
           success: listResult.success,

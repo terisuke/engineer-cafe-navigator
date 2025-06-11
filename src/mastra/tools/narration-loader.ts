@@ -1,7 +1,7 @@
-import { z } from 'zod';
 import fs from 'fs/promises';
 import path from 'path';
-import { SupportedLanguage, NarrationConfig } from '../types/config';
+import { z } from 'zod';
+import { NarrationConfig, SupportedLanguage } from '../types/config';
 
 export class NarrationLoaderTool {
   name = 'narration-loader';
@@ -54,7 +54,12 @@ export class NarrationLoaderTool {
     error?: string;
   }> {
     try {
-      const narrationPath = path.resolve(`src/slides/narration/${slideFile}-${language}.json`);
+      // Extract base filename from slideFile (remove language prefix if present)
+      // e.g., "en/engineer-cafe" -> "engineer-cafe"
+      const baseFileName = slideFile.includes('/') ? slideFile.split('/').pop() : slideFile;
+      
+      const narrationPath = path.resolve(`src/slides/narration/${baseFileName}-${language}.json`);
+      
       const narrationContent = await fs.readFile(narrationPath, 'utf-8');
       const narrationData = JSON.parse(narrationContent) as NarrationConfig;
 
@@ -73,9 +78,11 @@ export class NarrationLoaderTool {
       };
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        // Derive base file name here to avoid reference errors
+        const fileName = slideFile.includes('/') ? slideFile.split('/').pop() : slideFile;
         return {
           success: false,
-          error: `Narration file not found: ${slideFile}-${language}.json`,
+          error: `Narration file not found: ${fileName}-${language}.json`,
         };
       }
       throw error;
@@ -100,12 +107,15 @@ export class NarrationLoaderTool {
         };
       }
 
+      // Extract base filename from slideFile (remove language prefix if present)
+      const baseFileName = slideFile.includes('/') ? slideFile.split('/').pop() : slideFile;
+
       // Ensure directory exists
       const narrationDir = path.resolve('src/slides/narration');
       await fs.mkdir(narrationDir, { recursive: true });
 
       // Save the narration file
-      const narrationPath = path.resolve(narrationDir, `${slideFile}-${language}.json`);
+      const narrationPath = path.resolve(narrationDir, `${baseFileName}-${language}.json`);
       const formattedData = JSON.stringify(narrationData, null, 2);
       await fs.writeFile(narrationPath, formattedData, 'utf-8');
 
@@ -196,7 +206,9 @@ export class NarrationLoaderTool {
     error?: string;
   }> {
     try {
-      const result = await this.loadNarration(slideFile, language);
+      // Extract base filename from slideFile (remove language prefix if present)
+      const baseFileName = slideFile.includes('/') ? slideFile.split('/').pop() : slideFile;
+      const result = await this.loadNarration(baseFileName!, language);
       
       if (!result.success || !result.narrationData) {
         return { success: false, error: result.error };
@@ -284,9 +296,12 @@ export class NarrationLoaderTool {
     error?: string;
   }> {
     try {
+      // Extract base filename from slideFile (remove language prefix if present)
+      const baseFileName = slideFile.includes('/') ? slideFile.split('/').pop() : slideFile;
+      
       const templateData: NarrationConfig = {
         metadata: {
-          title: `${slideFile} Narration`,
+          title: `${baseFileName} Narration`,
           language,
           speaker: language === 'ja' ? 'ja-JP-Neural2-B' : 'en-US-Neural2-F',
           version: '1.0',
