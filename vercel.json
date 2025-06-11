@@ -1,0 +1,19 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/update-knowledge-base",
+      "schedule": "0 */6 * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/voice/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/qa/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/knowledge/search/route.ts": {
+      "maxDuration": 10
+    }
+  }
+}

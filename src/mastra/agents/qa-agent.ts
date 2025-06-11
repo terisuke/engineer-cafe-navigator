@@ -1,6 +1,7 @@
 import { Agent } from '@mastra/core/agent';
 import { SupportedLanguage } from '../types/config';
 import { EmotionTagParser } from '../../lib/emotion-tag-parser';
+import { ragSearchTool } from '../tools/rag-search';
 
 export class QAAgent extends Agent {
   private memory: any;
@@ -48,21 +49,39 @@ export class QAAgent extends Agent {
     return EmotionTagParser.enhanceAgentResponse(response.text, 'qa', language);
   }
 
-  private async searchKnowledgeBase(_query: string): Promise<string> {
-    // TODO: Implement RAG search using Mastra RAG tools
-    // This would search through the Engineer Cafe knowledge base
-    // For now, return placeholder context
-    const sampleContext = {
-      en: `Engineer Cafe is a 24/7 coworking space in Fukuoka designed for IT engineers. 
-            Features include high-speed internet, private meeting rooms, coffee service, 
-            and event spaces. Membership plans start from ¥8,000/month.`,
-      ja: `エンジニアカフェは福岡のITエンジニア向け24時間営業のコワーキングスペースです。
-            高速インターネット、プライベート会議室、コーヒーサービス、イベントスペースを完備。
-            会員プランは月額8,000円から。`
-    };
-    
+  private async searchKnowledgeBase(query: string): Promise<string> {
     const language = await this.memory.get('language') as SupportedLanguage || 'ja';
-    return sampleContext[language];
+    
+    try {
+      // Use the RAG search tool to find relevant information
+      const ragTool = this._tools.get('ragSearch') || ragSearchTool;
+      const context = await ragTool.searchKnowledgeBase(query, language);
+      
+      // If no results found, return a default context
+      if (!context) {
+        const defaultContext = {
+          en: `I couldn't find specific information about that in my knowledge base. 
+                Engineer Cafe is a 24/7 coworking space in Fukuoka designed for IT engineers.`,
+          ja: `申し訳ございませんが、その件について具体的な情報が見つかりませんでした。
+                エンジニアカフェは福岡のITエンジニア向け24時間営業のコワーキングスペースです。`
+        };
+        return defaultContext[language];
+      }
+      
+      return context;
+    } catch (error) {
+      console.error('Knowledge base search error:', error);
+      // Fallback to sample context if search fails
+      const sampleContext = {
+        en: `Engineer Cafe is a 24/7 coworking space in Fukuoka designed for IT engineers. 
+              Features include high-speed internet, private meeting rooms, coffee service, 
+              and event spaces. Membership plans start from ¥8,000/month.`,
+        ja: `エンジニアカフェは福岡のITエンジニア向け24時間営業のコワーキングスペースです。
+              高速インターネット、プライベート会議室、コーヒーサービス、イベントスペースを完備。
+              会員プランは月額8,000円から。`
+      };
+      return sampleContext[language];
+    }
   }
 
   async categorizeQuestion(question: string): Promise<string> {

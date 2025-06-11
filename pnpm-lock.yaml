@@ -11,6 +11,12 @@ importers:
       '@ai-sdk/google':
         specifier: ^1.2.18
         version: 1.2.18(zod@3.25.41)
+      '@ai-sdk/openai':
+        specifier: ^1.3.3
+        version: 1.3.22(zod@3.25.41)
+      '@google/generative-ai':
+        specifier: 0.24.1
+        version: 0.24.1
       '@headlessui/react':
         specifier: ^2.2.4
         version: 2.2.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -44,12 +50,24 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.49.8
         version: 2.49.8
+      '@upstash/redis':
+        specifier: 1.34.9
+        version: 1.34.9
+      ai:
+        specifier: ^4.1.15
+        version: 4.3.16(react@19.1.0)(zod@3.25.41)
+      cron:
+        specifier: 4.3.1
+        version: 4.3.1
       face-api.js:
         specifier: 0.22.2
         version: 0.22.2
       google-auth-library:
         specifier: 9.15.1
         version: 9.15.1
+      googleapis:
+        specifier: 149.0.0
+        version: 149.0.0
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
@@ -74,6 +92,9 @@ importers:
       three:
         specifier: ^0.176.0
         version: 0.176.0
+      uuid:
+        specifier: 11.1.0
+        version: 11.1.0
       ws:
         specifier: ^8.18.2
         version: 8.18.2
@@ -96,6 +117,9 @@ importers:
       autoprefixer:
         specifier: ^10.4.20
         version: 10.4.21(postcss@8.5.4)
+      dotenv:
+        specifier: 16.5.0
+        version: 16.5.0
       eslint:
         specifier: 9.27.0
         version: 9.27.0(jiti@1.21.7)
@@ -125,6 +149,12 @@ packages:
 
   '@ai-sdk/google@1.2.18':
     resolution: {integrity: sha512-8B70+i+uB12Ae6Sn6B9Oc6W0W/XorGgc88Nx0pyUrcxFOdytHBaAVhTPqYsO3LLClfjYN8pQ9GMxd5cpGEnUcA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.0.0
+
+  '@ai-sdk/openai@1.3.22':
+    resolution: {integrity: sha512-QwA+2EkG0QyjVR+7h6FE7iOu2ivNqAVMm9UJZkVxxTk5OIq5fFJDTEI/zICEMuHImTTXR2JjsL6EirJ28Jc4cw==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.0.0
@@ -565,6 +595,10 @@ packages:
   '@google-cloud/text-to-speech@6.1.0':
     resolution: {integrity: sha512-QP8ESj0/QWyWDVI2wD0azoToxeBJ86IENajTTxgWkSXAki474qwv4hZgt5AHCtMJWHmWG5OnVNHzah5+zfbTlg==}
     engines: {node: '>=18'}
+
+  '@google/generative-ai@0.24.1':
+    resolution: {integrity: sha512-MqO+MLfM6kjxcKoy0p1wRzG3b4ZZXtPI+z2IE26UogS2Cm/XHO+7gGRBh6gcJsOiIVoH93UwKvW4HdgiOZCy9Q==}
+    engines: {node: '>=18.0.0'}
 
   '@grpc/grpc-js@1.13.4':
     resolution: {integrity: sha512-GsFaMXCkMqkKIvwCQjCrwH+GHbPKBjhwo/8ZuUkWHqbI73Kky9I+pQltrlT0+MWpedCoosda53lgjYfyEPgxBg==}
@@ -1805,6 +1839,9 @@ packages:
     resolution: {integrity: sha512-eQs9RsucA/LNjnMoJvWG/nXa7Pot/RbBzilF/QRIU/xRl+0ApxrSUFsV5lmf01SvSlqMzJ7Zwxe440wmz2SJGA==}
     deprecated: This is a stub types definition. long provides its own type definitions, so you do not need this installed.
 
+  '@types/luxon@3.6.2':
+    resolution: {integrity: sha512-R/BdP7OxEMc44l2Ex5lSXHoIXTB2JLNa3y2QISIbr58U/YcsffyQrYW//hZSdrfxrjRZj3GcUoxMPGdO8gSYuw==}
+
   '@types/mdast@4.0.4':
     resolution: {integrity: sha512-kGaNbPh1k7AFzgpud/gMdvIm5xuECykRR+JnWKQno9TAXVa6WIVCGTPvYGekIDL4uwCZQSYbUxNBSb1aUo79oA==}
 
@@ -2035,6 +2072,9 @@ packages:
     resolution: {integrity: sha512-hHKFx+opG5BA3/owMXon8ypwSotBGTdblG6oda/iOu9+OEYnk0cxD2uIcGyGT8jCK578kV+xMrNxqbn8Zjlpgw==}
     cpu: [x64]
     os: [win32]
+
+  '@upstash/redis@1.34.9':
+    resolution: {integrity: sha512-7qzzF2FQP5VxR2YUNjemWs+hl/8VzJJ6fOkT7O7kt9Ct8olEVzb1g6/ik6B8Pb8W7ZmYv81SdlVV9F6O8bh/gw==}
 
   '@webassemblyjs/ast@1.14.1':
     resolution: {integrity: sha512-nuBEDgQfm1ccRp/8bCQrx1frohyufl4JlbMMZ4P1wpeOfDhF6FQkxZJ1b/e+PLwr6X1Nhw6OLme5usuBWYBvuQ==}
@@ -2502,9 +2542,16 @@ packages:
       typescript:
         optional: true
 
+  cron@4.3.1:
+    resolution: {integrity: sha512-7x7DoEOxV11t3OPWWMjj1xrL1PGkTV5RV+/54IJTZD7gStiaMploY43EkeBSkDZTLRbUwk+OISbQ0TR133oXyA==}
+    engines: {node: '>=18.x'}
+
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
+
+  crypto-js@4.2.0:
+    resolution: {integrity: sha512-KALDyEYgpY+Rlob/iriUtjV6d5Eq+Y191A5g4UqLAi8CyGP9N1+FdVbkc1SxKc2r4YAYqG8JzO2KGL+AizD70Q==}
 
   cssesc@3.0.0:
     resolution: {integrity: sha512-/Tb/JcjK111nNScGob5MNtsntNM1aCNUDipB/TkwZFhyDrrE47SOx/18wF2bbjgc3ZzCSKW1T5nt5EbFoAz/Vg==}
@@ -3104,6 +3151,14 @@ packages:
     resolution: {integrity: sha512-rcX58I7nqpu4mbKztFeOAObbomBbHU2oIb/d3tJfF3dizGSApqtSwYJigGCooHdnMyQBIw8BrWyK96w3YXgr6A==}
     engines: {node: '>=14'}
 
+  googleapis-common@7.2.0:
+    resolution: {integrity: sha512-/fhDZEJZvOV3X5jmD+fKxMqma5q2Q9nZNSF3kn1F18tpxmA86BcTxAGBQdM0N89Z3bEaIs+HVznSmFJEAmMTjA==}
+    engines: {node: '>=14.0.0'}
+
+  googleapis@149.0.0:
+    resolution: {integrity: sha512-LTMc/njwYy7KTeaUHDcQt7KxftHyghdzm2XzbL46PRLd1AXB09utT9Po2ZJn2X0EApz0pE2T5x5A9zM8iue6zw==}
+    engines: {node: '>=14.0.0'}
+
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
     engines: {node: '>= 0.4'}
@@ -3587,6 +3642,10 @@ packages:
     resolution: {integrity: sha512-VK5a2ydJ7xm8GvBeKLS9mu1pVK6ucef9780JVUjw6bAjJL/QXnd4Y0p7SPeOUMC27YhzNCZvm5d/QX0Tp3rc0w==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  luxon@3.6.1:
+    resolution: {integrity: sha512-tJLxrKJhO2ukZ5z0gyjY1zPh3Rh88Ej9P7jNrZiHMUXHae1yvI2imgOZtL1TO8TW6biMMKfTtAOoEJANgtWBMQ==}
+    engines: {node: '>=12'}
 
   markdown-it-front-matter@0.2.4:
     resolution: {integrity: sha512-25GUs0yjS2hLl8zAemVndeEzThB1p42yxuDEKbd4JlL3jiz+jsm6e56Ya8B0VREOkNxLYB4TTwaoPJ3ElMmW+w==}
@@ -4736,6 +4795,9 @@ packages:
   url-join@4.0.1:
     resolution: {integrity: sha512-jk1+QP6ZJqyOiuEI9AEWQfju/nB2Pw466kbA0LEZljHwKeMgd9WrAEgEGxjPDD2+TNbbb37rTyhEfrCXfuKXnA==}
 
+  url-template@2.0.8:
+    resolution: {integrity: sha512-XdVKMF4SJ0nP/O7XIPB0JwAEuT9lDIYnNsK8yGVe43y0AWoKeJNdv3ZNWh7ksJ6KqQFjOO6ox/VEitLnaVNufw==}
+
   use-sync-external-store@1.5.0:
     resolution: {integrity: sha512-Rb46I4cGGVBmjamjphe8L/UnvJD+uPPtTkNvX5mZgqdbavhI4EbgIWJiIHXJ8bc/i9EQGPRh4DwEURJ552Do0A==}
     peerDependencies:
@@ -4743,6 +4805,10 @@ packages:
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
+
+  uuid@11.1.0:
+    resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
+    hasBin: true
 
   uuid@9.0.1:
     resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
@@ -4893,6 +4959,12 @@ packages:
 snapshots:
 
   '@ai-sdk/google@1.2.18(zod@3.25.41)':
+    dependencies:
+      '@ai-sdk/provider': 1.1.3
+      '@ai-sdk/provider-utils': 2.2.8(zod@3.25.41)
+      zod: 3.25.41
+
+  '@ai-sdk/openai@1.3.22(zod@3.25.41)':
     dependencies:
       '@ai-sdk/provider': 1.1.3
       '@ai-sdk/provider-utils': 2.2.8(zod@3.25.41)
@@ -5602,6 +5674,8 @@ snapshots:
       google-gax: 5.0.1-rc.1
     transitivePeerDependencies:
       - supports-color
+
+  '@google/generative-ai@0.24.1': {}
 
   '@grpc/grpc-js@1.13.4':
     dependencies:
@@ -7252,6 +7326,8 @@ snapshots:
     dependencies:
       long: 5.3.2
 
+  '@types/luxon@3.6.2': {}
+
   '@types/mdast@4.0.4':
     dependencies:
       '@types/unist': 3.0.3
@@ -7499,6 +7575,10 @@ snapshots:
 
   '@unrs/resolver-binding-win32-x64-msvc@1.7.8':
     optional: true
+
+  '@upstash/redis@1.34.9':
+    dependencies:
+      crypto-js: 4.2.0
 
   '@webassemblyjs/ast@1.14.1':
     dependencies:
@@ -8003,11 +8083,18 @@ snapshots:
     optionalDependencies:
       typescript: 5.8.3
 
+  cron@4.3.1:
+    dependencies:
+      '@types/luxon': 3.6.2
+      luxon: 3.6.1
+
   cross-spawn@7.0.6:
     dependencies:
       path-key: 3.1.1
       shebang-command: 2.0.0
       which: 2.0.2
+
+  crypto-js@4.2.0: {}
 
   cssesc@3.0.0: {}
 
@@ -8824,6 +8911,26 @@ snapshots:
 
   google-logging-utils@1.1.1: {}
 
+  googleapis-common@7.2.0:
+    dependencies:
+      extend: 3.0.2
+      gaxios: 6.7.1
+      google-auth-library: 9.15.1
+      qs: 6.11.2
+      url-template: 2.0.8
+      uuid: 9.0.1
+    transitivePeerDependencies:
+      - encoding
+      - supports-color
+
+  googleapis@149.0.0:
+    dependencies:
+      google-auth-library: 9.15.1
+      googleapis-common: 7.2.0
+    transitivePeerDependencies:
+      - encoding
+      - supports-color
+
   gopd@1.2.0: {}
 
   graceful-fs@4.2.11: {}
@@ -9282,6 +9389,8 @@ snapshots:
   lucide-react@0.511.0(react@19.1.0):
     dependencies:
       react: 19.1.0
+
+  luxon@3.6.1: {}
 
   markdown-it-front-matter@0.2.4: {}
 
@@ -10753,11 +10862,15 @@ snapshots:
 
   url-join@4.0.1: {}
 
+  url-template@2.0.8: {}
+
   use-sync-external-store@1.5.0(react@19.1.0):
     dependencies:
       react: 19.1.0
 
   util-deprecate@1.0.2: {}
+
+  uuid@11.1.0: {}
 
   uuid@9.0.1: {}
 

@@ -129,7 +129,23 @@ export async function POST(request: NextRequest) {
         });
 
       case 'narrate_current':
-        const narrateResult = await slideNarrator.narrateSlide();
+        if (!slideFile || !language) {
+          return NextResponse.json(
+            { error: 'Slide file and language required for narration' },
+            { status: 400 }
+          );
+        }
+
+        console.log(`[SLIDES API] Narrating slide ${slideNumber} in language: ${language}`);
+        
+        // Ensure narration is loaded before attempting to narrate
+        await slideNarrator.loadNarration(slideFile, language);
+        
+        // Store the language in memory for TTS to use
+        await slideNarrator.memory.set('language', language);
+        console.log(`[SLIDES API] Set language in narrator memory: ${language}`);
+        
+        const narrateResult = await slideNarrator.narrateSlide(slideNumber);
         const audioBase64 = Buffer.from(narrateResult.audioBuffer).toString('base64');
         
         return NextResponse.json({
