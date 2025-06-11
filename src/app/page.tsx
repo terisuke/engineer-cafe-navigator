@@ -815,7 +815,7 @@ export default function Home() {
                               handleLanguageVoiceStart('ja');
                               setIsVoiceActive(true);
                             }}
-                            className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[200px]"
+                            className="flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 w-[280px]"
                           >
                             <MessageSquare className="w-6 h-6" />
                             <span className="text-lg font-semibold">日本語で話しかける</span>
@@ -825,7 +825,7 @@ export default function Home() {
                               handleLanguageVoiceStart('en');
                               setIsVoiceActive(true);
                             }}
-                            className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[200px]"
+                            className="flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 w-[280px]"
                           >
                             <MessageSquare className="w-6 h-6" />
                             <span className="text-lg font-semibold">Speak English</span>
@@ -833,19 +833,36 @@ export default function Home() {
                           <button
                             onClick={() => {
                               setShowSlideMode(true);
-                              // Auto-start presentation
+                              // Auto-start presentation in Japanese
                               setTimeout(() => {
                                 // Find MarpViewer and trigger auto-play
                                 const autoPlayEvent = new CustomEvent('autoStartPresentation', { 
-                                  detail: { autoPlay: true } 
+                                  detail: { autoPlay: true, language: 'ja' } 
                                 });
                                 window.dispatchEvent(autoPlayEvent);
                               }, 100);
                             }}
-                            className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                            className="flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 w-[280px]"
                           >
-                            <UserPlus className="w-5 h-5" />
-                            <span className="text-base font-semibold">初めての方へ</span>
+                            <UserPlus className="w-6 h-6" />
+                            <span className="text-lg font-semibold">初めての方へ</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowSlideMode(true);
+                              // Auto-start presentation in English
+                              setTimeout(() => {
+                                // Find MarpViewer and trigger auto-play
+                                const autoPlayEvent = new CustomEvent('autoStartPresentation', { 
+                                  detail: { autoPlay: true, language: 'en' } 
+                                });
+                                window.dispatchEvent(autoPlayEvent);
+                              }, 100);
+                            }}
+                            className="flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 w-[280px]"
+                          >
+                            <UserPlus className="w-6 h-6" />
+                            <span className="text-lg font-semibold">For first-time users</span>
                           </button>
                         </>
                       ) : (
