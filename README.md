@@ -4,7 +4,7 @@
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.3.2-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-blue)](https://www.typescriptlang.org/)
-[![Mastra](https://img.shields.io/badge/Mastra-0.9.4-green)](https://mastra.ai/)
+[![Mastra](https://img.shields.io/badge/Mastra-0.10.1-green)](https://mastra.ai/)
 [![React](https://img.shields.io/badge/React-19.1.0-61dafb)](https://reactjs.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-VRM-orange)](https://threejs.org/)
 
@@ -84,7 +84,7 @@ graph TB
 ### 🛠️ 技術スタック
 
 #### コア技術
-- **フレームワーク**: [Mastra 0.9.4](https://mastra.ai/) - AI エージェント開発フレームワーク
+- **フレームワーク**: [Mastra 0.10.1](https://mastra.ai/) - AI エージェント開発フレームワーク
 - **Frontend**: [Next.js 15.3.2](https://nextjs.org/) + [TypeScript 5.8.3](https://www.typescriptlang.org/)
 - **AI/ML**: [Google Gemini 2.5 Flash Preview](https://ai.google.dev/)
 - **音声処理**: [Google Cloud Speech-to-Text/Text-to-Speech](https://cloud.google.com/speech-to-text)
@@ -599,7 +599,7 @@ ls src/characters/models/
 **解決方法**:
 ```bash
 # 1. Markdownファイルの構文確認
-pnpm run marp:validate
+# Note: marp:validate コマンドは現在未実装
 
 # 2. アセットファイルの確認
 ls src/slides/assets/images/
@@ -622,6 +622,8 @@ pnpm run dev         # 開発サーバー起動
 pnpm run build       # ビルド
 pnpm run lint        # ESLintチェック
 pnpm run test:api    # APIテスト
+pnpm run test:rag    # RAG検索テスト
+pnpm run test:external-apis # 外部APIテスト
 ```
 
 ## 🔐 セキュリティ
@@ -764,11 +766,11 @@ const ratelimit = new Ratelimit({
 pnpm run lint
 pnpm run format
 
-# 型チェック
-pnpm run type-check
-
-# テスト実行
-pnpm run test
+# Note: type-check と test コマンドは現在未実装
+# 利用可能なテストコマンド:
+pnpm run test:api           # APIエンドポイントテスト
+pnpm run test:rag           # RAG検索機能テスト
+pnpm run test:external-apis # 外部API連携テスト
 ```
 
 ### 問題報告
