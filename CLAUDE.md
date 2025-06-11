@@ -21,6 +21,22 @@ pnpm install:css            # Install correct Tailwind CSS v3 dependencies
 
 # Testing
 pnpm test:api               # Run API endpoint tests
+pnpm test:rag               # Test RAG search functionality
+pnpm test:external-apis     # Test external API integrations
+pnpm test:local             # Run local setup tests
+pnpm test:production        # Production deployment tests
+
+# RAG & Knowledge Base
+pnpm seed:knowledge         # Seed knowledge base
+pnpm migrate:embeddings     # Migrate embeddings
+pnpm test:external-data     # Test external data fetcher
+
+# Monitoring & Analysis
+pnpm monitor:baseline       # Collect performance baseline
+pnpm monitor:migration      # Monitor migration status
+pnpm compare:implementations # Compare implementation performance
+pnpm validate:production    # Validate production readiness
+pnpm check:deployment       # Check deployment readiness
 ```
 
 ## ⚠️ CRITICAL: Tailwind CSS Version

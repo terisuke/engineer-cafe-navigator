@@ -31,23 +31,35 @@ Last Updated: 2025-06-01
 ### Technical Implementation
 - ✅ **Next.js 15.3.2** with App Router
 - ✅ **React 19.1.0** with TypeScript 5.8.3
-- ✅ **Mastra 0.9.4** for AI agent orchestration
+- ✅ **Mastra 0.10.1** for AI agent orchestration
 - ✅ **Google Gemini 2.5 Flash Preview** for AI responses
 - ✅ **Three.js 0.176.0** with @pixiv/three-vrm 3.4.0
 - ✅ **Tailwind CSS v3.4.17** (NOT v4)
 - ✅ **PostgreSQL with pgvector** via Supabase
 - ✅ **Security measures** - XSS protection, iframe sandboxing
 
-## 🔴 Features NOT Implemented (Despite Documentation)
+## 🔴 Features NOT Implemented (Despite Being Referenced)
 
 ### Documented but Non-Existent Features
-- ❌ **Enhanced Voice API** (`/api/voice/enhanced`) - Documented in API.md but no route.ts file exists
 - ❌ **Web Speech API Integration** - Hardcoded to false in VoiceInterface.tsx, never actually used
 - ❌ **Facial Expression Detection** - face-api.js is loaded but no implementation exists
+- ❌ **Test Framework** - No test command (`pnpm test`) configured despite references in documentation
 
 ### Unused Environment Variables
+These variables are documented but not referenced in the actual codebase:
 - ❌ `NEXT_PUBLIC_ENABLE_FACIAL_EXPRESSION` - Defined but not referenced in code
 - ❌ `NEXT_PUBLIC_USE_WEB_SPEECH_API` - Defined but not referenced in code
+
+### Actually Used Environment Variables
+✅ Core functionality:
+- `GOOGLE_CLOUD_PROJECT_ID`, `GOOGLE_CLOUD_CREDENTIALS`, `GOOGLE_GENERATIVE_AI_API_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- `POSTGRES_URL`, `DATABASE_URL`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`
+
+✅ Optional integrations:
+- `WEBSOCKET_URL`, `RECEPTION_API_URL`, `SLACK_WEBHOOK_URL`
+- `UPSTASH_REDIS_URL`, `ENGINEER_CAFE_CALENDAR_ID`
+- `ALERT_WEBHOOK_SECRET`, `CRON_SECRET`
 
 ### What Actually Works Instead
 - ✅ **Text-based Emotion Detection** - Sophisticated keyword analysis system
@@ -62,7 +74,6 @@ Last Updated: 2025-06-01
 ## 🔴 Known Issues
 
 ### Documentation Inconsistencies
-- Enhanced voice endpoint is documented but not implemented
 - Some environment variables in docs don't match actual usage
 - Test commands in documentation refer to non-existent npm scripts
 
@@ -79,7 +90,11 @@ Last Updated: 2025-06-01
 |----------|--------|-------|
 | POST /api/voice | ✅ Implemented | Full functionality with all actions |
 | GET /api/voice | ✅ Implemented | Status and language info |
-| POST /api/voice/enhanced | ❌ Not Implemented | Documented but no route.ts file |
+| POST /api/knowledge/search | ✅ Implemented | RAG knowledge search |
+| GET /api/monitoring/dashboard | ✅ Implemented | System monitoring |
+| GET /api/monitoring/migration-success | ✅ Implemented | Migration status |
+| POST /api/alerts/webhook | ✅ Implemented | Alert webhooks |
+| POST /api/cron/update-knowledge-base | ✅ Implemented | Knowledge base updates |
 | POST /api/marp | ✅ Implemented | Slide rendering works |
 | POST /api/slides | ✅ Implemented | Navigation and narration |
 | POST /api/character | ✅ Implemented | Expression and animation control |
@@ -91,13 +106,32 @@ Last Updated: 2025-06-01
 
 ### Currently Available
 ```bash
-pnpm dev          # Start development server
-pnpm build        # Build for production
-pnpm start        # Start production server
-pnpm lint         # Run ESLint
-pnpm test:api     # Run API integration tests
-pnpm install:css  # Install Tailwind CSS v3 dependencies
-pnpm dev:clean    # Clean cache and start dev server
+# Development
+pnpm dev                    # Start development server
+pnpm dev:clean              # Clean cache and start dev server
+pnpm build                  # Build for production
+pnpm start                  # Start production server
+pnpm lint                   # Run ESLint
+pnpm install:css            # Install Tailwind CSS v3 dependencies
+
+# Testing
+pnpm test:api               # Run API endpoint tests
+pnpm test:rag               # Test RAG search functionality
+pnpm test:external-apis     # Test external API integrations
+pnpm test:local             # Run local setup tests
+pnpm test:production        # Production deployment tests
+
+# RAG & Knowledge Base
+pnpm seed:knowledge         # Seed knowledge base
+pnpm migrate:embeddings     # Migrate embeddings
+pnpm test:external-data     # Test external data fetcher
+
+# Monitoring & Analysis
+pnpm monitor:baseline       # Collect performance baseline
+pnpm monitor:migration      # Monitor migration status
+pnpm compare:implementations # Compare implementation performance
+pnpm validate:production    # Validate production readiness
+pnpm check:deployment       # Check deployment readiness
 ```
 
 ### Documented but Not Available
