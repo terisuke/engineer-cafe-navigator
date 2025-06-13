@@ -13,11 +13,17 @@ export class GoogleCalendarClient {
     const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
     const redirectUri = process.env.GOOGLE_CALENDAR_REDIRECT_URI;
-    if (!clientId || !clientSecret || !redirectUri) {
-      throw new Error('Google Calendar OAuth2 credentials are not fully configured. Please set GOOGLE_CALENDAR_CLIENT_ID, GOOGLE_CALENDAR_CLIENT_SECRET, and GOOGLE_CALENDAR_REDIRECT_URI.');
-    }
-    this.oauth2Client = new OAuth2Client(clientId, clientSecret, redirectUri);
     
+    // For build time, allow missing credentials
+    if (!clientId || !clientSecret || !redirectUri) {
+      console.warn('Google Calendar OAuth2 credentials are not configured. OAuth2 features will be disabled.');
+      // Create a dummy client to prevent build errors
+      this.oauth2Client = new OAuth2Client();
+      this.calendar = google.calendar({ version: 'v3' });
+      return;
+    }
+    
+    this.oauth2Client = new OAuth2Client(clientId, clientSecret, redirectUri);
     this.calendar = google.calendar({ version: 'v3', auth: this.oauth2Client });
   }
 
@@ -25,6 +31,10 @@ export class GoogleCalendarClient {
    * Generate OAuth2 URL for user authentication
    */
   generateAuthUrl(): string {
+    if (!this.isOAuth2Configured()) {
+      throw new Error('Google Calendar OAuth2 is not configured');
+    }
+    
     const scopes = [
       'https://www.googleapis.com/auth/calendar.readonly'
     ];
@@ -36,12 +46,25 @@ export class GoogleCalendarClient {
   }
 
   /**
+   * Check if OAuth2 is configured
+   */
+  private isOAuth2Configured(): boolean {
+    return !!process.env.GOOGLE_CALENDAR_CLIENT_ID && 
+           !!process.env.GOOGLE_CALENDAR_CLIENT_SECRET && 
+           !!process.env.GOOGLE_CALENDAR_REDIRECT_URI;
+  }
+
+  /**
    * Exchange authorization code for tokens
    */
   async getTokensFromCode(code: string): Promise<{ 
     access_token: string; 
     refresh_token?: string;
   }> {
+    if (!this.isOAuth2Configured()) {
+      throw new Error('Google Calendar OAuth2 is not configured');
+    }
+    
     const { tokens } = await this.oauth2Client.getToken(code);
     if (!tokens.access_token) {
       throw new Error('No access_token returned from Google OAuth2.');
@@ -85,6 +108,10 @@ export class GoogleCalendarClient {
     singleEvents?: boolean;
     q?: string; // Free text search
   } = {}): Promise<GoogleCalendarEvent[]> {
+    if (!this.isOAuth2Configured()) {
+      console.warn('Google Calendar OAuth2 not configured, returning empty events');
+      return [];
+    }
     return withRetry(
       async () => {
         const response = await this.calendar.events.list({
@@ -114,6 +141,11 @@ export class GoogleCalendarClient {
    * Get events for today from Engineer Cafe calendar
    */
   async getTodayEvents(): Promise<GoogleCalendarEvent[]> {
+    if (!this.isOAuth2Configured()) {
+      console.warn('Google Calendar OAuth2 not configured, returning empty events');
+      return [];
+    }
+    
     const calendarId = process.env.ENGINEER_CAFE_CALENDAR_ID;
     if (!calendarId) {
       throw new Error('ENGINEER_CAFE_CALENDAR_ID not configured');
