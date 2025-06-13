@@ -48,7 +48,7 @@ async function testEngineerCafeSearch() {
     }
     
   } catch (error) {
-    console.error('Error in Test 1:', error.message);
+    console.error('Error in Test 1:', error instanceof Error ? error.message : 'Unknown error');
   }
   
   // Test 2: Search for specific facility information
@@ -80,7 +80,7 @@ async function testEngineerCafeSearch() {
     }
     
   } catch (error) {
-    console.error('Error in Test 2:', error.message);
+    console.error('Error in Test 2:', error instanceof Error ? error.message : 'Unknown error');
   }
   
   // Test 3: Verify tool identification
@@ -118,7 +118,7 @@ async function testEngineerCafeSearch() {
     }
     
   } catch (error) {
-    console.error('Error in Test 4:', error.message);
+    console.error('Error in Test 4:', error instanceof Error ? error.message : 'Unknown error');
   }
   
   // Test 5: Test with English language
@@ -140,7 +140,7 @@ async function testEngineerCafeSearch() {
     }
     
   } catch (error) {
-    console.error('Error in Test 5:', error.message);
+    console.error('Error in Test 5:', error instanceof Error ? error.message : 'Unknown error');
   }
   
   console.log('\n=== Test Complete ===');

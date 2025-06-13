@@ -95,7 +95,7 @@ async function testQAEndpoint() {
       }
       
     } catch (error) {
-      console.log(`❌ Error: ${error.message}`);
+      console.log(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
     console.log('-'.repeat(50));
