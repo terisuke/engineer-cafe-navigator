@@ -27,7 +27,7 @@ pnpm add react-markdown @uiw/react-md-editor react-hot-toast swr
 * `getById(id)` – 1件取得
 * `updateEntry(id, updates)` – 更新 (content 変更時は embedding 再生成)
 
-実装サンプル → docs/implementation/RAG-IMPLEMENTATION-GUIDE.md の **Utilities** 章を参照。
+実装サンプルは既存の `src/lib/knowledge-base-utils.ts` を参照してください。
 
 ---
 
@@ -105,4 +105,4 @@ src/app/(admin)/admin/knowledge/
 ---
 
 ### 質問・レビュー
-疑問点や設計変更提案があれば、チーム Slack #rag-dev まで。 
+疑問点や設計変更提案があれば、チーム Slack #rag-dev まで。  
