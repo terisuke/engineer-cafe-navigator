@@ -11,7 +11,29 @@ export class VoiceRecorder {
 
   async initialize(): Promise<void> {
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({
+      if (typeof navigator === 'undefined') {
+        this.onError(new Error('navigator is undefined'));
+        return;
+      }
+
+      // Normalize getUserMedia across browsers
+      let getUserMediaFunc: ((c: MediaStreamConstraints) => Promise<MediaStream>) | null = null;
+
+      if (navigator.mediaDevices?.getUserMedia) {
+        getUserMediaFunc = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      } else {
+        const legacy = (navigator as any).webkitGetUserMedia || (navigator as any).mozGetUserMedia || (navigator as any).msGetUserMedia;
+        if (legacy) {
+          getUserMediaFunc = (constraints: MediaStreamConstraints) => new Promise((res, rej) => legacy.call(navigator, constraints, res, rej));
+        }
+      }
+
+      if (!getUserMediaFunc) {
+        this.onError(new Error('getUserMedia API is not available'));
+        return;
+      }
+
+      this.stream = await getUserMediaFunc({
         audio: {
           channelCount: 1,
           sampleRate: 16000,

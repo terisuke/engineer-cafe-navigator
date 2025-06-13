@@ -1,5 +1,5 @@
-import { z } from 'zod';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { z } from 'zod';
 import { supabaseAdmin } from '../../lib/supabase';
 import { SupportedLanguage } from '../types/config';
 
@@ -27,7 +27,7 @@ export class RAGSearchTool {
     language: z.enum(['ja', 'en']).optional().describe('Language for the search (defaults to ja)'),
     category: z.string().optional().describe('Filter by specific category'),
     limit: z.number().min(1).max(10).optional().default(5).describe('Maximum number of results to return'),
-    threshold: z.number().min(0).max(1).optional().default(0.7).describe('Minimum similarity threshold'),
+    threshold: z.number().min(0).max(1).optional().default(0.5).describe('Minimum similarity threshold'),
   });
 
   constructor() {
@@ -45,7 +45,7 @@ export class RAGSearchTool {
     results: KnowledgeSearchResult[];
     message?: string;
   }> {
-    const { query, language = 'ja', category, limit = 5, threshold = 0.7 } = params;
+    const { query, language = 'ja', category, limit = 5, threshold = 0.5 } = params;
 
     try {
       // Generate embedding for the query
@@ -60,9 +60,33 @@ export class RAGSearchTool {
         threshold,
       });
 
+      // Sort by metadata.importance (critical>high>medium>low>undefined) then similarity
+      const importanceRank = (imp?: string) => {
+        switch ((imp || '').toLowerCase()) {
+          case 'critical': return 4;
+          case 'high': return 3;
+          case 'medium': return 2;
+          case 'low': return 1;
+          default: return 0;
+        }
+      };
+
+      const sorted = results.sort((a,b)=>{
+        const diffImp = importanceRank(b.metadata?.importance) - importanceRank(a.metadata?.importance);
+        if (diffImp !== 0) return diffImp;
+
+        // Boost if content directly includes the query string
+        const queryLower = query.toLowerCase();
+        const aContains = a.content.toLowerCase().includes(queryLower) ? 1 : 0;
+        const bContains = b.content.toLowerCase().includes(queryLower) ? 1 : 0;
+        if (aContains !== bContains) return bContains - aContains; // prefer inclusion
+
+        return b.similarity - a.similarity;
+      });
+
       return {
         success: true,
-        results,
+        results: sorted,
         message: results.length > 0 
           ? `Found ${results.length} relevant results` 
           : 'No matching results found',
@@ -80,7 +104,18 @@ export class RAGSearchTool {
   private async generateEmbedding(text: string): Promise<number[]> {
     try {
       const result = await this.embeddingModel.embedContent(text);
-      return result.embedding.values;
+      const embedding = result.embedding.values;
+      
+      // Google text-embedding-004 returns 768 dimensions, but database expects 1536
+      // Pad with zeros to reach 1536 dimensions (same as knowledge-base-utils)
+      if (embedding.length === 768) {
+        // Duplicate the 768-dim vector to reach 1536 dims. This preserves relative
+        // information better than zero-padding and改善 similar-ity matching.
+        const paddedEmbedding = [...embedding, ...embedding];
+        return paddedEmbedding;
+      }
+      
+      return embedding;
     } catch (error) {
       console.error('Embedding generation error:', error);
       throw new Error('Failed to generate embedding for the query');
@@ -97,28 +132,33 @@ export class RAGSearchTool {
     const { embedding, language, category, limit, threshold } = params;
 
     try {
-      // Build the RPC query for pgvector similarity search
-      let query = supabaseAdmin.rpc('search_knowledge_base', {
+      // Use Supabase RPC function for vector similarity search
+      const { data, error } = await supabaseAdmin.rpc('search_knowledge_base', {
         query_embedding: embedding,
         similarity_threshold: threshold,
-        match_count: limit,
+        match_count: limit * 3, // Get more results to filter by language/category
       });
-
-      // Apply filters
-      query = query.eq('language', language);
-      if (category) {
-        query = query.eq('category', category);
-      }
-
-      const { data, error } = await query;
 
       if (error) {
         // Fallback to direct query if RPC function doesn't exist
         return await this.fallbackSearch(params);
       }
 
+      // Filter results by language and category
+      let filteredData = data || [];
+      
+      // Filter by language
+      filteredData = filteredData.filter((item: any) => item.language === language);
+      
+      // Filter by category if specified
+      if (category) {
+        filteredData = filteredData.filter((item: any) => item.category === category);
+      }
+      
+      console.log(`[performKnowledgeBaseSearch] Found ${data?.length || 0} total results, ${filteredData.length} after filtering (language: ${language}, category: ${category || 'none'})`);
+
       // Transform the results
-      return (data || []).map((item: any) => ({
+      return filteredData.map((item: any) => ({
         id: item.id,
         title: item.metadata?.title || item.subcategory || item.category || 'Untitled',
         content: item.content,
@@ -240,7 +280,7 @@ export class RAGSearchTool {
       query,
       language,
       limit: 5,
-      threshold: 0.7,
+      threshold: 0.3,  // 閾値を下げて、より多くの結果を取得
     });
 
     if (!result.success || result.results.length === 0) {
