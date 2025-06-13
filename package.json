@@ -32,7 +32,9 @@
     "test:v2-rollout": "./scripts/test-v2-rollout.sh",
     "check:deployment": "tsx scripts/deployment-readiness-check.ts",
     "watch:slides": "tsx -r dotenv/config scripts/import-slide-narrations.ts --watch",
-    "import:markdown": "tsx scripts/import-markdown-knowledge.ts"
+    "import:markdown": "tsx scripts/import-markdown-knowledge.ts",
+    "test:source-priority": "tsx -r dotenv/config src/test/test-source-prioritization.ts",
+    "test:qa-sources": "tsx src/test/test-qa-api-sources.ts"
   },
   "keywords": [],
   "author": "",

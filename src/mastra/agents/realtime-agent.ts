@@ -6,7 +6,7 @@ import { TextChunker } from '@/lib/text-chunker';
 import { getEngineerCafeNavigator } from '@/mastra';
 import { Agent } from '@mastra/core/agent';
 import { SupportedLanguage } from '../types/config';
-import { QAAgent } from './qa-agent';
+import { EnhancedQAAgent } from './enhanced-qa-agent';
 
 export class RealtimeAgent extends Agent {
   private conversationState: 'idle' | 'listening' | 'processing' | 'speaking' = 'idle';
@@ -311,7 +311,7 @@ export class RealtimeAgent extends Agent {
     // Try RAG via existing QA-agent first
     try {
       const navigator = getEngineerCafeNavigator(this.config);
-      const qaAgent = navigator.getAgent('qa') as QAAgent | undefined;
+      const qaAgent = navigator.getAgent('qa') as EnhancedQAAgent | undefined;
       if (qaAgent && qaAgent.answerQuestion) {
         const qaAnswer: string = await qaAgent.answerQuestion(input);
         if (qaAnswer && qaAnswer.trim()) {
