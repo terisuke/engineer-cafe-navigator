@@ -331,9 +331,9 @@ export class RealtimeAgent extends Agent {
           text: input,
         });
         
-        // Only switch if detection confidence is extremely high (>=0.95) to avoid
-        // accidental language changes triggered by short English words in JA mode.
-        if (detection.success && detection.result.confidence >= 0.95) {
+        // Only switch if detection confidence is extremely high (>=0.98) to avoid
+        // accidental language changes triggered by speech recognition errors.
+        if (detection.success && detection.result.confidence >= 0.98) {
           const detectedLanguage = detection.result.detectedLanguage;
           
           // Switch language if detected language is different and confidence is high
