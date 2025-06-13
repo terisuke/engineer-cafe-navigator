@@ -105,7 +105,24 @@ export async function POST(request: NextRequest) {
         if (sessionId && !realtimeAgent.getCurrentSessionId()) {
           await realtimeAgent.startSession(undefined, language || 'ja');
         }
-        // Convert base64 audio to ArrayBuffer
+        // If transcript already provided (optional field), pass undefined to avoid duplicate STT
+        if (text && text.trim()) {
+          const result = await realtimeAgent.processTextInput(text);
+          const audioResponseBase64 = Buffer.from(result.audioResponse!).toString('base64');
+          return NextResponse.json({
+            success: true,
+            transcript: text,
+            response: result.response,
+            audioResponse: audioResponseBase64,
+            shouldUpdateCharacter: result.shouldUpdateCharacter,
+            characterAction: result.characterAction,
+            emotion: result.emotion,
+            primaryEmotion: result.primaryEmotion,
+            sessionId: realtimeAgent.getCurrentSessionId(),
+          });
+        }
+
+        // Convert base64 audio to ArrayBuffer and let agent handle STT internally
         const audioBuffer = Buffer.from(audioData, 'base64').buffer;
         const result = await realtimeAgent.processVoiceInput(audioBuffer);
         // result.audioResponseはArrayBufferなので、Buffer.fromで扱うためUint8Arrayに変換する
