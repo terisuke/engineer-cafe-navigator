@@ -50,7 +50,7 @@ interface CharacterAvatarProps {
 }
 
 export default function CharacterAvatar({
-  modelPath = '/characters/models/engineer-guide.vrm',
+  modelPath = '/characters/models/sakura.vrm',
   initialExpression = 'neutral',
   initialAnimation = 'idle',
   autoRotate = false,
