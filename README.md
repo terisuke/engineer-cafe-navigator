@@ -351,10 +351,10 @@ Engineer Cafe NavigatorはGoogle Cloud STTとWeb Speech APIのハイブリッド
 - **VRM表情制御**: 6種類の感情表現（neutral, happy, sad, angry, relaxed, surprised）
 - **コンテキスト連動**: 会話履歴を考慮した感情判定
 
-### 未実装機能
-以下の機能はドキュメントに記載されていますが、実際には実装されていません：
+### 将来の拡張予定
+以下の機能は将来のバージョンで実装予定です：
 
-- **Web Speech API**: ブラウザネイティブ音声認識
+- **Web Speech API**: ブラウザネイティブ音声認識（現在はGoogle Cloud STTを使用）
 - **表情認識**: face-api.jsを使ったカメラベースの表情検出
 - **Enhanced Voice API**: `/api/voice/enhanced`エンドポイント
 
@@ -599,7 +599,7 @@ ls src/characters/models/
 **解決方法**:
 ```bash
 # 1. Markdownファイルの構文確認
-# Note: marp:validate コマンドは現在未実装
+# Marpファイルの構文確認は手動で行ってください
 
 # 2. アセットファイルの確認
 ls src/slides/assets/images/
@@ -766,7 +766,6 @@ const ratelimit = new Ratelimit({
 pnpm run lint
 pnpm run format
 
-# Note: type-check と test コマンドは現在未実装
 # 利用可能なテストコマンド:
 pnpm run test:api           # APIエンドポイントテスト
 pnpm run test:rag           # RAG検索機能テスト

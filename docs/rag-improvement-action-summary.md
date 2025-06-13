@@ -14,10 +14,8 @@
 3. **デフォルト情報修正**: 24時間営業 → 9:00〜22:00営業
 
 ### 作成したドキュメント
-1. `docs/rag-system-fix-instructions.md` - 問題分析と修正指示
-2. `docs/data-input-guide.md` - 管理UIへのデータ投入手順
-3. `docs/rag-fix-completed.md` - 修正完了報告
-4. `docs/rag-test-implementation.md` - テストシステム実装指示
+1. `docs/data-input-guide.md` - 管理UIへのデータ投入手順
+2. `docs/rag-fix-completed.md` - 修正完了報告
 
 ### 作成したテストツール
 1. `scripts/test-rag-system.js` - 包括的テストスクリプト

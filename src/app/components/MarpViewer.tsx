@@ -119,7 +119,6 @@ export default function MarpViewer({
   const trackPresentationEvent = (event: string, data: any) => {
     const timestamp = new Date().toISOString();
     console.log(`[Analytics] ${timestamp}`, event, data);
-    // TODO: Send to analytics service
   };
 
   // Error recovery with retry logic

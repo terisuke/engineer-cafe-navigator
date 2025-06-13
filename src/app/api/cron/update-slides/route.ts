@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runSlideImport } from '@/scripts/slide-import-lib';
+import { runSlideImport } from '../../../../../scripts/slide-import-lib';
 
 export const dynamic = 'force-dynamic'; // Always run on server
 
