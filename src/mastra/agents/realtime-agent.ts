@@ -3,8 +3,10 @@ import { EmotionTagParser } from '@/lib/emotion-tag-parser';
 import { endPerformance, logPerformanceSummary, startPerformance } from '@/lib/performance-monitor';
 import { ConversationManager, SupabaseMemoryAdapter } from '@/lib/supabase-memory';
 import { TextChunker } from '@/lib/text-chunker';
+import { getEngineerCafeNavigator } from '@/mastra';
 import { Agent } from '@mastra/core/agent';
 import { SupportedLanguage } from '../types/config';
+import { QAAgent } from './qa-agent';
 
 export class RealtimeAgent extends Agent {
   private conversationState: 'idle' | 'listening' | 'processing' | 'speaking' = 'idle';
@@ -13,6 +15,7 @@ export class RealtimeAgent extends Agent {
   private supabaseMemory: SupabaseMemoryAdapter;
   private currentSessionId: string | null = null;
   private _tools: Map<string, any> = new Map();
+  private config: any;
 
   constructor(config: any, voiceService?: any) {
     super({
@@ -51,6 +54,7 @@ export class RealtimeAgent extends Agent {
     });
     this.voiceService = voiceService;
     this.supabaseMemory = new SupabaseMemoryAdapter('RealtimeAgent');
+    this.config = config;
   }
 
   // Method to add tools to this agent
@@ -61,6 +65,7 @@ export class RealtimeAgent extends Agent {
   async processTextInput(text: string): Promise<{
     response: string;
     rawResponse?: string;
+    audioResponse?: ArrayBuffer;
     shouldUpdateCharacter: boolean;
     characterAction?: string;
     emotion?: EmotionData;
@@ -105,6 +110,31 @@ export class RealtimeAgent extends Agent {
       // Store conversation turn with emotion
       await this.storeConversationTurn(text, cleanResponse, emotion);
       
+      // Generate TTS audio for the response
+      startPerformance('Text-to-Speech');
+      const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      const cleanedForTTS = this.cleanTextForTTS(cleanResponse);
+      
+      // Set voice parameters based on emotion
+      if (emotion && this.voiceService.setSpeakerByEmotion) {
+        this.voiceService.setSpeakerByEmotion(emotion.emotion);
+      }
+      
+      let audioResponse: ArrayBuffer | undefined;
+      try {
+        const ttsResult = await this.voiceService.textToSpeech(cleanedForTTS, language, emotion?.emotion);
+        
+        if (ttsResult.success && ttsResult.audioBase64) {
+          // Convert base64 to ArrayBuffer
+          const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
+          audioResponse = audioData.buffer;
+        }
+      } catch (ttsError) {
+        console.error('TTS generation failed:', ttsError);
+        // Continue without audio
+      }
+      performanceSteps['Text-to-Speech'] = endPerformance('Text-to-Speech');
+      
       this.conversationState = 'speaking';
       
       const characterAction = this.determineCharacterAction(cleanResponse, emotion);
@@ -115,6 +145,7 @@ export class RealtimeAgent extends Agent {
       return {
         response: cleanResponse,
         rawResponse: rawResponse,
+        audioResponse,
         shouldUpdateCharacter: true,
         characterAction,
         emotion,
@@ -165,6 +196,7 @@ export class RealtimeAgent extends Agent {
       const result = await this.voiceService.speechToText(audioBase64, currentLang);
       performanceSteps['Speech-to-Text'] = endPerformance('Speech-to-Text');
       
+      // Check confidence threshold (ignore very low-confidence STT results)
       if (!result.success || !result.transcript || !result.transcript.trim()) {
         this.conversationState = 'idle';
         return {
@@ -172,7 +204,7 @@ export class RealtimeAgent extends Agent {
           response: '',
           audioResponse: new ArrayBuffer(0),
           shouldUpdateCharacter: false,
-          error: result.error || 'Speech recognition failed',
+          error: result.error || 'Speech recognition confidence too low',
         };
       }
       
@@ -276,6 +308,20 @@ export class RealtimeAgent extends Agent {
   async generateResponse(input: string): Promise<string> {
     let language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
     
+    // Try RAG via existing QA-agent first
+    try {
+      const navigator = getEngineerCafeNavigator(this.config);
+      const qaAgent = navigator.getAgent('qa') as QAAgent | undefined;
+      if (qaAgent && qaAgent.answerQuestion) {
+        const qaAnswer: string = await qaAgent.answerQuestion(input);
+        if (qaAnswer && qaAnswer.trim()) {
+          return qaAnswer;
+        }
+      }
+    } catch (err) {
+      console.error('[RealtimeAgent] QA-agent RAG fallback failed:', err);
+    }
+    
     // Auto-detect language from input if confidence is high enough
     const languageTool = this._tools.get('languageSwitch');
     if (languageTool) {
@@ -285,7 +331,9 @@ export class RealtimeAgent extends Agent {
           text: input,
         });
         
-        if (detection.success && detection.result.confidence >= 0.8) {
+        // Only switch if detection confidence is extremely high (>=0.98) to avoid
+        // accidental language changes triggered by speech recognition errors.
+        if (detection.success && detection.result.confidence >= 0.98) {
           const detectedLanguage = detection.result.detectedLanguage;
           
           // Switch language if detected language is different and confidence is high

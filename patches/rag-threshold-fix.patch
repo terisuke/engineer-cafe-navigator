@@ -1,0 +1,11 @@
+--- a/src/mastra/tools/rag-search.ts
++++ b/src/mastra/tools/rag-search.ts
+@@ -220,7 +220,7 @@ export class RAGSearchTool {
+       query,
+       language,
+       limit: 5,
+-      threshold: 0.5,
++      threshold: 0.3,  // 閾値を下げて、より多くの結果を取得
+     });
+ 
+     if (!result.success || result.results.length === 0) {

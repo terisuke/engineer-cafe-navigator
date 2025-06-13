@@ -71,7 +71,7 @@ export class EmotionTagParser {
    */
   static parseEmotionTags(text: string): ParsedResponse {
     // Regex to match emotion tags: [emotion] or [emotion:intensity]
-    const emotionRegex = /\[([a-zA-Z_]+)(?::(\d*\.?\d+))?\]/g;
+    const emotionRegex = /\[\/?([a-zA-Z_]+)(?::(\d*\.?\d+))?\]/g;
     const emotions: EmotionTag[] = [];
     let cleanText = text;
     let match;
