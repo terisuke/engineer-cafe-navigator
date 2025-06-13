@@ -82,7 +82,7 @@ export default function Home() {
     } else if (selectedBackground.type === 'image') {
       return {
         backgroundImage: `url(${selectedBackground.value})`,
-        backgroundSize: 'cover',
+        backgroundSize: 'contain',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       };
@@ -666,7 +666,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen relative" style={getBackgroundStyle()}>
-      {/* Loading Overlay */}
+      <div className="container mx-auto">
+        {/* Loading Overlay */}
       {isProcessing && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl p-8 max-w-md mx-4">
@@ -806,127 +807,136 @@ export default function Home() {
                   
                   {/* Voice interaction controls - only show when not in slide mode */}
                   {!showSlideMode && (
-                    <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-4">
-                      {!isVoiceActive ? (
-                        // Language selection buttons
-                        <>
-                          <button
-                            onClick={() => {
-                              handleLanguageVoiceStart('ja');
-                              setIsVoiceActive(true);
-                            }}
-                            className="flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 w-[280px]"
-                          >
-                            <MessageSquare className="w-6 h-6" />
-                            <span className="text-lg font-semibold">日本語で話しかける</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleLanguageVoiceStart('en');
-                              setIsVoiceActive(true);
-                            }}
-                            className="flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 w-[280px]"
-                          >
-                            <MessageSquare className="w-6 h-6" />
-                            <span className="text-lg font-semibold">Speak English</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowSlideMode(true);
-                              // Auto-start presentation in Japanese
-                              setTimeout(() => {
-                                // Find MarpViewer and trigger auto-play
-                                const autoPlayEvent = new CustomEvent('autoStartPresentation', { 
-                                  detail: { autoPlay: true, language: 'ja' } 
-                                });
-                                window.dispatchEvent(autoPlayEvent);
-                              }, 100);
-                            }}
-                            className="flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 w-[280px]"
-                          >
-                            <UserPlus className="w-6 h-6" />
-                            <span className="text-lg font-semibold">初めての方へ</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowSlideMode(true);
-                              // Auto-start presentation in English
-                              setTimeout(() => {
-                                // Find MarpViewer and trigger auto-play
-                                const autoPlayEvent = new CustomEvent('autoStartPresentation', { 
-                                  detail: { autoPlay: true, language: 'en' } 
-                                });
-                                window.dispatchEvent(autoPlayEvent);
-                              }, 100);
-                            }}
-                            className="flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 w-[280px]"
-                          >
-                            <UserPlus className="w-6 h-6" />
-                            <span className="text-lg font-semibold">For first-time users</span>
-                          </button>
-                        </>
-                      ) : (
-                        // Voice control interface
-                        <div className="flex flex-col items-center gap-4">
-                          <div className="bg-white/90 backdrop-blur-sm rounded-xl px-6 py-3 shadow-lg">
-                            <span className="text-sm font-medium text-gray-700">
-                              {currentLanguage === 'ja' ? '会話中（日本語）' : 'Conversation (English)'}
-                            </span>
+                    <div className="absolute bottom-8 left-0 right-0 px-8">
+                      <div className="container mx-auto">
+                        {!isVoiceActive ? (
+                          // Language selection buttons - grouped layout
+                          <div className="flex flex-col sm:flex-row sm:justify-between items-center sm:items-end gap-6 sm:gap-4">
+                            {/* Japanese buttons group - left side */}
+                            <div className="flex flex-col gap-4 w-full sm:w-auto">
+                              <button
+                                onClick={() => {
+                                  handleLanguageVoiceStart('ja');
+                                  setIsVoiceActive(true);
+                                }}
+                                className="flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[240px] md:min-w-[280px] touch-manipulation"
+                              >
+                                <MessageSquare className="w-6 h-6" />
+                                <span className="text-base md:text-lg font-semibold">日本語で話しかける</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setShowSlideMode(true);
+                                  // Auto-start presentation in Japanese
+                                  setTimeout(() => {
+                                    // Find MarpViewer and trigger auto-play
+                                    const autoPlayEvent = new CustomEvent('autoStartPresentation', { 
+                                      detail: { autoPlay: true, language: 'ja' } 
+                                    });
+                                    window.dispatchEvent(autoPlayEvent);
+                                  }, 100);
+                                }}
+                                className="flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[240px] md:min-w-[280px] touch-manipulation"
+                              >
+                                <UserPlus className="w-6 h-6" />
+                                <span className="text-base md:text-lg font-semibold">初めての方へ</span>
+                              </button>
+                            </div>
+                            
+                            {/* English buttons group - right side */}
+                            <div className="flex flex-col gap-4 w-full sm:w-auto">
+                              <button
+                                onClick={() => {
+                                  handleLanguageVoiceStart('en');
+                                  setIsVoiceActive(true);
+                                }}
+                                className="flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[240px] md:min-w-[280px] touch-manipulation"
+                              >
+                                <MessageSquare className="w-6 h-6" />
+                                <span className="text-base md:text-lg font-semibold">Speak English</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setShowSlideMode(true);
+                                  // Auto-start presentation in English
+                                  setTimeout(() => {
+                                    // Find MarpViewer and trigger auto-play
+                                    const autoPlayEvent = new CustomEvent('autoStartPresentation', { 
+                                      detail: { autoPlay: true, language: 'en' } 
+                                    });
+                                    window.dispatchEvent(autoPlayEvent);
+                                  }, 100);
+                                }}
+                                className="flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[240px] md:min-w-[280px] touch-manipulation"
+                              >
+                                <UserPlus className="w-6 h-6" />
+                                <span className="text-base md:text-lg font-semibold">For first-time users</span>
+                              </button>
+                            </div>
                           </div>
-                          
-                          {/* Mic button */}
-                          <button
-                            onMouseDown={startVoiceRecording}
-                            onMouseUp={stopVoiceRecording}
-                            onTouchStart={startVoiceRecording}
-                            onTouchEnd={stopVoiceRecording}
-                            className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 ${
-                              isListening 
-                                ? 'bg-red-500 hover:bg-red-600 scale-110' 
-                                : 'bg-blue-500 hover:bg-blue-600 hover:scale-105'
-                            }`}
-                          >
-                            <svg 
-                              className="w-8 h-8 text-white" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
+                        ) : (
+                          // Voice control interface
+                          <div className="flex flex-col items-center gap-4">
+                            <div className="bg-white/90 backdrop-blur-sm rounded-xl px-6 py-3 shadow-lg">
+                              <span className="text-sm font-medium text-gray-700">
+                                {currentLanguage === 'ja' ? '会話中（日本語）' : 'Conversation (English)'}
+                              </span>
+                            </div>
+                            
+                            {/* Mic button */}
+                            <button
+                              onMouseDown={startVoiceRecording}
+                              onMouseUp={stopVoiceRecording}
+                              onTouchStart={startVoiceRecording}
+                              onTouchEnd={stopVoiceRecording}
+                              className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 ${
+                                isListening 
+                                  ? 'bg-red-500 hover:bg-red-600 scale-110' 
+                                  : 'bg-blue-500 hover:bg-blue-600 hover:scale-105'
+                              }`}
                             >
-                              <path 
-                                strokeLinecap="round" 
-                                strokeLinejoin="round" 
-                                strokeWidth={2} 
-                                d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" 
-                              />
-                            </svg>
-                          </button>
-                          
-                          <div className="text-center">
-                            <p className="text-sm text-gray-600">
-                              {isListening 
-                                ? (currentLanguage === 'ja' ? '聞いています...' : 'Listening...') 
-                                : (currentLanguage === 'ja' ? 'ボタンを押しながら話してください' : 'Hold to speak')
-                              }
-                            </p>
+                              <svg 
+                                className="w-8 h-8 text-white" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path 
+                                  strokeLinecap="round" 
+                                  strokeLinejoin="round" 
+                                  strokeWidth={2} 
+                                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" 
+                                />
+                              </svg>
+                            </button>
+                            
+                            <div className="text-center">
+                              <p className="text-sm text-gray-600">
+                                {isListening 
+                                  ? (currentLanguage === 'ja' ? '聞いています...' : 'Listening...') 
+                                  : (currentLanguage === 'ja' ? 'ボタンを押しながら話してください' : 'Hold to speak')
+                                }
+                              </p>
+                            </div>
+                            
+                            {/* End conversation button */}
+                            <button
+                              onClick={() => {
+                                setIsVoiceActive(false);
+                                setIsListening(false);
+                                setIsRecording(false);
+                                if (voiceRecorder) {
+                                  voiceRecorder.cleanup();
+                                  setVoiceRecorder(null);
+                                }
+                              }}
+                              className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+                            >
+                              {currentLanguage === 'ja' ? '会話を終了' : 'End conversation'}
+                            </button>
                           </div>
-                          
-                          {/* End conversation button */}
-                          <button
-                            onClick={() => {
-                              setIsVoiceActive(false);
-                              setIsListening(false);
-                              setIsRecording(false);
-                              if (voiceRecorder) {
-                                voiceRecorder.cleanup();
-                                setVoiceRecorder(null);
-                              }
-                            }}
-                            className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
-                          >
-                            {currentLanguage === 'ja' ? '会話を終了' : 'End conversation'}
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   )}
                   
@@ -982,6 +992,7 @@ export default function Home() {
             )}
           </div>
         </div>
+      </div>
       </div>
       
     </main>
