@@ -285,7 +285,6 @@ async function checkDocumentation(): Promise<CheckResult> {
     'README.md',
     'docs/DEPLOYMENT.md',
     'docs/MIGRATION-GUIDE.md',
-    'docs/FINAL-DEPLOYMENT-GUIDE.md',
   ];
   
   for (const doc of requiredDocs) {

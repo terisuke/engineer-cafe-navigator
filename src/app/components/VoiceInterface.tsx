@@ -159,7 +159,6 @@ export default function VoiceInterface({
     }
   };
 
-  // TODO: Implement processTextInput for Web Speech API integration in the future
 
   // Start voice recording
   const startListening = async () => {

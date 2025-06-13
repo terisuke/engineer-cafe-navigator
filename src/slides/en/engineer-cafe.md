@@ -27,11 +27,11 @@ class: lead
 
 ## Co-working Spaces
 
-| Space | Features |
-|-------|----------|
-| Main Hall | Open, free when no events |
-| Under Space | Basement, relaxed |
-| Focus Space | 6 silent cubicles |
+| Space       | Features                  |
+|-------------|---------------------------|
+| Main Hall   | Open, free when no events |
+| Under Space | Basement, relaxed         |
+| Focus Space | 6 silent cubicles         |
 
 **Note:** No talking / calls in the Focus Space
 
@@ -90,12 +90,12 @@ class: lead
 
 1. Tell us which space you want  
 2. Receive a neck holder (Wi-Fi printed on back)  
-3. Leaving >15 min → temporary checkout  
+3. Leaving >15 min → temporary checkout (do NOT leave belongings; staff may move them for security)  
 4. Return neck holder on exit
 
 Discord invite code is printed on the holder
 
-<!-- _narration: At reception just specify the space. Your neck holder shows Wi-Fi and a Discord invite. Please return it when you leave. -->
+<!-- _narration: At reception just specify the space. Your neck holder shows Wi-Fi and a Discord invite. If you leave for more than 15 minutes, do not leave your belongings behind; staff may move them to confirm. Please return the holder when you leave. -->
 
 ---
 

@@ -127,12 +127,13 @@
     {
       "slideNumber": 8,
       "narration": {
-        "auto": "At reception just specify the space. Your neck holder shows Wi-Fi and a Discord invite. Please return it when you leave.",
+        "auto": "At reception just specify the space. Your neck holder shows Wi-Fi and a Discord invite. If you leave for more than 15 minutes, do NOT leave your belongings behind; staff may move them for security. Please return the holder when you leave.",
         "onEnter": "About reception for future visits.",
         "onDemand": {
           "space specification": "At reception, please specify Main Hall, Under Space, or Focus Space.",
           "neck holder": "Wi-Fi information is printed on the back of the neck holder.",
-          "leaving": "If leaving for more than 15 minutes, please check out temporarily.",
+          "leaving": "If leaving for more than 15 minutes, please check out temporarily and do NOT leave belongings; staff may move them for security.",
+          "belongings": "Do NOT leave your belongings behind; staff may move them for security confirmation.",
           "discord": "Discord invitation code is also printed on the back of the neck holder."
         }
       },

@@ -3,7 +3,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { Config } from './types/config';
 import { GoogleCloudVoiceSimple } from './voice/google-cloud-voice-simple';
 import { WelcomeAgent } from './agents/welcome-agent';
-import { QAAgent } from './agents/qa-agent';
+import { EnhancedQAAgent } from './agents/enhanced-qa-agent';
 import { RealtimeAgent } from './agents/realtime-agent';
 import { SlideNarrator } from './agents/slide-narrator';
 import { SupabaseMemoryAdapter } from '@/lib/supabase-memory';
@@ -18,6 +18,8 @@ import { LanguageSwitchTool } from './tools/language-switch';
 import { PageTransitionTool } from './tools/page-transition';
 import { RAGSearchTool } from './tools/rag-search';
 import { ExternalDataFetcherTool } from './tools/external-data-fetcher';
+import { EngineerCafeWebSearchTool } from './tools/company-web-search';
+import { CalendarServiceTool } from './tools/calendar-service';
 
 export class EngineerCafeNavigator {
   private mastra: Mastra;
@@ -58,7 +60,7 @@ export class EngineerCafeNavigator {
     };
     
     const welcomeAgent = new WelcomeAgent(modelConfig);
-    const qaAgent = new QAAgent(modelConfig);
+    const qaAgent = new EnhancedQAAgent(modelConfig);
     const realtimeAgent = new RealtimeAgent(modelConfig, this.voiceService);
     const slideNarrator = new SlideNarrator(modelConfig);
 
@@ -79,6 +81,8 @@ export class EngineerCafeNavigator {
     const pageTransitionTool = new PageTransitionTool();
     const ragSearchTool = new RAGSearchTool();
     const externalDataFetcherTool = new ExternalDataFetcherTool(this.config.external);
+    const engineerCafeWebSearchTool = new EngineerCafeWebSearchTool();
+    const calendarServiceTool = new CalendarServiceTool();
 
     this.tools.set('slideControl', slideControlTool);
     this.tools.set('marpRenderer', marpRendererTool);
@@ -89,6 +93,8 @@ export class EngineerCafeNavigator {
     this.tools.set('pageTransition', pageTransitionTool);
     this.tools.set('ragSearch', ragSearchTool);
     this.tools.set('externalDataFetcher', externalDataFetcherTool);
+    this.tools.set('engineerCafeWebSearch', engineerCafeWebSearchTool);
+    this.tools.set('calendarService', calendarServiceTool);
     this.tools.set('voiceService', this.voiceService);
 
     // Register tools with agents

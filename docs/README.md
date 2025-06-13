@@ -104,7 +104,7 @@ graph TB
     
     subgraph "API Layer"
         API[Next.js 15 API Routes]
-        Mastra[Mastra 0.9.4 Agents]
+        Mastra[Mastra 0.10.1 Agents]
     end
     
     subgraph "External Services"

@@ -329,7 +329,6 @@ export class VRMUtils {
     if (!lookAt) return;
 
     // Note: VRM lookAt API varies by version
-    // TODO: Update according to the VRM library version being used
     // lookAt.enabled = enabled;
   }
 

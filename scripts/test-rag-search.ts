@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 
+import 'dotenv/config';
 import { ragSearchTool } from '../src/mastra/tools/rag-search';
 import { knowledgeBaseUtils } from '../src/lib/knowledge-base-utils';
 

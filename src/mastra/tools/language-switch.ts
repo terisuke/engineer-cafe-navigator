@@ -146,8 +146,17 @@ export class LanguageSwitchTool {
           }
         });
 
+        // Add debug logging
+        console.log('[LanguageDetection] Input:', input);
+        console.log('[LanguageDetection] English score:', englishScore);
+        console.log('[LanguageDetection] Japanese score:', japaneseScore);
+
         // Determine language and confidence
-        if (englishScore > japaneseScore) {
+        // Give Japanese higher priority - if there's ANY Japanese text, it's likely Japanese
+        if (japaneseScore > 0) {
+          detectedLanguage = 'ja';
+          confidence = Math.min(0.95, 0.7 + (japaneseScore / (englishScore + japaneseScore)) * 0.25);
+        } else if (englishScore > japaneseScore) {
           detectedLanguage = 'en';
           confidence = Math.min(0.95, 0.5 + (englishScore / (englishScore + japaneseScore)) * 0.45);
         } else if (japaneseScore > englishScore) {

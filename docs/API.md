@@ -634,6 +634,89 @@ curl https://engineer-cafe-navigator.vercel.app/api/voice?action=health
 }
 ```
 
+## 🔍 Knowledge Search API
+
+### POST /api/knowledge/search
+
+RAG (Retrieval-Augmented Generation) based knowledge base search.
+
+#### Request
+
+**Headers:**
+```json
+{
+  "Content-Type": "application/json"
+}
+```
+
+**Body:**
+```json
+{
+  "query": "エンジニアカフェの利用時間は？",
+  "language": "ja",
+  "limit": 5
+}
+```
+
+#### Response
+
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "content": "エンジニアカフェの営業時間は9:00-22:00です",
+      "similarity": 0.85,
+      "metadata": {
+        "source": "facility-info",
+        "category": "hours"
+      }
+    }
+  ],
+  "total": 1
+}
+```
+
+## 📊 Monitoring API
+
+### GET /api/monitoring/dashboard
+
+システム監視ダッシュボード用データの取得。
+
+#### Response
+
+```json
+{
+  "success": true,
+  "metrics": {
+    "activeUsers": 5,
+    "totalSessions": 150,
+    "avgResponseTime": 650,
+    "systemHealth": "healthy"
+  }
+}
+```
+
+### GET /api/monitoring/migration-success
+
+RAG移行ステータスの監視。
+
+#### Response
+
+```json
+{
+  "success": true,
+  "migrationStatus": {
+    "completed": true,
+    "version": "v2.0.0",
+    "performance": {
+      "searchAccuracy": 0.92,
+      "avgLatency": 580
+    }
+  }
+}
+```
+
 ## 🔧 開発・テスト
 
 ### ローカル開発
@@ -644,8 +727,13 @@ pnpm run dev
 
 # APIテスト
 curl -X POST http://localhost:3000/api/voice \
-  -H "Content-Type: application/json" \
+  -H "Content-Type": application/json" \
   -d '{"action":"status"}'
+
+# Knowledge Search テスト
+curl -X POST http://localhost:3000/api/knowledge/search \
+  -H "Content-Type": application/json" \
+  -d '{"query":"営業時間","language":"ja"}'
 ```
 
 ### テスト用セッション
