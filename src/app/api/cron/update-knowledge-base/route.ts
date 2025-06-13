@@ -26,6 +26,15 @@ export async function GET(request: NextRequest) {
   try {
     console.log('[CRON] Starting knowledge base update...');
     
+    // Check if required services are configured
+    const hasGoogleCalendar = process.env.GOOGLE_CALENDAR_CLIENT_ID && 
+                             process.env.GOOGLE_CALENDAR_CLIENT_SECRET && 
+                             process.env.GOOGLE_CALENDAR_REDIRECT_URI;
+    
+    if (!hasGoogleCalendar) {
+      console.warn('[CRON] Google Calendar OAuth2 not configured, some features will be limited');
+    }
+    
     // Run the update
     await knowledgeBaseUpdater.runUpdate();
     

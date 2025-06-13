@@ -170,6 +170,14 @@ export class KnowledgeBaseUpdater {
    */
   private async updateFromGoogleCalendar(): Promise<string> {
     try {
+      // Check if OAuth2 credentials are configured
+      if (!process.env.GOOGLE_CALENDAR_CLIENT_ID || 
+          !process.env.GOOGLE_CALENDAR_CLIENT_SECRET || 
+          !process.env.GOOGLE_CALENDAR_REDIRECT_URI) {
+        console.warn('[updateFromGoogleCalendar] OAuth2 credentials not configured, skipping');
+        return 'Skipped - OAuth2 not configured';
+      }
+      
       // Authenticate with service account
       await googleCalendarClient.authenticateWithServiceAccount();
       
