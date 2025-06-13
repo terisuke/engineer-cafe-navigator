@@ -13,17 +13,10 @@ export class QAAgent extends Agent {
     super({
       name: 'QAAgent',
       model: config.llm.model,
-      instructions: `You are a knowledgeable Q&A agent for Engineer Cafe in Fukuoka.
-        Your role is to:
-        1. Answer questions about Engineer Cafe services, facilities, and policies
-        2. Provide information about pricing, membership, and access
-        3. Help with technical and operational inquiries
-        4. Direct users to appropriate staff if needed
-        5. Maintain consistency with the information in your knowledge base
-        
-        Use the RAG tools to search for accurate, up-to-date information.
-        If you don't have specific information, politely say so and offer alternatives.
-        Always be helpful and professional.`,
+      instructions: `You are a knowledgeable Q&A agent for Engineer Cafe in Fukuoka. 
+        Answer questions concisely and directly. Keep responses brief - typically 1-2 sentences.
+        Only provide the specific information requested. Avoid unnecessary details.
+        Use the RAG tools to search for accurate information.`,
     });
     this.memory = config.memory || new Map();
     // Use 'realtime' namespace to share memory with RealtimeAgent
@@ -42,8 +35,8 @@ export class QAAgent extends Agent {
     const context = await this.searchKnowledgeBase(question);
     
     const prompt = language === 'en'
-      ? `Based on the following context about Engineer Cafe, answer this question: ${question}\n\nContext: ${context}`
-      : `エンジニアカフェについて以下の情報を参考に、この質問に答えてください: ${question}\n\n参考情報: ${context}`;
+      ? `Answer ONLY the specific question asked: ${question}\nContext: ${context}\nProvide ONLY the requested information. Do not add extra details or explanations. Keep it to 1-2 sentences maximum.`
+      : `聞かれたことだけに答えてください: ${question}\n参考情報: ${context}\n聞かれた情報のみを答え、余計な説明は不要です。最大1-2文で答えてください。`;
     
     const response = await this.generate([
       { role: 'user', content: prompt }
@@ -56,13 +49,19 @@ export class QAAgent extends Agent {
   private async searchKnowledgeBase(query: string): Promise<string> {
     const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
     
+    // Normalize query for better matching (handle speech recognition errors)
+    const normalizedQuery = query.toLowerCase()
+      .replace(/coffee say no/g, 'saino cafe')
+      .replace(/才能/g, 'saino')
+      .replace(/say no/g, 'saino');
+    
     // Try to categorize the question to improve search precision
-    const category = await this.categorizeQuestion(query);
+    const category = await this.categorizeQuestion(normalizedQuery);
     
     try {
       // Use the RAG search tool to find relevant information
       const ragTool = this._tools.get('ragSearch') || ragSearchTool;
-      console.log('[QAAgent] Searching knowledge base for:', query, 'in language:', language, 'category:', category);
+      console.log('[QAAgent] Searching knowledge base for:', normalizedQuery, 'in language:', language, 'category:', category);
       
       // Handle ambiguous cafe queries with clarification
       if (category === 'cafe-clarification-needed') {
@@ -98,17 +97,24 @@ export class QAAgent extends Agent {
           
           if (sainoOnlyResults.length > 0) {
             console.log('[QAAgent] Found', sainoOnlyResults.length, 'Saino cafe specific results');
-            const parts = sainoOnlyResults.map((item: any, i: number) => `[${item.title || 'Result'}]
-${item.content}`);
-            return parts.join('\n\n');
+            // Return only the most relevant result to keep response concise
+            const mostRelevant = sainoOnlyResults[0];
+            return `[${mostRelevant.title || 'Saino Cafe'}] ${mostRelevant.content}`;
           }
         }
       }
       
       // Try with category filter if available
       if (category && category !== 'general') {
+        // For hours queries, enhance the search with specific keywords
+        let enhancedQuery = normalizedQuery;
+        if (category === 'engineer-cafe' && (normalizedQuery.includes('営業時間') || normalizedQuery.includes('時間') || normalizedQuery.includes('hours') || normalizedQuery.includes('operation'))) {
+          enhancedQuery = normalizedQuery + ' 9:00 22:00 営業 開館 閉館 hours operation';
+          console.log('[QAAgent] Enhanced hours query:', enhancedQuery);
+        }
+        
         const categoryResult = await ragTool.execute({
-          query,
+          query: enhancedQuery,
           language,
           category,
           limit: 5,
@@ -117,30 +123,30 @@ ${item.content}`);
         
         if (categoryResult.success && categoryResult.results.length > 0) {
           console.log('[QAAgent] Found', categoryResult.results.length, 'results with category:', category);
-          const parts = categoryResult.results.map((item: any, i: number) => `[${item.title || 'Result'}]
-${item.content}`);
-          return parts.join('\n\n');
+          // Return only the most relevant result to keep response concise
+          const mostRelevant = categoryResult.results[0];
+          return `[${mostRelevant.title || 'Information'}] ${mostRelevant.content}`;
         }
       }
       
       // Try general search
-      const context = await ragTool.searchKnowledgeBase(query, language);
+      const context = await ragTool.searchKnowledgeBase(normalizedQuery, language);
       console.log('[QAAgent] Context found:', context ? context.substring(0, 100) + '...' : 'null');
       
       // If still no results, try with very low threshold
       if (!context) {
         console.log('[QAAgent] No context found, retrying with lower threshold');
         const retry = await ragTool.execute({
-          query,
+          query: normalizedQuery,
           language,
           limit: 10,
           threshold: 0.15,
         });
         if (retry.success && retry.results.length > 0) {
           console.log('[QAAgent] Retry successful, found', retry.results.length, 'results');
-          const parts = retry.results.map((item: any, i: number) => `[${item.title || 'Result'}]
-${item.content}`);
-          return parts.join('\n\n');
+          // Return only the most relevant result to keep response concise
+          const mostRelevant = retry.results[0];
+          return `[${mostRelevant.title || 'Information'}] ${mostRelevant.content}`;
         }
       }
       
@@ -176,17 +182,24 @@ ${item.content}`);
     // Simple categorization logic - in practice, this could use ML
     const lowerQuestion = question.toLowerCase();
     
-    // Check for specific cafe mentions first
-    if (lowerQuestion.includes('サイノ') || lowerQuestion.includes('saino') || lowerQuestion.includes('併設')) {
+    // Handle common speech recognition errors
+    const normalizedQuestion = lowerQuestion
+      .replace(/coffee say no/g, 'saino')
+      .replace(/才能/g, 'saino')
+      .replace(/say no/g, 'saino');
+    
+    // Check for specific cafe mentions first (use normalized question for better matching)
+    if (normalizedQuestion.includes('サイノ') || normalizedQuestion.includes('saino') || normalizedQuestion.includes('併設')) {
       return 'saino-cafe';
     }
     
-    // Check for ambiguous cafe queries that need clarification
-    if (lowerQuestion.includes('カフェ') || lowerQuestion.includes('cafe')) {
+    // Check for ambiguous cafe queries that need clarification (use normalized question)
+    if (normalizedQuestion.includes('カフェ') || normalizedQuestion.includes('cafe')) {
       // If it's clearly about Engineer Cafe operations
-      if (lowerQuestion.includes('エンジニアカフェ') || lowerQuestion.includes('engineer cafe') || 
-          lowerQuestion.includes('コワーキング') || lowerQuestion.includes('作業') || 
-          lowerQuestion.includes('無料') || lowerQuestion.includes('利用')) {
+      if (normalizedQuestion.includes('エンジニアカフェ') || normalizedQuestion.includes('エンジニア カフェ') || 
+          normalizedQuestion.includes('engineer cafe') || normalizedQuestion.includes('engineer　cafe') ||
+          normalizedQuestion.includes('コワーキング') || normalizedQuestion.includes('作業') || 
+          normalizedQuestion.includes('無料') || normalizedQuestion.includes('利用')) {
         return 'engineer-cafe';
       }
       // If it's ambiguous, mark for clarification
