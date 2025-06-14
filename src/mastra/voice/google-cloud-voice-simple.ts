@@ -49,9 +49,23 @@ export class GoogleCloudVoiceSimple {
   private currentSettings: VoiceSettings;
 
   constructor() {
+    // Parse credentials from environment variable if available
+    const credentialsJson = process.env.GOOGLE_CLOUD_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    let credentials;
+    
+    if (credentialsJson) {
+      try {
+        credentials = JSON.parse(credentialsJson);
+      } catch (error) {
+        console.error('Failed to parse Google Cloud credentials from environment variable:', error);
+      }
+    }
+    
     this.auth = new GoogleAuth({
       scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-      keyFile: 'config/service-account-key.json'
+      credentials: credentials,
+      keyFile: credentials ? undefined : 'config/service-account-key.json', // Fallback to file for local development
+      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID
     });
     
     // Default settings

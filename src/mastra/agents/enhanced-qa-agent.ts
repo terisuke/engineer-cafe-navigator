@@ -173,6 +173,15 @@ Official X/Twitter: https://x.com/EngineerCafeJP
         return clarificationMessage;
       }
       
+      if (category === 'saino-cafe') {
+        const sainoInfo = language === 'en'
+          ? "Saino Cafe is the attached cafe & bar inside Engineer Cafe.\nOperating hours: Monday-Saturday 11:00-22:00, Sunday & Holidays 11:00-20:00\nOffers coffee, light meals, and alcoholic beverages."
+          : "サイノカフェは、エンジニアカフェに併設されているカフェ＆バーです。\n営業時間: 月曜～土曜 11:00-22:00、日曜・祝日 11:00-20:00\nコーヒー、軽食、アルコール類を提供しています。";
+        
+        console.log('[EnhancedQAAgent] Providing Saino Cafe information');
+        return sainoInfo;
+      }
+      
       const context = await ragTool.searchKnowledgeBase(normalizedQuery, language);
       
       if (!context) {
@@ -220,27 +229,41 @@ Official X/Twitter: https://x.com/EngineerCafeJP
       return 'calendar';
     }
     
-    // Facility information
+    // Engineer Cafe specific (highest priority - check space variations)
+    if (normalizedQuestion.includes('エンジニアカフェ') || 
+        normalizedQuestion.includes('エンジニア カフェ') ||
+        normalizedQuestion.includes('engineer cafe') || 
+        normalizedQuestion.includes('engineer カフェ')) {
+      console.log('[EnhancedQAAgent] Detected Engineer Cafe specific query');
+      return 'facility-info';
+    }
+    
+    // Saino Cafe specific (併設カフェも含む)
+    if (normalizedQuestion.includes('サイノ') || normalizedQuestion.includes('saino') ||
+        normalizedQuestion.includes('併設') || normalizedQuestion.includes('併設されてる')) {
+      console.log('[EnhancedQAAgent] Detected Saino Cafe specific query');
+      return 'saino-cafe';
+    }
+    
+    // General facility information
     if (normalizedQuestion.includes('施設') || normalizedQuestion.includes('facility') ||
-        normalizedQuestion.includes('エンジニアカフェ') || normalizedQuestion.includes('engineer cafe') ||
         normalizedQuestion.includes('福岡市') || normalizedQuestion.includes('fukuoka') ||
         normalizedQuestion.includes('公式') || normalizedQuestion.includes('official') ||
         normalizedQuestion.includes('twitter') || normalizedQuestion.includes('x.com')) {
       return 'facility-info';
     }
     
-    // Saino Cafe specific
-    if (normalizedQuestion.includes('サイノ') || normalizedQuestion.includes('saino')) {
-      return 'saino-cafe';
-    }
-    
-    // Ambiguous cafe queries
+    // Ambiguous cafe queries (lower priority)
     if (normalizedQuestion.includes('カフェ') || normalizedQuestion.includes('cafe')) {
-      if (normalizedQuestion.includes('エンジニアカフェ') || normalizedQuestion.includes('engineer cafe') || 
-          normalizedQuestion.includes('コワーキング') || normalizedQuestion.includes('作業') || 
-          normalizedQuestion.includes('無料') || normalizedQuestion.includes('利用')) {
-        return 'engineer-cafe';
+      // If it contains working/facility keywords, assume Engineer Cafe
+      if (normalizedQuestion.includes('コワーキング') || normalizedQuestion.includes('作業') || 
+          normalizedQuestion.includes('無料') || normalizedQuestion.includes('利用') ||
+          normalizedQuestion.includes('営業時間') || normalizedQuestion.includes('時間')) {
+        console.log('[EnhancedQAAgent] Cafe query with facility keywords, assuming Engineer Cafe');
+        return 'facility-info';
       }
+      // Otherwise ask for clarification
+      console.log('[EnhancedQAAgent] Ambiguous cafe query, requesting clarification');
       return 'cafe-clarification-needed';
     }
     
