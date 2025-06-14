@@ -16,11 +16,11 @@
 @layer components {
   /* Button styles */
   .btn-primary {
-    @apply px-4 py-2 bg-primary text-white rounded-lg hover:bg-secondary transition-colors duration-200 font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply px-6 py-3 md:px-8 md:py-4 bg-primary text-white rounded-xl hover:bg-secondary transition-colors duration-200 font-medium text-base md:text-lg shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation;
   }
 
   .btn-secondary {
-    @apply px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 font-medium;
+    @apply px-6 py-3 md:px-8 md:py-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium text-base md:text-lg touch-manipulation;
   }
 
   /* Card styles */
