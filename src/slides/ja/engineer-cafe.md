@@ -10,6 +10,7 @@ class: lead
 
 # エンジニアカフェへようこそ  
 Welcome to Engineer Cafe
+![bg contain right:40%](/assets/images/engineercafelogo.png)
 
 <!-- _narration: 皆さん、エンジニアカフェへようこそ。ここはエンジニアが学び、交流し、成長できる公共スペースです。本スライドでは施設の概要と利用方法を説明します。 -->
 
@@ -21,6 +22,7 @@ Welcome to Engineer Cafe
 - 「エンジニアフレンドリーシティ福岡」の一環  
 - コミュニティマネージャー常駐  
 - ハッカーサポーターによる技術支援
+![bg contain right:35%](/assets/images/engineerfriendlogo.png)
 
 <!-- _narration: エンジニアカフェは福岡市と市民の協力で生まれました。コミュニティマネージャーとハッカーサポーターが日々皆さんをサポートします。 -->
 
@@ -33,6 +35,7 @@ Welcome to Engineer Cafe
 | メインホール     | 開放的・イベント時以外は無料 |
 | Under スペース | 地下、落ち着いた雰囲気     |
 | 集中スペース   | 6席・完全静音           |
+![bg contain right:40%](/assets/images/concentratespace.jpg)
 
 **注意:** 集中スペースは通話・Web会議禁止
 
@@ -47,6 +50,7 @@ Welcome to Engineer Cafe
 - 申請方法  
   1. スタッフへ直接  
   2. Discord 受付チャンネル
+![bg contain right:45%](/assets/images/discord.jpg)
 
 <!-- _narration: 席は二時間区切りですが、空いていれば延長できます。延長はスタッフか Discord で申請してください。 -->
 
@@ -58,6 +62,7 @@ Welcome to Engineer Cafe
 - 飲食不可  
   - 蓋付き飲料のみ可  
   - ストローは禁止
+![bg contain right:45%](/assets/images/notalloweat.png)
 
 <!-- _narration: 建物は重要文化財です。飲食は基本禁止で、蓋付き飲料だけ許可されています。ストローも不可なのでご注意ください。 -->
 
@@ -68,14 +73,14 @@ Welcome to Engineer Cafe
 1. Wi-Fi 接続  
    - SSID: **engnrcf-guest-2.4GHz**  
    - PASS: **akarenga-112years**
+![bg contain left:35%](/assets/images/engineercafewifi.png)
 2. QRコードでフォーム入力  
 3. 会員番号はスタッフと一緒に確認
-
-<!-- _narration: まず Wi-Fi に接続し、QR コードから会員登録を行います。番号入力は間違い防止のためスタッフと一緒に行います。 -->
 
 ---
 
 ## 会員証について
+![bg contain right:40%](/assets/images/membershipcards.jpg)
 
 - レーザー加工機で作成 ⇒ **再発行不可**  
 - 紛失時  
@@ -96,12 +101,14 @@ Welcome to Engineer Cafe
 4. ネックホルダー返却
 
 Discord 招待コードも裏面に記載
+![bg contain right:45%](/assets/images/discord.jpg)
 
 <!-- _narration: 受付では利用スペースをお伝えください。ネックホルダーに Wi-Fi と Discord 情報があります。15 分以上外出する場合は荷物を置いたままにしないでください。確認のためスタッフが荷物に触れることがあります。帰る際は必ず返却してください。 -->
 
 ---
 
 ## エンジニアカフェの想い
+![bg contain right:45%](/assets/images/welcomeoerson.png)
 
 > ルールより「協力」  
 > みんなで心地よい空間をつくる
@@ -115,6 +122,7 @@ Discord 招待コードも裏面に記載
 ---
 
 # ご清聴ありがとうございました
+![bg contain right:45%](/assets/images/regsterform.png)
 
 お問い合わせはスタッフまで
 

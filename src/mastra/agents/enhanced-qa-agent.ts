@@ -49,6 +49,11 @@ export class EnhancedQAAgent extends Agent {
       // Default to RAG search
       console.log('[EnhancedQAAgent] Using RAG search');
       context = await this.searchKnowledgeBase(question);
+      
+      // Check if the result is a clarification message (starts with [curious])
+      if (context.startsWith('[curious]')) {
+        return context;
+      }
     }
     
     const prompt = language === 'en'
@@ -131,7 +136,7 @@ export class EnhancedQAAgent extends Agent {
     if (language === 'ja') {
       return `
 エンジニアカフェは福岡市が運営するITエンジニア向けの公共施設です。
-営業時間: 9:00-22:00（年中無休）
+営業時間: 9:00-22:00、休館日: 毎月最終月曜日（祝日の場合は翌平日）と年末年始（12/29-1/3）
 設備: 高速インターネット、会議室、イベントスペース、コワーキングスペース
 利用料金: 完全無料
 所在地: 福岡市中央区天神
@@ -167,22 +172,21 @@ Official X/Twitter: https://x.com/EngineerCafeJP
       
       if (category === 'cafe-clarification-needed') {
         const clarificationMessage = language === 'en'
-          ? "[curious]I'd be happy to help! Are you asking about:\n1. **Engineer Cafe** (the coworking space) - hours, facilities, usage\n2. **Saino Cafe** (the attached cafe & bar) - menu, hours, prices\n\nPlease let me know which one you're interested in![/curious]"
-          : "[curious]お手伝いさせていただきます！どちらについてお聞きでしょうか：\n1. **エンジニアカフェ**（コワーキングスペース）- 営業時間、設備、利用方法\n2. **サイノカフェ**（併設のカフェ＆バー）- メニュー、営業時間、料金\n\nお聞かせください！[/curious]";
+          ? "[curious]Are you asking about Engineer Cafe (the coworking space) or Saino Cafe (the attached cafe & bar)?[/curious]"
+          : "[curious]コワーキングスペースのエンジニアカフェのことですか、それとも併設のカフェ＆バーのsainoカフェのことですか？[/curious]";
         
         return clarificationMessage;
       }
       
+      // For saino-cafe queries, enhance search with specific terms
+      let searchQuery = normalizedQuery;
       if (category === 'saino-cafe') {
-        const sainoInfo = language === 'en'
-          ? "Saino Cafe is the attached cafe & bar inside Engineer Cafe.\nOperating hours: Monday-Saturday 11:00-22:00, Sunday & Holidays 11:00-20:00\nOffers coffee, light meals, and alcoholic beverages."
-          : "サイノカフェは、エンジニアカフェに併設されているカフェ＆バーです。\n営業時間: 月曜～土曜 11:00-22:00、日曜・祝日 11:00-20:00\nコーヒー、軽食、アルコール類を提供しています。";
-        
-        console.log('[EnhancedQAAgent] Providing Saino Cafe information');
-        return sainoInfo;
+        // Add saino-specific terms to improve RAG search accuracy
+        searchQuery = `saino ${normalizedQuery} 併設 カフェ バー`.replace(/\s+/g, ' ').trim();
+        console.log('[EnhancedQAAgent] Enhanced search query for Saino:', searchQuery);
       }
       
-      const context = await ragTool.searchKnowledgeBase(normalizedQuery, language);
+      const context = await ragTool.searchKnowledgeBase(searchQuery, language);
       
       if (!context) {
         const defaultContext = {
@@ -239,8 +243,10 @@ Official X/Twitter: https://x.com/EngineerCafeJP
     }
     
     // Saino Cafe specific (併設カフェも含む)
-    if (normalizedQuestion.includes('サイノ') || normalizedQuestion.includes('saino') ||
-        normalizedQuestion.includes('併設') || normalizedQuestion.includes('併設されてる')) {
+    // More specific Saino Cafe detection to reduce false positives
+    if ((normalizedQuestion.includes('サイノ') || normalizedQuestion.includes('saino')) ||
+        ((normalizedQuestion.includes('併設') || normalizedQuestion.includes('併設されてる')) &&
+         (normalizedQuestion.includes('カフェ') || normalizedQuestion.includes('cafe') || normalizedQuestion.includes('bar')))) {
       console.log('[EnhancedQAAgent] Detected Saino Cafe specific query');
       return 'saino-cafe';
     }
@@ -253,14 +259,18 @@ Official X/Twitter: https://x.com/EngineerCafeJP
       return 'facility-info';
     }
     
-    // Ambiguous cafe queries (lower priority)
+    // Ambiguous cafe queries - ask for clarification when unclear
     if (normalizedQuestion.includes('カフェ') || normalizedQuestion.includes('cafe')) {
-      // If it contains working/facility keywords, assume Engineer Cafe
+      // If it contains working/facility keywords (but not saino-specific), assume Engineer Cafe
       if (normalizedQuestion.includes('コワーキング') || normalizedQuestion.includes('作業') || 
-          normalizedQuestion.includes('無料') || normalizedQuestion.includes('利用') ||
-          normalizedQuestion.includes('営業時間') || normalizedQuestion.includes('時間')) {
+          normalizedQuestion.includes('無料') || normalizedQuestion.includes('利用')) {
         console.log('[EnhancedQAAgent] Cafe query with facility keywords, assuming Engineer Cafe');
         return 'facility-info';
+      }
+      // For time-related queries without specific context, ask for clarification
+      if (normalizedQuestion.includes('営業時間') || normalizedQuestion.includes('時間')) {
+        console.log('[EnhancedQAAgent] Ambiguous time query for cafe, requesting clarification');
+        return 'cafe-clarification-needed';
       }
       // Otherwise ask for clarification
       console.log('[EnhancedQAAgent] Ambiguous cafe query, requesting clarification');

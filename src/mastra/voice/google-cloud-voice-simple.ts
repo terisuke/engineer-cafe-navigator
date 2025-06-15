@@ -49,22 +49,35 @@ export class GoogleCloudVoiceSimple {
   private currentSettings: VoiceSettings;
 
   constructor() {
-    // Parse credentials from environment variable if available
-    const credentialsJson = process.env.GOOGLE_CLOUD_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    // Check if credentials are provided as a path or JSON string
+    const credentialsPath = process.env.GOOGLE_CLOUD_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS;
     let credentials;
+    let keyFile;
     
-    if (credentialsJson) {
-      try {
-        credentials = JSON.parse(credentialsJson);
-      } catch (error) {
-        console.error('Failed to parse Google Cloud credentials from environment variable:', error);
+    if (credentialsPath) {
+      // Check if it's a file path or JSON string
+      if (credentialsPath.startsWith('./') || credentialsPath.startsWith('/') || credentialsPath.endsWith('.json')) {
+        // It's a file path
+        keyFile = credentialsPath;
+      } else {
+        // Try to parse as JSON
+        try {
+          credentials = JSON.parse(credentialsPath);
+        } catch (error) {
+          console.error('Failed to parse Google Cloud credentials from environment variable:', error);
+          // Fallback to default file path
+          keyFile = 'config/service-account-key.json';
+        }
       }
+    } else {
+      // No credentials provided, use default file path
+      keyFile = 'config/service-account-key.json';
     }
     
     this.auth = new GoogleAuth({
       scopes: ['https://www.googleapis.com/auth/cloud-platform'],
       credentials: credentials,
-      keyFile: credentials ? undefined : 'config/service-account-key.json', // Fallback to file for local development
+      keyFile: keyFile,
       projectId: process.env.GOOGLE_CLOUD_PROJECT_ID
     });
     

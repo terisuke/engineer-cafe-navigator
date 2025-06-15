@@ -9,12 +9,14 @@ class: lead
 ---
 
 # Welcome to Engineer Cafe
+![bg contain right:40%](/assets/images/engineercafelogo.png)
 
 <!-- _narration: Welcome everyone to Engineer Cafe, a public space where engineers can learn, connect and grow. This deck explains our facilities and how to use them. -->
 
 ---
 
 ## What is Engineer Cafe?
+![bg contain right:35%](/assets/images/engineerfriendlogo.png)
 
 - Established Aug 2019  
 - Part of "Engineer-Friendly City Fukuoka"  
@@ -26,6 +28,7 @@ class: lead
 ---
 
 ## Co-working Spaces
+![bg contain right:40%](/assets/images/concentratespace.jpg)
 
 | Space       | Features                  |
 |-------------|---------------------------|
@@ -40,6 +43,7 @@ class: lead
 ---
 
 ## Time Slots & Extensions
+![bg contain right:45%](/assets/images/discord.jpg)
 
 - Standard 2 h (1 h for soundproof rooms)
 - Unlimited extensions if seats are free
@@ -52,6 +56,7 @@ class: lead
 ---
 
 ## Cultural-Property Etiquette
+![bg contain right:45%](/assets/images/notalloweat.png)
 
 - The Red-Brick Culture Hall is a national Important Cultural Property
 - Food & drinks ✖  
@@ -63,6 +68,7 @@ class: lead
 ---
 
 ## How to Register
+![bg contain left:35%](/assets/images/engineercafewifi.png)
 
 1. Connect to Wi-Fi  
    - **engnrcf-guest-2.4GHz** / **akarenga-112years**  
@@ -74,6 +80,7 @@ class: lead
 ---
 
 ## About Membership Cards
+![bg contain right:40%](/assets/images/membershipcards.jpg)
 
 - Laser-cut on site → **cannot be re-issued**  
 - Lost card?  
@@ -82,24 +89,10 @@ class: lead
 - NFC/IC card & mobile wallet linking available  
 - One neck strap per person (no re-supply)
 
-<!-- _narration: Your card is unique and not reissuable, but we can look you up if it's lost. You can also link the ID to an NFC card or phone for smooth entry. -->
-
----
-
-## Reception on Future Visits
-
-1. Tell us which space you want  
-2. Receive a neck holder (Wi-Fi printed on back)  
-3. Leaving >15 min → temporary checkout (do NOT leave belongings; staff may move them for security)  
-4. Return neck holder on exit
-
-Discord invite code is printed on the holder
-
-<!-- _narration: At reception just specify the space. Your neck holder shows Wi-Fi and a Discord invite. If you leave for more than 15 minutes, do not leave your belongings behind; staff may move them to confirm. Please return the holder when you leave. -->
-
 ---
 
 ## Our Philosophy
+![bg contain right:45%](/assets/images/welcomeoerson.png)
 
 > Fewer rules, more collaboration
 
@@ -112,6 +105,7 @@ Discord invite code is printed on the holder
 ---
 
 # Thank you!
+![bg contain right:45%](/assets/images/regsterform.png)
 
 Talk to any staff member if you have questions
 

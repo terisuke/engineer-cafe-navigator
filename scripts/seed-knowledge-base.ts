@@ -6,7 +6,7 @@ import { knowledgeBaseUtils, KnowledgeBaseEntry } from '../src/lib/knowledge-bas
 const sampleEntries: KnowledgeBaseEntry[] = [
   // Japanese entries
   {
-    content: 'エンジニアカフェは福岡市中央区天神にある、ITエンジニア向けのコワーキングスペースです。24時間365日利用可能で、高速インターネット、電源完備、フリードリンクなどの設備を提供しています。',
+    content: 'エンジニアカフェは福岡市中央区天神にある、ITエンジニア向けの公共施設です。営業時間は9:00-22:00、休館日は毎月最終月曜日（祝日の場合は翌平日）と年末年始（12/29-1/3）です。高速インターネット、電源完備、会議室、イベントスペースなどの設備を無料で提供しています。',
     category: '基本情報',
     subcategory: '概要',
     language: 'ja',

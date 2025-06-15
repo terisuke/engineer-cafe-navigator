@@ -159,12 +159,10 @@ export default function MarpViewer({
     }
   };
 
-  // Load slides and narration data
+  // Load slides and narration data when slideFile or language prop changes
   useEffect(() => {
-    loadSlideData();
-  }, [slideFile, language]);
-
-  // Simplified: removed complex event system for direct advancement
+    loadSlideData(currentLanguage);
+  }, [slideFile, currentLanguage]);
 
   // Track slide view duration
   useEffect(() => {
@@ -289,14 +287,20 @@ export default function MarpViewer({
   }, [currentSlide, renderedHtml]);
 
 
-  const loadSlideData = async (language: string = 'ja') => {
+  const loadSlideData = async (requestedLang: string = 'ja') => {
     try {
       setIsLoading(true);
       setError(null);
-      setCurrentLanguage(language as 'ja' | 'en'); // Update current language state
+      // Update language state only if changed to avoid unnecessary reload loops
+      if (requestedLang !== currentLanguage) {
+        setCurrentLanguage(requestedLang as 'ja' | 'en');
+      }
+
+      // Clear previous HTML to avoid showing outdated slide deck
+      setRenderedHtml('');
 
       // Determine the slide file path based on language
-      const languageSlideFile = language === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
+      const languageSlideFile = requestedLang === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
 
       // Render slides with narration
       const response = await fetch('/api/marp', {
@@ -309,7 +313,7 @@ export default function MarpViewer({
           slideFile: languageSlideFile, // Use language-specific slide file
           theme: 'engineer-cafe',
           outputFormat: 'both',
-          language: language, // Add language parameter
+          language: requestedLang, // Add language parameter
           options: {
             // Ensure proper Marp rendering options
             html: true,
@@ -322,7 +326,8 @@ export default function MarpViewer({
 
       const result = await response.json();
 
-      if (result.success) {
+      // Ignore response if a newer loadSlideData was triggered in the meantime
+      if (result.success && requestedLang === currentLanguage) {
         if (result.slideData && result.slideData.slides) {
           setSlides(result.slideData.slides);
           setTotalSlides(result.slideData.slides.length);
@@ -1035,7 +1040,7 @@ export default function MarpViewer({
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={() => loadSlideData()}
+            onClick={() => loadSlideData(currentLanguage)}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
           >
             {currentLanguage === 'ja' ? '再試行' : 'Retry'}
