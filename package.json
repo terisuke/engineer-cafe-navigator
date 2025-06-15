@@ -15,7 +15,12 @@
     "migrate:embeddings": "tsx -r dotenv/config scripts/migrate-embeddings.ts",
     "import:narration": "tsx -r dotenv/config scripts/import-slide-narrations.ts",
     "import:markdown": "tsx -r dotenv/config scripts/import-markdown-knowledge.ts",
-    "setup:admin": "tsx -r dotenv/config scripts/setup-admin-knowledge.ts"
+    "setup:admin": "tsx -r dotenv/config scripts/setup-admin-knowledge.ts",
+    "vercel-build": "pnpm build"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
   },
   "keywords": [],
   "author": "",

@@ -2,7 +2,7 @@
 const nextConfig = {
   experimental: {
     serverActions: {
-      allowedOrigins: ['localhost:3000']
+      allowedOrigins: ['localhost:3000', 'vercel.app', '*.vercel.app']
     }
   },
   // WebSocket support for external integrations

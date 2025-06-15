@@ -494,6 +494,8 @@ Marpスライドのレンダリングと表示
 
 ### Vercelへのデプロイ
 
+#### 1. Vercel CLIを使用したデプロイ
+
 ```bash
 # Vercel CLIインストール
 pnpm install -g vercel
@@ -504,6 +506,17 @@ vercel
 # 本番デプロイ
 vercel --prod
 ```
+
+#### 2. GitHubからの自動デプロイ（推奨）
+
+1. GitHubリポジトリをpush
+2. [Vercel Dashboard](https://vercel.com/dashboard)でプロジェクトをインポート
+3. 環境変数を設定（下記参照）
+4. 自動デプロイが開始
+
+#### 3. 環境変数の設定
+
+Vercelダッシュボードまたは`.env.production.example`を参考に以下を設定：
 
 ### 環境変数設定（本番）
 
