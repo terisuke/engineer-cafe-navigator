@@ -1,12 +1,12 @@
 'use client';
 
-import { VRMUtils, VRMBlendShapeController } from '@/lib/vrm-utils';
-import { EmotionManager, EmotionData } from '@/lib/emotion-manager';
-import { LipSyncAnalyzer, LipSyncFrame } from '@/lib/lip-sync-analyzer';
-import { ExpressionController, ExpressionData } from '@/lib/expression-controller';
+import { EmotionData, EmotionManager } from '@/lib/emotion-manager';
+import { ExpressionController } from '@/lib/expression-controller';
+import { LipSyncAnalyzer } from '@/lib/lip-sync-analyzer';
+import { VRMBlendShapeController, VRMUtils } from '@/lib/vrm-utils';
 import { VRM, VRMLoaderPlugin } from '@pixiv/three-vrm';
-import { VRMAnimationLoaderPlugin, VRMAnimation, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
-import { Download, Maximize2, RotateCcw, Settings } from 'lucide-react';
+import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
+import { Maximize2, Settings } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -1127,22 +1127,6 @@ useEffect(() => {
             title="Settings"
           >
             <Settings className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={resetCharacter}
-            className="p-2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full shadow-md transition-colors"
-            title="Reset Pose"
-          >
-            <RotateCcw className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={takeScreenshot}
-            className="p-2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full shadow-md transition-colors"
-            title="Screenshot"
-          >
-            <Download className="w-5 h-5" />
           </button>
 
           <button

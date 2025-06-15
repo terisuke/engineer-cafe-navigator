@@ -1,6 +1,6 @@
 'use client';
 
-import { Maximize, MessageSquare, Presentation, Settings, Sparkles, UserPlus, Volume2, VolumeX } from 'lucide-react';
+import { Maximize, MessageSquare, Presentation, Settings, UserPlus, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import BackgroundSelector, { BackgroundOption } from './components/BackgroundSelector';
 import CharacterAvatar from './components/CharacterAvatar';
@@ -709,60 +709,12 @@ export default function Home() {
         </div>
       )}
       
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-sm">
-        <div 
-          className="container mx-auto px-4 py-3 flex items-center justify-between"
-          style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.8)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
-          }}
-        >
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <h1 className="text-lg font-bold text-gray-800">
-                Engineer Cafe Navigator
-              </h1>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              {/* Simplified Audio Controls - Volume only */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsMuted(!isMuted)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title={isMuted ? "音声をオンにする" : "音声をオフにする"}
-                >
-                  {isMuted ? (
-                    <VolumeX className="w-5 h-5 text-gray-600" />
-                  ) : (
-                    <Volume2 className="w-5 h-5 text-gray-600" />
-                  )}
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={volume}
-                  onChange={(e) => setVolume(Number(e.target.value))}
-                  className="w-16 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                  title="音量調整"
-                />
-              </div>
-            </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <div className="h-screen flex flex-col">
-        <div className="flex-1 pt-16">
-          <div className="h-full flex">
+        <div className="flex-1 pt-4">
+          <div className="h-full flex flex-col lg:flex-row">
             {/* Character Section */}
-            <div className={`${showSlideMode ? 'w-1/3' : 'w-full'} h-full transition-all duration-500 ease-in-out`}>
+            <div className={`${showSlideMode ? 'w-full lg:w-1/3 h-[45vh] lg:h-full' : 'w-full h-full'} transition-all duration-500 ease-in-out`}>
               <div className="h-full p-4">
                 {showSlideMode && (
                   <div className="flex items-center space-x-2 mb-4 px-4 py-3 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm">
@@ -818,10 +770,10 @@ export default function Home() {
                                   handleLanguageVoiceStart('ja');
                                   setIsVoiceActive(true);
                                 }}
-                                className="flex items-center justify-center gap-4 px-8 py-6 md:py-8 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[280px] md:min-w-[320px] touch-manipulation"
+                                className="flex items-center justify-center gap-0 md:gap-4 px-6 md:px-8 py-6 md:py-8 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[56px] md:min-w-[320px] touch-manipulation"
                               >
-                                <MessageSquare className="w-7 h-7 md:w-8 md:h-8" />
-                                <span className="text-lg md:text-xl font-semibold">日本語で話しかける</span>
+                                <MessageSquare className="w-6 h-6 md:w-8 md:h-8" />
+                                <span className="hidden md:inline text-lg md:text-xl font-semibold ml-2">日本語で話しかける</span>
                               </button>
                               <button
                                 onClick={() => {
@@ -875,20 +827,15 @@ export default function Home() {
                           </div>
                         ) : (
                           // Voice control interface
-                          <div className="flex flex-col items-center gap-4">
-                            <div className="bg-white/90 backdrop-blur-sm rounded-xl px-8 py-4 shadow-lg">
-                              <span className="text-base md:text-lg font-medium text-gray-700">
-                                {currentLanguage === 'ja' ? '会話中（日本語）' : 'Conversation (English)'}
-                              </span>
-                            </div>
-                            
+                          <div className="flex flex-col items-center gap-6">
                             {/* Mic button */}
                             <button
                               onMouseDown={startVoiceRecording}
                               onMouseUp={stopVoiceRecording}
                               onTouchStart={startVoiceRecording}
                               onTouchEnd={stopVoiceRecording}
-                              className={`w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center shadow-xl transition-all duration-200 ${
+                              onContextMenu={(e) => e.preventDefault()}
+                              className={`select-none w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center shadow-xl transition-all duration-200 ${
                                 isListening 
                                   ? 'bg-red-500 hover:bg-red-600 scale-110' 
                                   : 'bg-blue-500 hover:bg-blue-600 hover:scale-105'
@@ -908,16 +855,6 @@ export default function Home() {
                                 />
                               </svg>
                             </button>
-                            
-                            <div className="text-center">
-                              <p className="text-base md:text-lg text-gray-600">
-                                {isListening 
-                                  ? (currentLanguage === 'ja' ? '聞いています...' : 'Listening...') 
-                                  : (currentLanguage === 'ja' ? 'ボタンを押しながら話してください' : 'Hold to speak')
-                                }
-                              </p>
-                            </div>
-                            
                             {/* End conversation button */}
                             <button
                               onClick={() => {
@@ -931,7 +868,7 @@ export default function Home() {
                               }}
                               className="px-6 py-3 md:py-4 bg-gray-500 hover:bg-gray-600 text-white text-base md:text-lg rounded-xl transition-colors touch-manipulation"
                             >
-                              {currentLanguage === 'ja' ? '会話を終了' : 'End conversation'}
+                              {currentLanguage === 'ja' ? '会話を終了' : 'End'}
                             </button>
                           </div>
                         )}
@@ -953,6 +890,32 @@ export default function Home() {
                             onLightingChange={setLightingIntensity}
                           />
                         </div>
+                        {/* Audio Controls inside settings */}
+                        <div className="mt-4">
+                          <h3 className="text-sm font-semibold text-gray-700 mb-2">Audio</h3>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setIsMuted(!isMuted)}
+                              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                              title={isMuted ? '音声をオンにする' : '音声をオフにする'}
+                            >
+                              {isMuted ? (
+                                <VolumeX className="w-5 h-5 text-gray-600" />
+                              ) : (
+                                <Volume2 className="w-5 h-5 text-gray-600" />
+                              )}
+                            </button>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={volume}
+                              onChange={(e) => setVolume(Number(e.target.value))}
+                              className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                              title="音量調整"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -962,7 +925,7 @@ export default function Home() {
             
             {/* Slide Section - only show when in slide mode */}
             {showSlideMode && (
-              <div className="w-2/3 h-full transition-all duration-500 ease-in-out">
+              <div className="w-full lg:w-2/3 h-[55vh] lg:h-full transition-all duration-500 ease-in-out">
                 <div className="h-full p-4">
                   <div className="h-full bg-white/90 backdrop-blur-sm rounded-lg shadow-lg overflow-hidden">
                     <div className="flex items-center justify-between p-4 border-b bg-white/95">
