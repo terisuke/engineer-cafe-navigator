@@ -62,7 +62,7 @@ The application follows a multi-layered architecture:
    - Conversation sessions, history, and analytics
    - Knowledge base with vector embeddings (1536 dimensions, OpenAI)
    - Multi-language support (Japanese/English content)
-   - Agent memory for state persistence
+   - Intelligent agent memory with 3-minute TTL for conversational continuity
 
 ### Key API Endpoints
 
@@ -90,11 +90,78 @@ Required environment variables:
 The application uses Supabase with the following main tables:
 - `conversation_sessions`: Visitor sessions with language and mode
 - `conversation_history`: Chat messages with audio URLs
-- `knowledge_base`: RAG knowledge with vector embeddings
-- `agent_memory`: Key-value storage for agent state
+- `knowledge_base`: RAG knowledge with vector embeddings (1536 dimensions)
+- `agent_memory`: Key-value storage for agent state and short-term memory
 - `conversation_analytics`: Usage metrics and analytics
 
 All tables have Row Level Security (RLS) enabled with service role access.
+
+### Memory Architecture
+
+The application features a unified memory system that provides contextual conversation experiences through intelligent memory management:
+
+#### **SimplifiedMemorySystem** (`/src/lib/simplified-memory.ts`)
+A streamlined memory implementation that replaces the previous complex multi-layer architecture with a single, cohesive system.
+
+**Core Components:**
+- **Short-term Memory**: 3-minute conversation context using `agent_memory` table with TTL
+- **Knowledge Base Integration**: Seamless integration with existing RAG system (1536-dimension OpenAI embeddings)
+- **Agent Isolation**: Separate memory namespaces for RealtimeAgent and EnhancedQAAgent
+- **Automatic Cleanup**: TTL-based expiration handling via Supabase
+- **Multi-language Support**: Japanese/English context and knowledge retrieval
+
+**Memory Features:**
+- **Conversational Continuity**: Agents remember recent conversation context and can reference previous questions/answers
+- **Intelligent Context Building**: Combines short-term conversation history with relevant knowledge base information
+- **Emotion Tracking**: Stores and retrieves emotional context from conversations for personalized responses
+- **Memory-aware Question Handling**: Special processing for memory-related questions ("さっき何を聞いた？", "Do you remember...?")
+- **Performance Optimized**: Message indexing and hash-based cache keys for efficient retrieval
+
+**Agent Integration:**
+- **RealtimeAgent**: Uses SimplifiedMemorySystem for context-aware voice interactions with 3-minute conversation window
+- **EnhancedQAAgent**: Leverages memory for follow-up questions and maintains conversation continuity across Q&A sessions
+
+**Usage Example:**
+```typescript
+import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
+
+const memory = new SimplifiedMemorySystem('RealtimeAgent');
+
+// Store conversation with metadata
+await memory.addMessage('user', 'エンジニアカフェの営業時間は？', {
+  emotion: 'curious',
+  sessionId: 'session_123'
+});
+
+await memory.addMessage('assistant', 'エンジニアカフェの営業時間は9:00〜22:00です。', {
+  emotion: 'helpful',
+  sessionId: 'session_123'
+});
+
+// Get comprehensive context for follow-up questions
+const context = await memory.getContext('さっき僕が何を聞いたか覚えてる？', {
+  includeKnowledgeBase: true,
+  language: 'ja'
+});
+
+// context.contextString includes:
+// "最近の会話履歴（直近3分）:
+//  ユーザー: エンジニアカフェの営業時間は？
+//  アシスタント: エンジニアカフェの営業時間は9:00〜22:00です。 [helpful]"
+```
+
+**Memory Layers:**
+1. **Short-term (3 minutes)**: Recent conversation turns with emotion data and session metadata
+2. **Knowledge Base**: Engineer Cafe information via OpenAI embeddings for contextual responses
+3. **Session Continuity**: Maintains conversation flow across multiple interactions
+4. **Memory-aware Processing**: Intelligent handling of memory-related queries with conversation history reference
+
+**Memory-Related Question Processing:**
+The system automatically detects and handles memory-related questions using keyword analysis:
+- **Japanese**: さっき, 前に, 覚えて, 記憶, 質問, 聞いた, 話した, etc.
+- **English**: remember, recall, earlier, before, previous, asked, said, etc.
+
+When detected, the agent uses conversation history instead of knowledge base search to provide contextual responses about previous interactions.
 
 ### Development Workflow
 
@@ -132,9 +199,10 @@ The knowledge base contains 84+ entries organized by:
 - **Multi-language Support**: Japanese/English UI and content with automatic language detection
 - **Real-time Voice Interactions**: Speech-to-text with interruption handling
 - **3D Character Animations**: Synchronized with voice output and emotion detection with intelligent lip-sync caching
+- **Intelligent Memory System**: Contextual 3-minute conversation memory with automatic memory-related question detection and RAG integration
 - **Slide Presentations**: Marp-based slides with voice narration
 - **Admin Knowledge Management**: Structured metadata editing with dropdowns and templates
-- **Hybrid AI Architecture**: Gemini for responses, OpenAI for embeddings
+- **Hybrid AI Architecture**: Gemini for responses, OpenAI for embeddings (1536 dimensions)
 - **Cross-language RAG**: Questions in one language can retrieve answers from content in either language
 - **Voice Recognition**: Google Cloud STT with Service Account authentication
 - **WebSocket Support**: For external system integration
@@ -185,3 +253,30 @@ The application features an advanced lip-sync system for VRM character animation
 ```
 
 This system dramatically reduces lip-sync processing time for repeated slide presentations while maintaining high-quality mouth animations.
+
+### Conversation Memory System
+
+The application features an advanced conversation memory system that enables natural, contextual interactions:
+
+#### **Memory-Aware Conversations**
+- **Contextual Follow-ups**: Users can ask "さっき僕が何を聞いた？" (What did I ask earlier?) and receive accurate responses
+- **Question History**: Agents remember previous questions and can reference them in responses
+- **Conversation Continuity**: 3-minute conversation windows maintain context across multiple interactions
+- **Intelligent Routing**: Memory-related questions automatically use conversation history instead of knowledge base search
+
+#### **Natural Language Memory Queries**
+The system recognizes memory-related questions in both languages:
+- **Japanese**: "さっき", "前に", "覚えてる", "何を聞いた", "どんな質問"
+- **English**: "remember", "earlier", "before", "what did I ask", "previous question"
+
+#### **Technical Implementation**
+- **Agent Isolation**: Separate memory namespaces prevent cross-contamination between RealtimeAgent and EnhancedQAAgent
+- **TTL Management**: Automatic 3-minute expiration with Supabase-based cleanup
+- **Emotion Context**: Emotional state is preserved and referenced in memory retrieval
+- **Performance Optimization**: Hash-based message indexing for efficient memory access
+
+#### **User Experience Benefits**
+- **Natural Interactions**: Users can reference previous conversations naturally
+- **Reduced Repetition**: No need to repeat context in follow-up questions
+- **Personalized Responses**: Agents can acknowledge and build upon previous interactions
+- **Seamless Transitions**: Smooth conversation flow between different types of questions
