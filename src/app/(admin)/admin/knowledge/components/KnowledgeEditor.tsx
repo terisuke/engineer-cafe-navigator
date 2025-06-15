@@ -530,7 +530,7 @@ export function KnowledgeEditor({ entry, onSave, onCancel }: KnowledgeEditorProp
             <button
               type="button"
               onClick={() => {
-                const template = metadataTemplates.templates[formData.category] || metadataTemplates.templates.default;
+                const template = (formData.category && metadataTemplates.templates[formData.category]) || metadataTemplates.templates.default;
                 setFormData(prev => ({
                   ...prev,
                   metadata: { ...template }
