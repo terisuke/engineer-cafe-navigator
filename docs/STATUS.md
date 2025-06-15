@@ -31,7 +31,7 @@ Last Updated: 2025-06-01
 ### Technical Implementation
 - ✅ **Next.js 15.3.2** with App Router
 - ✅ **React 19.1.0** with TypeScript 5.8.3
-- ✅ **Mastra 0.10.1** for AI agent orchestration
+- ✅ **Mastra 0.10.5** for AI agent orchestration
 - ✅ **Google Gemini 2.5 Flash Preview** for AI responses
 - ✅ **Three.js 0.176.0** with @pixiv/three-vrm 3.4.0
 - ✅ **Tailwind CSS v3.4.17** (NOT v4)

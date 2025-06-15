@@ -6,7 +6,7 @@
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.3.2-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-blue)](https://www.typescriptlang.org/)
-[![Mastra](https://img.shields.io/badge/Mastra-0.10.1-green)](https://mastra.ai/)
+[![Mastra](https://img.shields.io/badge/Mastra-0.10.5-green)](https://mastra.ai/)
 [![React](https://img.shields.io/badge/React-19.1.0-61dafb)](https://reactjs.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-VRM-orange)](https://threejs.org/)
 
