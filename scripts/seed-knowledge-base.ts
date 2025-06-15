@@ -198,6 +198,32 @@ const sampleEntries: KnowledgeBaseEntry[] = [
     source: 'official',
     metadata: { title: 'Maker Space' }
   },
+
+  // Saino Cafe Location Information
+  {
+    content: 'sainoカフェは、エンジニアカフェと同じフロア（1階）の階段手前に位置しています。2階ではありません。コーヒー、軽食、デザートなどを提供しており、エンジニアカフェ利用者の休憩や軽食に便利です。',
+    category: '設備',
+    subcategory: 'sainoカフェ',
+    language: 'ja',
+    source: 'official',
+    metadata: { 
+      title: 'sainoカフェの場所',
+      importance: 'high',
+      tags: ['cafe', 'location', 'same-floor']
+    }
+  },
+  {
+    content: 'saino cafe is located on the same floor (1st floor) as Engineer Cafe, near the stairs area. It is NOT on the 2nd floor. The cafe offers coffee, light meals, and desserts, making it convenient for Engineer Cafe users to take breaks and grab refreshments.',
+    category: 'Facilities',
+    subcategory: 'saino cafe',
+    language: 'en',
+    source: 'official',
+    metadata: { 
+      title: 'saino cafe location',
+      importance: 'high',
+      tags: ['cafe', 'location', 'same-floor']
+    }
+  },
   {
     content: 'Tech book library with over 1000 latest technical books. From O\'Reilly classics to the latest publications. Free access for all members.',
     category: 'Facilities',

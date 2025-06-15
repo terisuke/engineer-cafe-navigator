@@ -29,6 +29,11 @@ export class EnhancedQAAgent extends Agent {
     this._tools.set(name, tool);
   }
 
+  // Method to set language for this agent
+  async setLanguage(language: SupportedLanguage) {
+    await this.supabaseMemory.set('language', language);
+  }
+
   async answerQuestion(question: string): Promise<string> {
     const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
     
