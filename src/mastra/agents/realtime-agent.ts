@@ -111,17 +111,26 @@ export class RealtimeAgent extends Agent {
       );
       
       // Store conversation turn with emotion (both long-term and short-term)
+      // Store conversation in memory systems
+      // TODO: Migration in progress - currently using both systems for compatibility
       await this.storeConversationTurn(text, cleanResponse, emotion);
       
-      // Store in short-term memory with 3-minute TTL
-      await this.simplifiedMemory.addMessage('user', text, {
-        emotion: emotion?.emotion,
-        confidence: emotion?.confidence,
-      });
-      await this.simplifiedMemory.addMessage('assistant', cleanResponse, {
-        emotion: emotion?.emotion,
-        confidence: emotion?.confidence,
-      });
+      // Primary memory storage using SimplifiedMemorySystem
+      try {
+        await this.simplifiedMemory.addMessage('user', text, {
+          emotion: emotion?.emotion,
+          confidence: emotion?.confidence,
+          sessionId: this.currentSessionId || undefined,
+        });
+        await this.simplifiedMemory.addMessage('assistant', cleanResponse, {
+          emotion: emotion?.emotion,
+          confidence: emotion?.confidence,
+          sessionId: this.currentSessionId || undefined,
+        });
+      } catch (error) {
+        console.error('[RealtimeAgent] Failed to store in SimplifiedMemorySystem:', error);
+        // Fallback to legacy system if SimplifiedMemorySystem fails
+      }
       
       // Generate TTS audio for the response
       startPerformance('Text-to-Speech');
@@ -278,18 +287,26 @@ export class RealtimeAgent extends Agent {
       this.supabaseMemory.set('currentEmotion', emotion).catch(console.error);
       this.supabaseMemory.set('emotionTags', parsedResponse.emotions).catch(console.error);
       
-      // Store conversation turn in history (async, non-blocking)
+      // Store conversation in memory systems (async, non-blocking)
+      // TODO: Migration in progress - currently using both systems for compatibility
       this.storeConversationTurn(transcript, cleanResponse, emotion).catch(console.error);
       
-      // Store in short-term memory with 3-minute TTL (async, non-blocking)
+      // Primary memory storage using SimplifiedMemorySystem
       this.simplifiedMemory.addMessage('user', transcript, {
         emotion: emotion?.emotion,
         confidence: emotion?.confidence,
-      }).catch(console.error);
+        sessionId: this.currentSessionId || undefined,
+      }).catch((error) => {
+        console.error('[RealtimeAgent] Failed to store user message in SimplifiedMemorySystem:', error);
+      });
+      
       this.simplifiedMemory.addMessage('assistant', cleanResponse, {
         emotion: emotion?.emotion,
         confidence: emotion?.confidence,
-      }).catch(console.error);
+        sessionId: this.currentSessionId || undefined,
+      }).catch((error) => {
+        console.error('[RealtimeAgent] Failed to store assistant message in SimplifiedMemorySystem:', error);
+      });
       
       // Convert CLEAN response to speech (without emotion tags and markdown)
       startPerformance('Text-to-Speech');
@@ -677,13 +694,10 @@ export class RealtimeAgent extends Agent {
   }> {
     const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
     const sessionSummary = await this.simplifiedMemory.getSessionSummary(language);
+    const stats = await this.simplifiedMemory.getMemoryStats();
     
     return {
-      activeTurns: 0, // TODO: implement with SimplifiedMemorySystem
-      oldestTurn: null,
-      newestTurn: null,
-      dominantEmotion: null,
-      timeSpan: 0,
+      ...stats,
       sessionSummary,
     };
   }
@@ -693,8 +707,21 @@ export class RealtimeAgent extends Agent {
   }
 
   async promoteToLongTermMemory(key: string, data: any, reason: string): Promise<void> {
-    // TODO: implement with SimplifiedMemorySystem if needed
-    console.log(`[RealtimeAgent] Promote to long-term memory: ${key} (${reason})`);
+    try {
+      const longTermData = {
+        data,
+        reason,
+        promotedAt: Date.now(),
+        originalSource: 'short_term_memory',
+      };
+
+      // Store in agent_memory without TTL for long-term persistence
+      await this.supabaseMemory.set(`long_term_${key}`, longTermData);
+      
+      console.log(`[RealtimeAgent] Promoted data to long-term memory: ${key} (${reason})`);
+    } catch (error) {
+      console.error(`[RealtimeAgent] Error promoting to long-term memory:`, error);
+    }
   }
 
   async cleanupShortTermMemory(): Promise<void> {

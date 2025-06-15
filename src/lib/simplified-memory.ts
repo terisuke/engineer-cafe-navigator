@@ -1,18 +1,27 @@
 import { RAGSearchTool, KnowledgeSearchResult } from "@/mastra/tools/rag-search";
 import { supabaseAdmin } from "./supabase";
+import { getMostFrequentEmotion } from "./emotion-utils";
 
 /**
  * Simplified memory system using existing Supabase infrastructure
  * Combines 3-minute short-term memory with Engineer Cafe knowledge base
  */
+export interface MemoryConfig {
+  ttlSeconds?: number;
+  maxEntries?: number;
+}
+
 export class SimplifiedMemorySystem {
   private ragTool: RAGSearchTool;
   private agentName: string;
-  private readonly TTL_SECONDS = 180; // 3 minutes
+  private readonly TTL_SECONDS: number;
+  private readonly MAX_ENTRIES: number;
 
-  constructor(agentName: string) {
+  constructor(agentName: string, config: MemoryConfig = {}) {
     this.agentName = agentName;
     this.ragTool = new RAGSearchTool();
+    this.TTL_SECONDS = config.ttlSeconds ?? 180; // 3 minutes default
+    this.MAX_ENTRIES = config.maxEntries ?? 100; // Increased from 30 to 100
   }
 
   /**
@@ -56,6 +65,7 @@ export class SimplifiedMemorySystem {
       console.log(`[SimplifiedMemory] Stored ${role} message with 3-minute TTL`);
     } catch (error) {
       console.error('[SimplifiedMemory] Error storing message:', error);
+      throw error; // Rethrow to allow caller to handle the error
     }
   }
 
@@ -189,6 +199,62 @@ export class SimplifiedMemorySystem {
   }
 
   /**
+   * Get memory statistics
+   */
+  async getMemoryStats(): Promise<{
+    activeTurns: number;
+    oldestTurn: number | null;
+    newestTurn: number | null;
+    dominantEmotion: string | null;
+    timeSpan: number; // in minutes
+  }> {
+    try {
+      const recentMessages = await this.getRecentMessages();
+      
+      if (recentMessages.length === 0) {
+        return {
+          activeTurns: 0,
+          oldestTurn: null,
+          newestTurn: null,
+          dominantEmotion: null,
+          timeSpan: 0,
+        };
+      }
+
+      const timestamps = recentMessages
+        .map(m => m.metadata?.timestamp)
+        .filter(Boolean) as number[];
+      
+      const oldestTurn = timestamps.length > 0 ? Math.min(...timestamps) : null;
+      const newestTurn = timestamps.length > 0 ? Math.max(...timestamps) : null;
+      const timeSpan = oldestTurn && newestTurn ? (newestTurn - oldestTurn) / (1000 * 60) : 0;
+
+      const emotions = recentMessages
+        .map(m => m.metadata?.emotion)
+        .filter(Boolean) as string[];
+      
+      const dominantEmotion = getMostFrequentEmotion(emotions);
+
+      return {
+        activeTurns: recentMessages.length,
+        oldestTurn,
+        newestTurn,
+        dominantEmotion,
+        timeSpan,
+      };
+    } catch (error) {
+      console.error('[SimplifiedMemory] Error getting memory stats:', error);
+      return {
+        activeTurns: 0,
+        oldestTurn: null,
+        newestTurn: null,
+        dominantEmotion: null,
+        timeSpan: 0,
+      };
+    }
+  }
+
+  /**
    * Get recent messages from agent_memory within 3-minute window
    */
   private async getRecentMessages(): Promise<Array<{ role: string; content: string; metadata?: any }>> {
@@ -238,7 +304,7 @@ export class SimplifiedMemorySystem {
       const currentIndex = data?.value?.timestamps || [];
       const updatedIndex = [...currentIndex, newTimestamp]
         .sort((a, b) => b - a) // Most recent first
-        .slice(0, 30); // Keep only latest 30
+        .slice(0, this.MAX_ENTRIES); // Keep only latest entries
 
       // Update index
       const expiresAt = new Date(Date.now() + this.TTL_SECONDS * 1000).toISOString();
@@ -303,29 +369,20 @@ export class SimplifiedMemorySystem {
       (language === 'en' ? 'No conversation context.' : '会話履歴がありません。');
   }
 
-  private getMostFrequentEmotion(emotions: string[]): string | null {
-    if (emotions.length === 0) return null;
-
-    const emotionCount: Record<string, number> = {};
-    for (const emotion of emotions) {
-      emotionCount[emotion] = (emotionCount[emotion] || 0) + 1;
-    }
-
-    let maxCount = 0;
-    let dominantEmotion: string | null = null;
-    
-    for (const [emotion, count] of Object.entries(emotionCount)) {
-      if (count > maxCount) {
-        maxCount = count;
-        dominantEmotion = emotion;
-      }
-    }
-
-    return dominantEmotion;
-  }
 }
 
-// Export singleton instances for different agents
-export const realtimeMemory = new SimplifiedMemorySystem('RealtimeAgent');
-export const qaMemory = new SimplifiedMemorySystem('QAAgent');
-export const welcomeMemory = new SimplifiedMemorySystem('WelcomeAgent');
+// Export singleton instances for different agents with configuration
+export const realtimeMemory = new SimplifiedMemorySystem('RealtimeAgent', {
+  ttlSeconds: 180, // 3 minutes
+  maxEntries: 100
+});
+
+export const qaMemory = new SimplifiedMemorySystem('QAAgent', {
+  ttlSeconds: 180, // 3 minutes  
+  maxEntries: 50 // QA sessions might need fewer entries
+});
+
+export const welcomeMemory = new SimplifiedMemorySystem('WelcomeAgent', {
+  ttlSeconds: 60, // 1 minute for welcome interactions
+  maxEntries: 20
+});

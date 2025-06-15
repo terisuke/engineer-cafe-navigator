@@ -21,6 +21,10 @@ export class EnhancedQAAgent extends Agent {
         Reference previous conversation when relevant to show memory of the interaction.`,
     });
     this.memory = config.memory || new Map();
+    // Set default language explicitly
+    if (!this.memory.has('language')) {
+      this.memory.set('language', 'ja');
+    }
     this.simplifiedMemory = new SimplifiedMemorySystem('EnhancedQAAgent');
   }
 
@@ -113,9 +117,14 @@ export class EnhancedQAAgent extends Agent {
       { role: 'user', content: prompt }
     ]);
     
-    // Store the Q&A interaction in memory
-    await this.simplifiedMemory.addMessage('user', question);
-    await this.simplifiedMemory.addMessage('assistant', response.text);
+    // Store the Q&A interaction in memory with error handling
+    try {
+      await this.simplifiedMemory.addMessage('user', question);
+      await this.simplifiedMemory.addMessage('assistant', response.text);
+    } catch (error) {
+      console.error('[EnhancedQAAgent] Failed to store conversation in memory:', error);
+      // Continue execution even if memory storage fails
+    }
     
     // Auto-enhance response with emotion tags
     return EmotionTagParser.enhanceAgentResponse(response.text, 'qa', language);
