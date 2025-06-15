@@ -19,6 +19,7 @@ import { PageTransitionTool } from './tools/page-transition';
 import { RAGSearchTool } from './tools/rag-search';
 import { ExternalDataFetcherTool } from './tools/external-data-fetcher';
 import { EngineerCafeWebSearchTool } from './tools/company-web-search';
+import { GeneralWebSearchTool } from './tools/general-web-search';
 import { CalendarServiceTool } from './tools/calendar-service';
 
 export class EngineerCafeNavigator {
@@ -82,6 +83,7 @@ export class EngineerCafeNavigator {
     const ragSearchTool = new RAGSearchTool();
     const externalDataFetcherTool = new ExternalDataFetcherTool(this.config.external);
     const engineerCafeWebSearchTool = new EngineerCafeWebSearchTool();
+    const generalWebSearchTool = new GeneralWebSearchTool();
     const calendarServiceTool = new CalendarServiceTool();
 
     this.tools.set('slideControl', slideControlTool);
@@ -94,6 +96,7 @@ export class EngineerCafeNavigator {
     this.tools.set('ragSearch', ragSearchTool);
     this.tools.set('externalDataFetcher', externalDataFetcherTool);
     this.tools.set('engineerCafeWebSearch', engineerCafeWebSearchTool);
+    this.tools.set('generalWebSearch', generalWebSearchTool);
     this.tools.set('calendarService', calendarServiceTool);
     this.tools.set('voiceService', this.voiceService);
 

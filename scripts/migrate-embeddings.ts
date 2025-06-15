@@ -13,7 +13,7 @@ import { supabaseAdmin } from '../src/lib/supabase';
 import { MIGRATION_CONFIG } from '../src/mastra/config/mastra-v2';
 
 // Load environment variables
-config({ path: path.join(__dirname, '../.env.local') });
+config();
 
 const colors = {
   reset: '\x1b[0m',

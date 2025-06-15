@@ -167,12 +167,16 @@ export class GoogleCloudVoiceSimple {
 
       const result = await response.json();
       
+      console.log('Speech-to-Text API response:', JSON.stringify(result, null, 2));
+      
       if (result.results && result.results.length > 0 && result.results[0].alternatives && result.results[0].alternatives.length > 0) {
         const transcript = result.results[0].alternatives[0].transcript;
         const confidence = result.results[0].alternatives[0].confidence || 0;
         
+        console.log(`Raw transcript from API: "${transcript}" (type: ${typeof transcript})`);
+        
         // Check if transcript is valid
-        if (!transcript || typeof transcript !== 'string') {
+        if (!transcript || typeof transcript !== 'string' || transcript.trim().length === 0) {
           console.log('Speech-to-Text: Empty or invalid transcript');
           return {
             success: false,
@@ -180,14 +184,16 @@ export class GoogleCloudVoiceSimple {
           };
         }
         
-        console.log(`Speech-to-Text successful: "${transcript}" (confidence: ${confidence})`);
+        const trimmedTranscript = transcript.trim();
+        console.log(`Speech-to-Text successful: "${trimmedTranscript}" (confidence: ${confidence})`);
         
         return {
           success: true,
-          transcript: transcript.trim(),
+          transcript: trimmedTranscript,
           confidence
         };
       } else {
+        console.log('No transcription results in API response:', result);
         return {
           success: false,
           error: 'No transcription results'

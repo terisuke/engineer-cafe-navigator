@@ -50,6 +50,7 @@ cp .env.example .env.local
 GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
 GOOGLE_CLOUD_PROJECT_ID=your-gcp-project
 GOOGLE_CLOUD_CREDENTIALS=./config/service-account-key.json
+OPENAI_API_KEY=your-openai-api-key  # RAG検索用埋め込みモデル
 NEXT_PUBLIC_SUPABASE_URL=https://project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key

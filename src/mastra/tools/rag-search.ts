@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 import { supabaseAdmin } from '../../lib/supabase';
 import { SupportedLanguage } from '../types/config';
@@ -19,8 +18,7 @@ export class RAGSearchTool {
   name = 'rag-search';
   description = 'Search the Engineer Cafe knowledge base using semantic similarity';
   
-  private genAI: GoogleGenerativeAI;
-  private embeddingModel: any;
+  private openaiApiKey: string;
   
   schema = z.object({
     query: z.string().describe('The search query to find relevant information'),
@@ -31,13 +29,12 @@ export class RAGSearchTool {
   });
 
   constructor() {
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      throw new Error('GOOGLE_GENERATIVE_AI_API_KEY is not set');
+      throw new Error('OPENAI_API_KEY is not set');
     }
     
-    this.genAI = new GoogleGenerativeAI(apiKey);
-    this.embeddingModel = this.genAI.getGenerativeModel({ model: 'text-embedding-004' });
+    this.openaiApiKey = apiKey;
   }
 
   async execute(params: z.infer<typeof this.schema>): Promise<{
@@ -103,19 +100,24 @@ export class RAGSearchTool {
 
   private async generateEmbedding(text: string): Promise<number[]> {
     try {
-      const result = await this.embeddingModel.embedContent(text);
-      const embedding = result.embedding.values;
-      
-      // Google text-embedding-004 returns 768 dimensions, but database expects 1536
-      // Pad with zeros to reach 1536 dimensions (same as knowledge-base-utils)
-      if (embedding.length === 768) {
-        // Duplicate the 768-dim vector to reach 1536 dims. This preserves relative
-        // information better than zero-padding and改善 similar-ity matching.
-        const paddedEmbedding = [...embedding, ...embedding];
-        return paddedEmbedding;
+      const response = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          input: text,
+          model: 'text-embedding-3-small', // 1536 dimensions
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
       }
-      
-      return embedding;
+
+      const data = await response.json();
+      return data.data[0].embedding;
     } catch (error) {
       console.error('Embedding generation error:', error);
       throw new Error('Failed to generate embedding for the query');
@@ -276,24 +278,111 @@ export class RAGSearchTool {
 
   // Helper method to search and format results for agent use
   async searchKnowledgeBase(query: string, language: SupportedLanguage = 'ja'): Promise<string> {
+    console.log('[RAGSearchTool] searchKnowledgeBase called with:', { query, language });
+    
     const result = await this.execute({
       query,
       language,
       limit: 5,
-      threshold: 0.3,  // 閾値を下げて、より多くの結果を取得
+      threshold: 0.3,  // Lower threshold for more results with OpenAI embeddings
+    });
+
+    console.log('[RAGSearchTool] Search result:', {
+      success: result.success,
+      resultCount: result.results.length,
+      message: result.message
     });
 
     if (!result.success || result.results.length === 0) {
+      console.log('[RAGSearchTool] No results found, returning empty string');
       return '';
     }
 
     // Format results as a context string
     const contextParts = result.results.map((item, index) => {
       const title = item.title || `Result ${index + 1}`;
+      console.log(`[RAGSearchTool] Result ${index + 1}:`, {
+        title,
+        similarity: item.similarity,
+        contentLength: item.content.length,
+        category: item.category
+      });
       return `[${title}]\n${item.content}`;
     });
 
-    return contextParts.join('\n\n');
+    const finalContext = contextParts.join('\n\n');
+    console.log('[RAGSearchTool] Returning context length:', finalContext.length);
+    return finalContext;
+  }
+
+  // Multi-language search: search both languages and combine results
+  async searchKnowledgeBaseMultiLang(query: string, primaryLanguage: SupportedLanguage = 'ja'): Promise<string> {
+    console.log('[RAGSearchTool] searchKnowledgeBaseMultiLang called with:', { query, primaryLanguage });
+    
+    // Search both languages in parallel
+    const [primaryResult, secondaryResult] = await Promise.all([
+      this.execute({
+        query,
+        language: primaryLanguage,
+        limit: 3,
+        threshold: 0.3,
+      }),
+      this.execute({
+        query,
+        language: primaryLanguage === 'ja' ? 'en' : 'ja',
+        limit: 2,
+        threshold: 0.3,
+      })
+    ]);
+
+    console.log('[RAGSearchTool] Multi-language search results:', {
+      primary: { success: primaryResult.success, count: primaryResult.results.length },
+      secondary: { success: secondaryResult.success, count: secondaryResult.results.length }
+    });
+
+    // Combine results, prioritizing primary language
+    const allResults = [
+      ...primaryResult.results,
+      ...secondaryResult.results
+    ];
+
+    if (allResults.length === 0) {
+      console.log('[RAGSearchTool] No results found in either language');
+      return '';
+    }
+
+    // Remove duplicates based on content similarity
+    const uniqueResults = this.removeDuplicateResults(allResults);
+
+    // Format results as a context string
+    const contextParts = uniqueResults.map((item, index) => {
+      const title = item.title || `Result ${index + 1}`;
+      console.log(`[RAGSearchTool] Multi-lang result ${index + 1}:`, {
+        title,
+        similarity: item.similarity,
+        language: item.language,
+        contentLength: item.content.length,
+        category: item.category
+      });
+      return `[${title}]\n${item.content}`;
+    });
+
+    const finalContext = contextParts.join('\n\n');
+    console.log('[RAGSearchTool] Multi-lang returning context length:', finalContext.length);
+    return finalContext;
+  }
+
+  private removeDuplicateResults(results: KnowledgeSearchResult[]): KnowledgeSearchResult[] {
+    const seen = new Set<string>();
+    return results.filter(result => {
+      // Use category + subcategory as duplicate key
+      const key = `${result.category}/${result.subcategory}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
   }
 }
 

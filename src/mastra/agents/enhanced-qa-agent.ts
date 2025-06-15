@@ -1,6 +1,7 @@
 import { Agent } from '@mastra/core/agent';
 import { EmotionTagParser } from '../../lib/emotion-tag-parser';
 import { ragSearchTool } from '../tools/rag-search';
+import { GeneralWebSearchTool } from '../tools/general-web-search';
 import { SupportedLanguage } from '../types/config';
 import { SupabaseMemoryAdapter } from '@/lib/supabase-memory';
 
@@ -43,16 +44,33 @@ export class EnhancedQAAgent extends Agent {
       console.log('[EnhancedQAAgent] Using Calendar context');
       context = await this.getCalendarContext(question);
     } else if (category === 'facility-info') {
-      console.log('[EnhancedQAAgent] Using Facility context');
-      context = await this.getFacilityContext(question);
-    } else {
-      // Default to RAG search
-      console.log('[EnhancedQAAgent] Using RAG search');
+      console.log('[EnhancedQAAgent] Using RAG search for facility info');
       context = await this.searchKnowledgeBase(question);
       
       // Check if the result is a clarification message (starts with [curious])
       if (context.startsWith('[curious]')) {
         return context;
+      }
+    } else {
+      // Check if query needs web search instead of RAG
+      if (GeneralWebSearchTool.shouldUseWebSearch(question, category)) {
+        console.log('[EnhancedQAAgent] Using web search for general query');
+        context = await this.performWebSearch(question);
+      } else {
+        // Default to RAG search
+        console.log('[EnhancedQAAgent] Using RAG search');
+        context = await this.searchKnowledgeBase(question);
+        
+        // Check if the result is a clarification message (starts with [curious])
+        if (context.startsWith('[curious]')) {
+          return context;
+        }
+        
+        // If RAG search returns irrelevant results, fallback to web search
+        if (await this.isIrrelevantResult(context, question)) {
+          console.log('[EnhancedQAAgent] RAG result irrelevant, falling back to web search');
+          context = await this.performWebSearch(question);
+        }
       }
     }
     
@@ -159,22 +177,42 @@ Official X/Twitter: https://x.com/EngineerCafeJP
   private async searchKnowledgeBase(query: string): Promise<string> {
     const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
     
+    console.log('[EnhancedQAAgent] Starting RAG search for query:', query);
+    
     // Normalize query for better matching
     const normalizedQuery = query.toLowerCase()
       .replace(/coffee say no/g, 'saino cafe')
       .replace(/才能/g, 'saino')
-      .replace(/say no/g, 'saino');
+      .replace(/say no/g, 'saino')
+      .replace(/才能カフェ/g, 'saino cafe')
+      .replace(/才能 カフェ/g, 'saino cafe')
+      .replace(/セイノ/g, 'saino')
+      .replace(/サイノ/g, 'saino');
+    
+    console.log('[EnhancedQAAgent] Normalized query:', normalizedQuery);
     
     const category = await this.categorizeQuestion(normalizedQuery);
+    console.log('[EnhancedQAAgent] Categorized as:', category);
     
     try {
       const ragTool = this._tools.get('ragSearch') || ragSearchTool;
+      console.log('[EnhancedQAAgent] Using RAG tool:', !!ragTool);
       
       if (category === 'cafe-clarification-needed') {
         const clarificationMessage = language === 'en'
           ? "[curious]Are you asking about Engineer Cafe (the coworking space) or Saino Cafe (the attached cafe & bar)?[/curious]"
           : "[curious]コワーキングスペースのエンジニアカフェのことですか、それとも併設のカフェ＆バーのsainoカフェのことですか？[/curious]";
         
+        console.log('[EnhancedQAAgent] Returning clarification message');
+        return clarificationMessage;
+      }
+      
+      if (category === 'meeting-room-clarification-needed') {
+        const clarificationMessage = language === 'en'
+          ? "[curious]Are you asking about the basement workspace (free, part of Engineer Cafe) or the 2F meeting rooms (paid, city-managed)?[/curious]"
+          : "[curious]地下の無料ワークスペース（エンジニアカフェの一部）のことですか、それとも2階の有料会議室（市の管理）のことですか？[/curious]";
+        
+        console.log('[EnhancedQAAgent] Returning meeting room clarification message');
         return clarificationMessage;
       }
       
@@ -186,9 +224,54 @@ Official X/Twitter: https://x.com/EngineerCafeJP
         console.log('[EnhancedQAAgent] Enhanced search query for Saino:', searchQuery);
       }
       
-      const context = await ragTool.searchKnowledgeBase(searchQuery, language);
+      // Also enhance if query contains saino-related terms but wasn't categorized as saino-cafe
+      if (normalizedQuery.includes('saino') || normalizedQuery.includes('カフェ&バー') || normalizedQuery.includes('併設')) {
+        if (category !== 'saino-cafe') {
+          searchQuery = `saino ${normalizedQuery} 併設 カフェ バー`.replace(/\s+/g, ' ').trim();
+          console.log('[EnhancedQAAgent] Enhanced search query for potential Saino query:', searchQuery);
+        }
+      }
+      
+      // Enhance basement/underground space queries
+      const basementKeywords = ['地下', 'basement', 'under space', 'underスペース', 'under スペース', 'b1'];
+      const hasBasementKeyword = basementKeywords.some(keyword => normalizedQuery.includes(keyword));
+      
+      // Specific basement space keywords
+      const specificBasementSpaces = {
+        'mtg': 'MTGスペース 会議室 ミーティング 予約 2時間',
+        'ミーティング': 'MTGスペース 会議室 ミーティング 予約 2時間',
+        '会議室': 'MTGスペース 会議室 ミーティング 予約 2時間',
+        '集中': '集中スペース ブース おしゃべり禁止 予約不要',
+        'focus': '集中スペース focus ブース おしゃべり禁止 予約不要',
+        'アンダー': 'アンダースペース フリーアドレス 拡張画面 防音室',
+        'under': 'アンダースペース under フリーアドレス 拡張画面 防音室',
+        'makers': 'Makersスペース 3Dプリンタ レーザーカッター 講習',
+        'メーカー': 'Makersスペース makers 3Dプリンタ レーザーカッター 講習',
+        '3d': 'Makersスペース 3Dプリンタ レーザーカッター 講習',
+        'レーザー': 'Makersスペース 3Dプリンタ レーザーカッター 講習'
+      };
+      
+      if (hasBasementKeyword) {
+        let spaceSpecificTerms = '';
+        for (const [keyword, terms] of Object.entries(specificBasementSpaces)) {
+          if (normalizedQuery.includes(keyword)) {
+            spaceSpecificTerms = terms;
+            break;
+          }
+        }
+        
+        searchQuery = `地下 basement ${spaceSpecificTerms} ${normalizedQuery}`.replace(/\s+/g, ' ').trim();
+        console.log('[EnhancedQAAgent] Enhanced search query for basement space:', searchQuery);
+      }
+      
+      console.log('[EnhancedQAAgent] Calling RAG search with query:', searchQuery);
+      
+      // Use multi-language search to get the best results regardless of language
+      const context = await ragTool.searchKnowledgeBaseMultiLang(searchQuery, language);
+      console.log('[EnhancedQAAgent] Multi-language RAG search result length:', context ? context.length : 0);
       
       if (!context) {
+        console.log('[EnhancedQAAgent] No context found, returning default');
         const defaultContext = {
           en: `I couldn't find specific information about that in my knowledge base. 
                 Engineer Cafe is open from 9:00 to 22:00 daily, a coworking space in Fukuoka designed for IT engineers.`,
@@ -198,9 +281,10 @@ Official X/Twitter: https://x.com/EngineerCafeJP
         return defaultContext[language];
       }
       
+      console.log('[EnhancedQAAgent] Returning RAG context:', context.substring(0, 100) + '...');
       return context;
     } catch (error) {
-      console.error('Knowledge base search error:', error);
+      console.error('[EnhancedQAAgent] Knowledge base search error:', error);
       const sampleContext = {
         en: `Engineer Cafe is open from 9:00 to 22:00 daily, a coworking space in Fukuoka designed for IT engineers. 
               Features include high-speed internet, private meeting rooms, coffee service, 
@@ -242,6 +326,27 @@ Official X/Twitter: https://x.com/EngineerCafeJP
       return 'facility-info';
     }
     
+    // Meeting room ambiguity check (before general facility-info)
+    const meetingRoomKeywords = ['会議室', 'meeting room', 'ミーティング', 'mtg'];
+    const hasMeetingRoom = meetingRoomKeywords.some(keyword => normalizedQuestion.includes(keyword));
+    const hasSpecificFloor = normalizedQuestion.includes('2階') || normalizedQuestion.includes('2f') || 
+                            normalizedQuestion.includes('地下') || normalizedQuestion.includes('basement') ||
+                            normalizedQuestion.includes('under');
+    
+    // Check for basement/underground space queries specifically
+    const basementKeywords = ['地下', 'basement', 'under space', 'underスペース', 'under スペース', 'b1'];
+    const hasBasementKeyword = basementKeywords.some(keyword => normalizedQuestion.includes(keyword));
+    
+    if (hasBasementKeyword) {
+      console.log('[EnhancedQAAgent] Detected basement space query');
+      return 'facility-info'; // Handle as facility info with basement context
+    }
+    
+    if (hasMeetingRoom && !hasSpecificFloor) {
+      console.log('[EnhancedQAAgent] Detected ambiguous meeting room query - needs clarification');
+      return 'meeting-room-clarification-needed';
+    }
+
     // Saino Cafe specific (併設カフェも含む)
     // More specific Saino Cafe detection to reduce false positives
     if ((normalizedQuestion.includes('サイノ') || normalizedQuestion.includes('saino')) ||
@@ -255,7 +360,15 @@ Official X/Twitter: https://x.com/EngineerCafeJP
     if (normalizedQuestion.includes('施設') || normalizedQuestion.includes('facility') ||
         normalizedQuestion.includes('福岡市') || normalizedQuestion.includes('fukuoka') ||
         normalizedQuestion.includes('公式') || normalizedQuestion.includes('official') ||
-        normalizedQuestion.includes('twitter') || normalizedQuestion.includes('x.com')) {
+        normalizedQuestion.includes('twitter') || normalizedQuestion.includes('x.com') ||
+        normalizedQuestion.includes('会議室') || normalizedQuestion.includes('meeting room') ||
+        normalizedQuestion.includes('受付') || normalizedQuestion.includes('reception') ||
+        normalizedQuestion.includes('フロア') || normalizedQuestion.includes('floor') ||
+        normalizedQuestion.includes('どこ') || normalizedQuestion.includes('where') ||
+        normalizedQuestion.includes('場所') || normalizedQuestion.includes('location') ||
+        normalizedQuestion.includes('階') || normalizedQuestion.includes('回') ||
+        normalizedQuestion.includes('部屋') || normalizedQuestion.includes('room')) {
+      console.log('[EnhancedQAAgent] Detected facility/location query');
       return 'facility-info';
     }
     
@@ -311,4 +424,88 @@ Official X/Twitter: https://x.com/EngineerCafeJP
     
     return message;
   }
+
+  private async isIrrelevantResult(context: string, question: string): Promise<boolean> {
+    // Skip relevance check for clarification messages
+    if (context.startsWith('[curious]')) {
+      return false;
+    }
+
+    // If context is too short or generic, consider it irrelevant
+    if (context.length < 50) {
+      console.log('[EnhancedQAAgent] Context too short, considering irrelevant');
+      return true;
+    }
+
+    try {
+      const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      
+      const relevancePrompt = language === 'en'
+        ? `Based ONLY on the following information, can you clearly answer this question: "${question}"?
+
+Information:
+${context}
+
+Answer with only "YES" or "NO". If the information is about Engineer Cafe facilities but the question is about sports, news, or unrelated topics, answer "NO".`
+        : `以下の情報のみを使用して、この質問「${question}」に明確に回答できますか？
+
+情報:
+${context}
+
+「はい」または「いいえ」でのみ答えてください。情報がエンジニアカフェの施設に関するものでも、質問がスポーツ、ニュース、または無関係な話題の場合は「いいえ」と答えてください。`;
+
+      const relevanceCheck = await this.generate([
+        { role: 'user', content: relevancePrompt }
+      ]);
+
+      const isRelevant = relevanceCheck.text.toLowerCase().includes('yes') || 
+                        relevanceCheck.text.toLowerCase().includes('はい');
+      
+      console.log('[EnhancedQAAgent] Relevance check result:', isRelevant ? 'RELEVANT' : 'IRRELEVANT');
+      return !isRelevant;
+      
+    } catch (error) {
+      console.error('[EnhancedQAAgent] Error in relevance check:', error);
+      // If relevance check fails, assume relevant to avoid unnecessary web search
+      return false;
+    }
+  }
+
+  private async performWebSearch(query: string): Promise<string> {
+    const webSearchTool = this._tools.get('generalWebSearch');
+    if (!webSearchTool) {
+      console.log('[EnhancedQAAgent] General web search tool not available');
+      return 'Web search service is not available.';
+    }
+
+    try {
+      const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      
+      console.log('[EnhancedQAAgent] Calling general web search with query:', query);
+      const result = await webSearchTool.execute({
+        query: query,
+        language: language,
+      });
+
+      if (result.success && result.text) {
+        // Format the response with sources if available
+        if (result.sources && result.sources.length > 0) {
+          return webSearchTool.formatSearchResultsWithSources(result.text, result.sources, language);
+        }
+        return result.text;
+      } else {
+        console.log('[EnhancedQAAgent] Web search failed:', result.error);
+        return language === 'ja' 
+          ? 'インターネット検索で情報を見つけることができませんでした。'
+          : 'Unable to find information through web search.';
+      }
+    } catch (error) {
+      console.error('[EnhancedQAAgent] Web search error:', error);
+      const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      return language === 'ja' 
+        ? 'インターネット検索でエラーが発生しました。'
+        : 'Error occurred during web search.';
+    }
+  }
+
 }

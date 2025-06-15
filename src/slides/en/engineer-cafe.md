@@ -30,11 +30,21 @@ class: lead
 ## Co-working Spaces
 ![bg contain right:40%](/assets/images/concentratespace.jpg)
 
-| Space       | Features                  |
-|-------------|---------------------------|
-| Main Hall   | Open, free when no events |
-| Under Space | Basement, relaxed         |
-| Focus Space | 6 silent cubicles         |
+| Space            | Features                  |
+|------------------|---------------------------|
+| Main Hall        | Open, free when no events |
+| 4 Basement Spaces| See next page for details |
+
+---
+
+## Basement Spaces Detail
+
+| Space         | Features                           |
+|---------------|-----------------------------------|
+| MTG Space     | 2+ people・Website booking・2h slots |
+| Focus Space   | 6 booths・No booking・Silent only    |
+| Under Space   | Free address・Extended screens・1 soundproof room |
+| Makers Space  | 3D printer・Laser cutter・Training required |
 
 **Note:** No talking / calls in the Focus Space
 
