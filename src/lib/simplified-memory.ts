@@ -289,36 +289,106 @@ export class SimplifiedMemorySystem {
   }
 
   /**
-   * Update message index for efficient retrieval
+   * Update message index for efficient retrieval using atomic operations
    */
   private async updateMessageIndex(newTimestamp: number): Promise<void> {
     try {
-      // Get current index
-      const { data } = await supabaseAdmin
-        .from('agent_memory')
-        .select('value')
-        .eq('agent_name', this.agentName)
-        .eq('key', 'message_index')
-        .single();
-
-      const currentIndex = data?.value?.timestamps || [];
-      const updatedIndex = [...currentIndex, newTimestamp]
-        .sort((a, b) => b - a) // Most recent first
-        .slice(0, this.MAX_ENTRIES); // Keep only latest entries
-
-      // Update index
       const expiresAt = new Date(Date.now() + this.TTL_SECONDS * 1000).toISOString();
       
-      await supabaseAdmin
-        .from('agent_memory')
-        .upsert({
-          agent_name: this.agentName,
-          key: 'message_index',
-          value: { timestamps: updatedIndex },
-          expires_at: expiresAt,
-        });
+      // Use a PostgreSQL function call for atomic array operations
+      const { error } = await supabaseAdmin.rpc('update_message_index_atomic', {
+        p_agent_name: this.agentName,
+        p_new_timestamp: newTimestamp,
+        p_max_entries: this.MAX_ENTRIES,
+        p_expires_at: expiresAt
+      });
+
+      if (error) {
+        // Fallback to optimistic concurrency control if RPC function doesn't exist
+        console.warn('[SimplifiedMemory] RPC function not available, using fallback approach');
+        await this.updateMessageIndexFallback(newTimestamp);
+      }
     } catch (error) {
       console.error('[SimplifiedMemory] Error updating message index:', error);
+      // Try fallback approach
+      try {
+        await this.updateMessageIndexFallback(newTimestamp);
+      } catch (fallbackError) {
+        console.error('[SimplifiedMemory] Fallback also failed:', fallbackError);
+      }
+    }
+  }
+
+  /**
+   * Fallback method using optimistic concurrency control
+   */
+  private async updateMessageIndexFallback(newTimestamp: number): Promise<void> {
+    const maxRetries = 3;
+    let retryCount = 0;
+
+    while (retryCount < maxRetries) {
+      try {
+        const expiresAt = new Date(Date.now() + this.TTL_SECONDS * 1000).toISOString();
+        
+        // Get current index with version info
+        const { data: currentData } = await supabaseAdmin
+          .from('agent_memory')
+          .select('value, created_at')
+          .eq('agent_name', this.agentName)
+          .eq('key', 'message_index')
+          .single();
+
+        const currentIndex = currentData?.value?.timestamps || [];
+        const currentVersion = currentData?.created_at;
+        
+        // Prepare updated index
+        const updatedIndex = [...currentIndex, newTimestamp]
+          .sort((a, b) => b - a) // Most recent first
+          .slice(0, this.MAX_ENTRIES); // Keep only latest entries
+
+        if (currentData) {
+          // Update existing record with version check
+          const { error } = await supabaseAdmin
+            .from('agent_memory')
+            .update({
+              value: { timestamps: updatedIndex },
+              expires_at: expiresAt,
+              updated_at: new Date().toISOString()
+            })
+            .eq('agent_name', this.agentName)
+            .eq('key', 'message_index')
+            .eq('created_at', currentVersion);
+
+          if (error) {
+            throw error;
+          }
+        } else {
+          // Insert new record
+          const { error } = await supabaseAdmin
+            .from('agent_memory')
+            .insert({
+              agent_name: this.agentName,
+              key: 'message_index',
+              value: { timestamps: updatedIndex },
+              expires_at: expiresAt,
+            });
+
+          if (error) {
+            throw error;
+          }
+        }
+
+        // Success - exit retry loop
+        return;
+      } catch (error) {
+        retryCount++;
+        if (retryCount >= maxRetries) {
+          throw error;
+        }
+        // Exponential backoff with jitter
+        const delay = Math.random() * (50 * Math.pow(2, retryCount));
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
   }
 

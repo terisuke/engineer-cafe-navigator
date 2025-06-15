@@ -8,35 +8,8 @@ jest.mock('path');
 // Import the module being tested
 const packageJsonUtils = require('../src/packageJson'); // Adjust path as needed
 
-// Test data fixtures
-const validPackageJson = {
-  name: 'test-package',
-  version: '1.0.0',
-  description: 'A test package for unit testing',
-  main: 'index.js',
-  scripts: {
-    test: 'jest',
-    start: 'node index.js',
-    build: 'npm run compile'
-  },
-  dependencies: {
-    lodash: '^4.17.21',
-    express: '^4.18.2'
-  },
-  devDependencies: {
-    jest: '^29.5.0',
-    typescript: '^5.0.0'
-  },
-  keywords: ['test', 'package', 'npm'],
-  author: 'Test Author',
-  license: 'MIT'
-};
-
-const invalidPackageJson = {
-  name: '',
-  version: 'invalid-version',
-  dependencies: 'not-an-object'
-};
+// Import test data fixtures
+const { validPackageJson, invalidPackageJson } = require('./fixtures/packageJson');
 
 describe('PackageJson Parser', () => {
   beforeEach(() => {
@@ -466,8 +439,3 @@ afterAll(() => {
   console.log('Completed PackageJson test suite');
 });
 
-// Export test utilities for potential use by other test files
-module.exports = {
-  validPackageJson,
-  invalidPackageJson
-};
