@@ -30,17 +30,17 @@ importers:
         specifier: ^3.1.3
         version: 3.1.3
       '@mastra/core':
-        specifier: ^0.10.1
-        version: 0.10.1(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41)
+        specifier: ^0.10.5
+        version: 0.10.5(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41)
       '@mastra/pg':
-        specifier: ^0.10.0
-        version: 0.10.0(@mastra/core@0.10.1(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41))(pg-query-stream@4.8.1(pg@8.14.1))
+        specifier: ^0.10.3
+        version: 0.10.3(@mastra/core@0.10.5(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41))(pg-query-stream@4.8.1(pg@8.14.1))
       '@mastra/rag':
-        specifier: ^0.10.1
-        version: 0.10.1(@mastra/core@0.10.1(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41))(ai@4.3.16(react@19.1.0)(zod@3.25.41))
+        specifier: ^0.10.3
+        version: 0.10.3(@mastra/core@0.10.5(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41))(ai@4.3.16(react@19.1.0)(zod@3.25.41))
       '@mastra/voice-google':
-        specifier: ^0.10.0
-        version: 0.10.0(@mastra/core@0.10.1(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41))
+        specifier: ^0.10.2
+        version: 0.10.2(@mastra/core@0.10.5(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41))
       '@pixiv/three-vrm':
         specifier: ^3.4.1
         version: 3.4.1(three@0.176.0)
@@ -818,27 +818,33 @@ packages:
     resolution: {integrity: sha512-ApI1SmNK7qy6x1D9h9HGBPJorPhclincNXf4VXrpCJ1+gNFzVf8Aga10Q1JJYFb/5N5FtFxTodMZwMqB31S+Ig==}
     engines: {node: '>=18'}
 
-  '@mastra/core@0.10.1':
-    resolution: {integrity: sha512-m+W5i1AKRmWi2E6AoW99OtTIstvSgCFCgc0jE4oN915sDBCwIJ0pzZK/7jVk3BVo1z9t8RbHrW3fpUyfA7OFJQ==}
+  '@mastra/core@0.10.5':
+    resolution: {integrity: sha512-Cm3ghshlrSS/zrPojz5aQziXxIEjXsXJbO+UI0WFe0hYEvyDa5Pue7wxxSkIehi55b19fwRHcfTOsv17/aotOA==}
     engines: {node: '>=20'}
     peerDependencies:
       zod: ^3.0.0
 
-  '@mastra/pg@0.10.0':
-    resolution: {integrity: sha512-zAl5wC3JEsVFvYejI3iVbb4Gerth3+yQJ8h9qKLEnRPjyYCtvM8O5WQMzAgDLWkSqfruQQBFU2nzG7FT9fzQhw==}
+  '@mastra/pg@0.10.3':
+    resolution: {integrity: sha512-iQNXO+/mSuGfh+VEfG1wVEakTIpCBUrpN3YoaDhU/6QFbmhOHLJJfnyCQ1e7NfdQUiQyMuDQtzDs20OcqS/JOw==}
     peerDependencies:
-      '@mastra/core': ^0.10.0
+      '@mastra/core': '>=0.10.4-0 <0.11.0'
 
-  '@mastra/rag@0.10.1':
-    resolution: {integrity: sha512-Bo1gSsTspg0IwoseKIk2kSPQcULHcyar22PbCUjhtA4I74y3Iw97N7q4SZSqgdIK8QHm/aHY7xMrMgKH76Zqcw==}
+  '@mastra/rag@0.10.3':
+    resolution: {integrity: sha512-4vOmsX+PAe8AS5O3gYjxpLBxbMWNQEG832LFSAH1WLefNp8PXCDJxP10K9KA/KNvRmYdvdkI8CaS3rL9qEJcfA==}
     peerDependencies:
-      '@mastra/core': ^0.10.0
+      '@mastra/core': ^0.10.0-alpha.0
       ai: ^4.0.0
 
-  '@mastra/voice-google@0.10.0':
-    resolution: {integrity: sha512-aAHE2NGBMYn/mZZ+j93gHJpmKJ9ZbfXDhKgSPTB1pYb92NMORtlIRtd4ebyrXaeh+64rGtm8ajfAv7woTIQXng==}
+  '@mastra/schema-compat@0.10.2':
+    resolution: {integrity: sha512-QCPnD0Jd7NJgfVdvNkLPJhqSjyNcA+eaa16N+3kwa+wTBMb6eziWZC1aQNQ6o4T1JVPoo5unVVtL1pqiIgV+tA==}
     peerDependencies:
-      '@mastra/core': ^0.10.0
+      ai: ^4.0.0
+      zod: ^3.0.0
+
+  '@mastra/voice-google@0.10.2':
+    resolution: {integrity: sha512-ZF5dcqlGfNpsTtJ8U2Z0AAf79xKFv/gxE1cOozD1TFeIC/ICmhD0PEVX4AstBi4JQjAIf0VfxR2sqywGiwuFew==}
+    peerDependencies:
+      '@mastra/core': ^0.10.0-alpha.0
 
   '@napi-rs/wasm-runtime@0.2.10':
     resolution: {integrity: sha512-bCsCyeZEwVErsGmyPNSzwfwFn4OdxBj0mmv6hOFucB/k81Ojdu68RbZdxYsRQUPc9l6SU5F/cG+bXgWs3oUgsQ==}
@@ -5210,6 +5216,9 @@ packages:
   zod@3.25.41:
     resolution: {integrity: sha512-8+sDJTGtCYIDBhdqDygp0ffj8kzziRKqAJPhpYObbElJ+3TRe/mnlnwH+/OMa3kKhueS4Drm5UMW00/u1p07zA==}
 
+  zod@3.25.64:
+    resolution: {integrity: sha512-hbP9FpSZf7pkS7hRVUrOjhwKJNyampPgtXKc3AN6DsWtoHsg2Sb4SQaS4Tcay380zSwd2VPo9G9180emBACp5g==}
+
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
@@ -6131,8 +6140,12 @@ snapshots:
       postcss: 8.5.4
       postcss-nesting: 13.0.1(postcss@8.5.4)
 
-  '@mastra/core@0.10.1(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41)':
+  '@mastra/core@0.10.5(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41)':
     dependencies:
+      '@ai-sdk/provider': 1.1.3
+      '@ai-sdk/provider-utils': 2.2.8(zod@3.25.41)
+      '@ai-sdk/ui-utils': 1.2.11(zod@3.25.41)
+      '@mastra/schema-compat': 0.10.2(ai@4.3.16(react@19.1.0)(zod@3.25.41))(zod@3.25.41)
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/auto-instrumentations-node': 0.59.0(@opentelemetry/api@1.9.0)(@opentelemetry/core@2.0.1(@opentelemetry/api@1.9.0))
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
@@ -6161,8 +6174,6 @@ snapshots:
       sift: 17.1.3
       xstate: 5.19.4
       zod: 3.25.41
-      zod-from-json-schema: 0.0.5
-      zod-to-json-schema: 3.24.5(zod@3.25.41)
     transitivePeerDependencies:
       - '@hono/arktype-validator'
       - '@hono/effect-validator'
@@ -6181,9 +6192,9 @@ snapshots:
       - valibot
       - zod-openapi
 
-  '@mastra/pg@0.10.0(@mastra/core@0.10.1(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41))(pg-query-stream@4.8.1(pg@8.14.1))':
+  '@mastra/pg@0.10.3(@mastra/core@0.10.5(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41))(pg-query-stream@4.8.1(pg@8.14.1))':
     dependencies:
-      '@mastra/core': 0.10.1(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41)
+      '@mastra/core': 0.10.5(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41)
       async-mutex: 0.5.0
       pg: 8.16.0
       pg-promise: 11.13.0(pg-query-stream@4.8.1(pg@8.14.1))
@@ -6192,23 +6203,31 @@ snapshots:
       - pg-native
       - pg-query-stream
 
-  '@mastra/rag@0.10.1(@mastra/core@0.10.1(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41))(ai@4.3.16(react@19.1.0)(zod@3.25.41))':
+  '@mastra/rag@0.10.3(@mastra/core@0.10.5(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41))(ai@4.3.16(react@19.1.0)(zod@3.25.41))':
     dependencies:
-      '@mastra/core': 0.10.1(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41)
+      '@mastra/core': 0.10.5(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41)
       '@paralleldrive/cuid2': 2.2.2
       ai: 4.3.16(react@19.1.0)(zod@3.25.41)
       big.js: 7.0.1
       js-tiktoken: 1.0.20
       node-html-better-parser: 1.4.11
       pathe: 2.0.3
-      zod: 3.25.41
+      zod: 3.25.64
 
-  '@mastra/voice-google@0.10.0(@mastra/core@0.10.1(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41))':
+  '@mastra/schema-compat@0.10.2(ai@4.3.16(react@19.1.0)(zod@3.25.41))(zod@3.25.41)':
+    dependencies:
+      ai: 4.3.16(react@19.1.0)(zod@3.25.41)
+      json-schema: 0.4.0
+      zod: 3.25.41
+      zod-from-json-schema: 0.0.5
+      zod-to-json-schema: 3.24.5(zod@3.25.41)
+
+  '@mastra/voice-google@0.10.2(@mastra/core@0.10.5(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41))':
     dependencies:
       '@google-cloud/speech': 6.7.1
       '@google-cloud/text-to-speech': 6.1.0
-      '@mastra/core': 0.10.1(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41)
-      zod: 3.25.41
+      '@mastra/core': 0.10.5(openapi-types@12.1.3)(react@19.1.0)(zod@3.25.41)
+      zod: 3.25.64
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -11835,5 +11854,7 @@ snapshots:
       zod: 3.25.41
 
   zod@3.25.41: {}
+
+  zod@3.25.64: {}
 
   zwitch@2.0.4: {}

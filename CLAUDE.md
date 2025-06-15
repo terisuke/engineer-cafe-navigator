@@ -34,12 +34,12 @@ pnpm migrate:embeddings     # Migrate existing knowledge to OpenAI embeddings
 ## High-Level Architecture
 
 ### Technology Stack
-- **Frontend**: Next.js 15 (App Router) + React 19 + TypeScript
-- **AI Framework**: Mastra 0.9.4 for agent orchestration
+- **Frontend**: Next.js 15.3.2 (App Router) + React 19.1.0 + TypeScript 5.8.3
+- **AI Framework**: Mastra 0.10.5 for agent orchestration
 - **AI Model**: Google Gemini 2.5 Flash Preview (for responses)
 - **Embeddings**: OpenAI text-embedding-3-small (1536 dimensions for vector search)
 - **Voice**: Google Cloud Speech-to-Text/Text-to-Speech
-- **3D Graphics**: Three.js with @pixiv/three-vrm
+- **3D Graphics**: Three.js 0.176.0 with @pixiv/three-vrm 3.4.1
 - **Database**: PostgreSQL with pgvector extension
 - **Backend Services**: Supabase
 
