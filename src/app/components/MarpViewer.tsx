@@ -609,6 +609,7 @@ export default function MarpViewer({
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       audio.volume = volume / 100;
+      audioStateManager.registerAudio(audio);
 
       return new Promise<void>((resolve) => {
         audio.onended = () => {
@@ -649,6 +650,7 @@ export default function MarpViewer({
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       audio.volume = volume / 100;
+      audioStateManager.registerAudio(audio);
 
       // Perform lip-sync analysis
       if (onVisemeControl) {

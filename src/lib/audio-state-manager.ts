@@ -7,6 +7,9 @@ export class AudioStateManager {
   }> = [];
   private currentAudio: HTMLAudioElement | null = null;
   private isProcessing: boolean = false;
+  private activeAudios: Set<HTMLAudioElement> = new Set();
+  private globalVolume: number = 0.8;
+  private globalMuted: boolean = false;
   
   incrementProcessingCount(): void {
     this.audioProcessingCount++;
@@ -69,11 +72,13 @@ export class AudioStateManager {
       
       const audio = new Audio(audioUrl);
       this.currentAudio = audio;
+      this.registerAudio(audio);
       
       // Add small preload delay to prevent audio truncation
       audio.preload = 'auto';
       
       audio.onended = () => {
+        this.activeAudios.delete(audio);
         resolve();
       };
       
@@ -114,6 +119,35 @@ export class AudioStateManager {
   private onAllAudioComplete(): void {
     console.log('[AudioStateManager] All audio processing complete');
     window.dispatchEvent(new CustomEvent('audioProcessingComplete'));
+  }
+  
+  // Register externally created audio instances
+  registerAudio(audio: HTMLAudioElement) {
+    this.activeAudios.add(audio);
+    audio.volume = this.globalMuted ? 0 : this.globalVolume;
+    audio.muted = this.globalMuted;
+    audio.onended = () => {
+      this.activeAudios.delete(audio);
+    };
+  }
+  
+  setVolume(vol: number) {
+    this.globalVolume = Math.max(0, Math.min(1, vol));
+    this.activeAudios.forEach(a => {
+      a.volume = this.globalMuted ? 0 : this.globalVolume;
+    });
+  }
+  
+  setMuted(muted: boolean) {
+    this.globalMuted = muted;
+    this.activeAudios.forEach(a => {
+      a.muted = muted;
+      if (muted) {
+        a.volume = 0;
+      } else {
+        a.volume = this.globalVolume;
+      }
+    });
   }
 }
 

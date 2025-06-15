@@ -1,7 +1,9 @@
 'use client';
 
+import { audioStateManager } from '@/lib/audio-state-manager';
+import { preprocessTTS } from '@/utils/tts-preprocess';
 import { Maximize, MessageSquare, Presentation, Settings, UserPlus, Volume2, VolumeX } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import BackgroundSelector, { BackgroundOption } from './components/BackgroundSelector';
 import CharacterAvatar from './components/CharacterAvatar';
 import EnvironmentSettings from './components/EnvironmentSettings';
@@ -68,6 +70,38 @@ export default function Home() {
     Array.from({ length: 5 }, () => Math.random() * 0.5 + 0.5),
     []
   );
+
+  const prevVolumeRef = useRef<number>(80);
+
+  // Sync audioStateManager when volume or mute changes
+  useEffect(() => {
+    audioStateManager.setVolume(volume / 100);
+  }, [volume]);
+
+  useEffect(() => {
+    audioStateManager.setMuted(isMuted);
+  }, [isMuted]);
+
+  const toggleMute = () => {
+    if (isMuted) {
+      setIsMuted(false);
+      setVolume(prevVolumeRef.current || 80);
+    } else {
+      prevVolumeRef.current = volume;
+      setIsMuted(true);
+      setVolume(0);
+    }
+  };
+
+  const handleVolumeChange = (val:number) => {
+    setVolume(val);
+    if (val === 0) {
+      setIsMuted(true);
+    } else {
+      setIsMuted(false);
+      prevVolumeRef.current = val;
+    }
+  };
 
   // Apply selected background to both character and main display
   const handleBackgroundChange = (newBackground: BackgroundOption) => {
@@ -143,7 +177,8 @@ export default function Home() {
         // Fallback to API if no cached audio
         console.log('[Main] No cached audio, using API');
         const { EmotionTagParser } = await import('@/lib/emotion-tag-parser');
-        const cleanText = EmotionTagParser.parseEmotionTags(cachedGreeting.text).cleanText;
+        let cleanText = EmotionTagParser.parseEmotionTags(cachedGreeting.text).cleanText;
+        cleanText = preprocessTTS(cleanText, language);
         
         const response = await fetch('/api/voice', {
           method: 'POST',
@@ -327,7 +362,7 @@ export default function Home() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 action: 'text_to_speech',
-                text: quickResponse.text,
+                text: preprocessTTS(quickResponse.text, currentLanguage),
                 language: currentLanguage,
                 emotion: emotionToUse,
                 intensity: emotionAnalysis.intensity
@@ -339,7 +374,7 @@ export default function Home() {
               // Cache the audio for future use
               await ResponseCache.cacheResponse({
                 id: `quick_${Date.now()}`,
-                text: quickResponse.text,
+                text: preprocessTTS(quickResponse.text, currentLanguage),
                 audioBase64: ttsResult.audioResponse,
                 emotion: emotionToUse,
                 language: currentLanguage,
@@ -355,7 +390,7 @@ export default function Home() {
           // Save conversation to memory
           ConversationMemory.saveConversation({
             userInput: speechResult.transcript,
-            aiResponse: quickResponse.text,
+            aiResponse: preprocessTTS(quickResponse.text, currentLanguage),
             emotion: emotionToUse,
             language: currentLanguage,
             responseTime: Date.now() - (speechResult.startTime || Date.now()),
@@ -423,7 +458,7 @@ export default function Home() {
           if (result.audioResponse && result.responseText) {
             await ResponseCache.cacheResponse({
               id: `ai_${Date.now()}`,
-              text: result.responseText,
+              text: preprocessTTS(result.responseText, currentLanguage),
               audioBase64: result.audioResponse,
               emotion: emotionToUse,
               language: currentLanguage,
@@ -435,7 +470,7 @@ export default function Home() {
           if (result.responseText && speechResult.transcript) {
             ConversationMemory.saveConversation({
               userInput: speechResult.transcript,
-              aiResponse: result.responseText,
+              aiResponse: preprocessTTS(result.responseText, currentLanguage),
               emotion: emotionToUse,
               language: currentLanguage,
               responseTime: Date.now() - (speechResult.startTime || Date.now()),
@@ -471,7 +506,7 @@ export default function Home() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               action: 'text_to_speech',
-              text: errorResponse.text,
+              text: preprocessTTS(errorResponse.text, currentLanguage),
               language: currentLanguage,
               emotion: errorResponse.emotion
             })
@@ -578,6 +613,7 @@ export default function Home() {
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       audio.volume = volume / 100;
+      audioStateManager.registerAudio(audio);
 
       // Perform lip-sync analysis
       if (setVisemeFunction) {
@@ -895,7 +931,7 @@ export default function Home() {
                           <h3 className="text-sm font-semibold text-gray-700 mb-2">Audio</h3>
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => setIsMuted(!isMuted)}
+                              onClick={toggleMute}
                               className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                               title={isMuted ? '音声をオンにする' : '音声をオフにする'}
                             >
@@ -910,7 +946,7 @@ export default function Home() {
                               min="0"
                               max="100"
                               value={volume}
-                              onChange={(e) => setVolume(Number(e.target.value))}
+                              onChange={(e) => handleVolumeChange(Number(e.target.value))}
                               className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                               title="音量調整"
                             />
