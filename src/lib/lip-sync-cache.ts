@@ -72,8 +72,8 @@ export class LipSyncCache {
       return hash;
     } catch (error) {
       console.warn('Failed to generate audio hash:', error);
-      // Fallback to timestamp-based hash
-      return `fallback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Fallback to size-based hash for consistency
+      return `fallback_size_${audioBlob.size.toString(16)}_type_${audioBlob.type.replace(/[^a-z0-9]/gi, '')}`;
     }
   }
 

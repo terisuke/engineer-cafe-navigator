@@ -324,27 +324,41 @@ export class RealtimeAgent extends Agent {
   async generateResponse(input: string): Promise<string> {
     let language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
     
-    console.log('[RealtimeAgent] generateResponse called with input:', input);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[RealtimeAgent] generateResponse called with input:', input);
+    }
     
     // Try RAG via existing QA-agent first
     try {
       const navigator = getEngineerCafeNavigator(this.config);
       const qaAgent = navigator.getAgent('qa') as EnhancedQAAgent | undefined;
-      console.log('[RealtimeAgent] QA agent available:', !!qaAgent);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[RealtimeAgent] QA agent available:', !!qaAgent);
+      }
       
       if (qaAgent && qaAgent.answerQuestion) {
-        console.log('[RealtimeAgent] Calling QA agent with input:', input);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[RealtimeAgent] Calling QA agent with input:', input);
+        }
         const qaAnswer: string = await qaAgent.answerQuestion(input);
-        console.log('[RealtimeAgent] QA agent response:', qaAnswer ? qaAnswer.substring(0, 200) + '...' : 'null/empty');
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[RealtimeAgent] QA agent response:', qaAnswer ? qaAnswer.substring(0, 200) + '...' : 'null/empty');
+        }
         
         if (qaAnswer && qaAnswer.trim()) {
-          console.log('[RealtimeAgent] Using QA agent response');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[RealtimeAgent] Using QA agent response');
+          }
           return qaAnswer;
         } else {
-          console.log('[RealtimeAgent] QA agent returned empty response, falling back to standard response');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[RealtimeAgent] QA agent returned empty response, falling back to standard response');
+          }
         }
       } else {
-        console.log('[RealtimeAgent] QA agent not available or missing answerQuestion method');
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[RealtimeAgent] QA agent not available or missing answerQuestion method');
+        }
       }
     } catch (err) {
       console.error('[RealtimeAgent] QA-agent RAG fallback failed:', err);

@@ -3,7 +3,7 @@
 import { useKeyboardControls } from '@/app/hooks/useKeyboardControls';
 import { audioStateManager } from '@/lib/audio-state-manager';
 import { ChevronLeft, ChevronRight, Keyboard, MessageCircle, Pause, Play, RotateCcw, Settings } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import SlideDebugPanel from './SlideDebugPanel';
 
 interface SlideData {
@@ -115,6 +115,8 @@ export default function MarpViewer({
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentRequestIdRef = useRef<string>('');
 
   // Analytics tracking
   const trackPresentationEvent = (event: string, data: any) => {
@@ -162,11 +164,12 @@ export default function MarpViewer({
 
   // Load slides and narration data when slideFile or language prop changes
   useEffect(() => {
-    // Only auto-load if autoPlay is enabled
-    if (autoPlay) {
-      loadSlideData(currentLanguage);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[MarpViewer] useEffect triggered - slideFile: ${slideFile}, currentLanguage: ${currentLanguage}`);
     }
-  }, [slideFile, currentLanguage, autoPlay]);
+    // Always load slide data when slideFile or language changes
+    loadSlideData(currentLanguage);
+  }, [slideFile, currentLanguage]); // Remove loadSlideData from dependencies to avoid circular reference
 
   // Track slide view duration
   useEffect(() => {
@@ -217,14 +220,28 @@ export default function MarpViewer({
   // Listen for auto-start presentation event from parent
   useEffect(() => {
     const handleAutoStartPresentation = (event: CustomEvent) => {
-      if (event.detail?.autoPlay && !isPlaying) {
+      if (event.detail?.autoPlay) {
         // Set character to neutral expression for slide presentation
         if (onExpressionControl) {
           onExpressionControl('neutral', 1.0);
         }
         
+        // Stop any currently playing presentation first
+        if (isPlaying) {
+          setIsPlaying(false);
+          setCurrentSlide(1);
+          setRenderedHtml('');
+        }
+        
         // Load slides with specified language
         const eventLanguage = event.detail?.language || 'ja';
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[MarpViewer] Auto-start presentation event received for language: ${eventLanguage}`);
+        }
+        
+        // Force update the current language state immediately
+        setCurrentLanguage(eventLanguage as 'ja' | 'en');
+        
         loadSlideData(eventLanguage).then(() => {
           setIsPlaying(true);
         });
@@ -291,8 +308,19 @@ export default function MarpViewer({
   }, [currentSlide, renderedHtml]);
 
 
-  const loadSlideData = async (requestedLang: string = 'ja') => {
+  const loadSlideData = useCallback(async (requestedLang: string = 'ja') => {
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    const currentRequestId = `${requestedLang}-${Date.now()}-${Math.random()}`;
+    currentRequestIdRef.current = currentRequestId;
+    
     try {
+      
       setIsLoading(true);
       setError(null);
       // Update language state
@@ -303,6 +331,33 @@ export default function MarpViewer({
 
       // Determine the slide file path based on language
       const languageSlideFile = requestedLang === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[MarpViewer] Loading slides for language: ${requestedLang} (Request ID: ${currentRequestId})`);
+        console.log(`[MarpViewer] Base slideFile: ${slideFile}`);
+        console.log(`[MarpViewer] Language-specific slideFile: ${languageSlideFile}`);
+      }
+
+      // Prepare request body
+      const requestBody = {
+        action: 'render_with_narration',
+        slideFile: languageSlideFile, // Use language-specific slide file
+        theme: 'engineer-cafe',
+        outputFormat: 'both',
+        language: requestedLang, // Add language parameter
+        requestId: currentRequestId, // Add request ID for tracking
+        options: {
+          // Ensure proper Marp rendering options
+          html: true,
+          markdown: {
+            breaks: true,
+          },
+        },
+      };
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[MarpViewer] Sending request body:`, requestBody);
+      }
 
       // Render slides with narration
       const response = await fetch('/api/marp', {
@@ -310,24 +365,23 @@ export default function MarpViewer({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          action: 'render_with_narration',
-          slideFile: languageSlideFile, // Use language-specific slide file
-          theme: 'engineer-cafe',
-          outputFormat: 'both',
-          language: requestedLang, // Add language parameter
-          options: {
-            // Ensure proper Marp rendering options
-            html: true,
-            markdown: {
-              breaks: true,
-            },
-          },
-        }),
+        body: JSON.stringify(requestBody),
+        signal: abortControllerRef.current.signal, // Add abort signal
       });
 
       const result = await response.json();
       
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[MarpViewer] Slide loading API response for ${requestedLang} (Request ID: ${currentRequestId}):`, result);
+      }
+
+      // Check if this is still the current request
+      if (currentRequestIdRef.current !== currentRequestId) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[MarpViewer] Ignoring outdated response for ${requestedLang} (Request ID: ${currentRequestId})`);
+        }
+        return;
+      }
 
       // Ignore response if a newer loadSlideData was triggered in the meantime
       if (result.success) {
@@ -433,12 +487,31 @@ export default function MarpViewer({
         setError(result.error || 'Failed to load slides');
       }
     } catch (error) {
+      // Don't show error if request was aborted
+      if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[MarpViewer] Request for ${requestedLang} was aborted`);
+        }
+        return;
+      }
+      
+      // Check if this is still the current request before showing error
+      if (currentRequestIdRef.current !== currentRequestId) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[MarpViewer] Ignoring error from outdated request for ${requestedLang}`);
+        }
+        return;
+      }
+      
       console.error('Error loading slides:', error);
       setError('Error loading slides');
     } finally {
-      setIsLoading(false);
+      // Only clear loading if this is still the current request
+      if (currentRequestIdRef.current === currentRequestId) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [slideFile]); // Include slideFile as dependency
 
 
   const narrateCurrentSlide = async () => {
@@ -466,6 +539,19 @@ export default function MarpViewer({
           language: currentLanguage, // Use current language state instead of prop
         }),
       });
+      
+      // Check if response is ok
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        console.error('Non-JSON response received:', textResponse);
+        throw new Error('Invalid response format - expected JSON');
+      }
       
       result = await response.json();
       
@@ -1009,7 +1095,24 @@ export default function MarpViewer({
         }),
       });
 
+      // Check if response is ok
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        console.error('Non-JSON response received:', textResponse);
+        throw new Error('Invalid response format - expected JSON');
+      }
+
       const result = await response.json();
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[MarpViewer] API response:`, result);
+      }
 
       if (result.success) {
         onQuestionAsked?.(questionText);

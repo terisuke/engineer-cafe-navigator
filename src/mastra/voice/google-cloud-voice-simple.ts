@@ -58,9 +58,9 @@ export class GoogleCloudVoiceSimple {
     };
     
     if (credentialsPath) {
-      // Check if it's a file path by checking if file exists
-      if (fs.existsSync(credentialsPath)) {
-        // It's a file path
+      // Server-side only: Check if it's a file path by checking if file exists
+      if (typeof window === 'undefined' && fs.existsSync(credentialsPath)) {
+        // It's a file path (server-side only)
         authOptions.keyFile = credentialsPath;
       } else {
         // Try to parse as JSON
@@ -68,13 +68,25 @@ export class GoogleCloudVoiceSimple {
           authOptions.credentials = JSON.parse(credentialsPath);
         } catch (error) {
           console.error('Failed to parse Google Cloud credentials from environment variable:', error);
-          // Fallback to default file path
-          authOptions.keyFile = 'config/service-account-key.json';
+          // Fallback to default file path (server-side only)
+          if (typeof window === 'undefined') {
+            const defaultKeyPath = 'config/service-account-key.json';
+            if (fs.existsSync(defaultKeyPath)) {
+              authOptions.keyFile = defaultKeyPath;
+            } else {
+              throw new Error(`Service account key file not found at ${defaultKeyPath}. Please provide valid credentials.`);
+            }
+          }
         }
       }
-    } else {
-      // No credentials provided, use default file path
-      authOptions.keyFile = 'config/service-account-key.json';
+    } else if (typeof window === 'undefined') {
+      // No credentials provided, use default file path (server-side only)
+      const defaultKeyPath = 'config/service-account-key.json';
+      if (fs.existsSync(defaultKeyPath)) {
+        authOptions.keyFile = defaultKeyPath;
+      } else {
+        throw new Error(`Service account key file not found at ${defaultKeyPath}. Please set GOOGLE_CLOUD_CREDENTIALS environment variable.`);
+      }
     }
     
     this.auth = new GoogleAuth(authOptions);

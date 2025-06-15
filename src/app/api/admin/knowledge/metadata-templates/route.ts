@@ -69,6 +69,7 @@ function buildMetadataTemplates() {
     title: '',
     importance: 'critical',
     slideNumber: 1,
+    last_updated: now,
   },
   'engineer-cafe': {
     title: '',

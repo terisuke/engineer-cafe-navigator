@@ -8,7 +8,7 @@ export async function GET() {
       .from('knowledge_base')
       .select('category')
       .not('category', 'is', null)
-      .order('category');
+      .order('category', { ascending: true });
 
     if (catError) throw catError;
 
@@ -17,7 +17,8 @@ export async function GET() {
       .from('knowledge_base')
       .select('category, subcategory')
       .not('subcategory', 'is', null)
-      .order('category, subcategory');
+      .order('category', { ascending: true })
+      .order('subcategory', { ascending: true });
 
     if (subError) throw subError;
 
@@ -26,7 +27,7 @@ export async function GET() {
       .from('knowledge_base')
       .select('source')
       .not('source', 'is', null)
-      .order('source');
+      .order('source', { ascending: true });
 
     if (srcError) throw srcError;
 

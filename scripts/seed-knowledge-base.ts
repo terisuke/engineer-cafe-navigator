@@ -62,7 +62,11 @@ const sampleEntries: KnowledgeBaseEntry[] = [
     subcategory: '地下Makersスペース',
     language: 'ja',
     source: 'official',
-    metadata: { title: '地下Makersスペース' }
+    metadata: { 
+      title: '地下Makersスペース',
+      duplicateOf: 'メイカースペース',
+      note: 'Specific basement location reference for Makers Space'
+    }
   },
   {
     content: 'エンジニアカフェでは毎週技術勉強会やハンズオンセミナーを開催。AI、Web開発、モバイル開発、インフラなど幅広いテーマを扱っています。会員は無料で参加可能。',
