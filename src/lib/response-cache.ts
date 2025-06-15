@@ -18,8 +18,9 @@ export interface EmotionalVariation {
 
 export class ResponseCache {
   private static readonly CACHE_PREFIX = 'engineer_cafe_response_';
-  private static readonly MAX_CACHE_SIZE = 100;
-  private static readonly CACHE_EXPIRY_DAYS = 7;
+  private static readonly MAX_CACHE_SIZE = 50; // Reduced from 100
+  private static readonly CACHE_EXPIRY_DAYS = 3; // Reduced from 7
+  private static readonly MAX_TEXT_LENGTH = 200; // Limit text length for caching
 
   // 定型文のテンプレート（感情バリエーション付き）
   private static readonly PREDEFINED_RESPONSES: Record<string, {
@@ -100,37 +101,92 @@ export class ResponseCache {
 
   static getCacheKey(text: string, language: 'ja' | 'en'): string {
     const normalizedText = text.toLowerCase().trim();
-    // Use encodeURIComponent for Unicode support instead of btoa
-    const encoded = encodeURIComponent(normalizedText).replace(/[.!'()*]/g, (c) => {
-      return '%' + c.charCodeAt(0).toString(16);
-    });
-    return `${this.CACHE_PREFIX}${language}_${encoded}`;
+    
+    // Don't cache very long texts to prevent storage overflow
+    if (normalizedText.length > this.MAX_TEXT_LENGTH) {
+      return '';
+    }
+    
+    // Create a hash-based cache key instead of encoding the full text
+    const hash = this.hashString(normalizedText);
+    return `${this.CACHE_PREFIX}${language}_${hash}`;
+  }
+
+  private static hashString(str: string): string {
+    let hash = 0;
+    if (str.length === 0) return hash.toString();
+    
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    return Math.abs(hash).toString(36); // Base36 for shorter strings
   }
 
   static async cacheResponse(response: Omit<CachedResponse, 'timestamp' | 'useCount'>): Promise<void> {
     try {
       const cacheKey = this.getCacheKey(response.text, response.language);
+      
+      // Skip caching if text is too long or cache key is empty
+      if (!cacheKey || response.text.length > this.MAX_TEXT_LENGTH) {
+        console.log('[ResponseCache] Skipping cache - text too long or invalid key');
+        return;
+      }
+
+      // Check storage space before caching
+      if (!this.hasStorageSpace()) {
+        console.log('[ResponseCache] Storage space low, cleaning up...');
+        this.aggressiveCleanup();
+        
+        // Check again after cleanup
+        if (!this.hasStorageSpace()) {
+          console.warn('[ResponseCache] Storage still full after cleanup, skipping cache');
+          return;
+        }
+      }
+
       const cachedResponse: CachedResponse = {
         ...response,
         timestamp: Date.now(),
         useCount: 0
       };
 
-      localStorage.setItem(cacheKey, JSON.stringify(cachedResponse));
+      // Store original text for hash collision detection
+      const responseWithOriginal = {
+        ...cachedResponse,
+        originalText: response.text
+      };
+
+      localStorage.setItem(cacheKey, JSON.stringify(responseWithOriginal));
       this.cleanupOldCache();
     } catch (error) {
-      console.error('Failed to cache response:', error);
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        console.warn('[ResponseCache] Storage quota exceeded, clearing cache...');
+        this.clearAllCache();
+      } else {
+        console.error('Failed to cache response:', error);
+      }
     }
   }
 
   static getCachedResponse(text: string, language: 'ja' | 'en'): CachedResponse | null {
     try {
       const cacheKey = this.getCacheKey(text, language);
-      const cached = localStorage.getItem(cacheKey);
+      if (!cacheKey) return null;
       
+      const cached = localStorage.getItem(cacheKey);
       if (!cached) return null;
 
-      const response: CachedResponse = JSON.parse(cached);
+      const response: any = JSON.parse(cached);
+      
+      // Verify hash collision by checking original text if available
+      if (response.originalText && response.originalText !== text) {
+        console.log('[ResponseCache] Hash collision detected, removing invalid cache entry');
+        localStorage.removeItem(cacheKey);
+        return null;
+      }
       
       // Check if cache is expired
       const daysSinceCache = (Date.now() - response.timestamp) / (1000 * 60 * 60 * 24);
@@ -139,11 +195,18 @@ export class ResponseCache {
         return null;
       }
 
-      // Increment use count
-      response.useCount++;
-      localStorage.setItem(cacheKey, JSON.stringify(response));
+      // Increment use count and update cache
+      response.useCount = (response.useCount || 0) + 1;
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(response));
+      } catch (error) {
+        // If we can't update the cache, still return the response
+        console.warn('[ResponseCache] Could not update use count:', error);
+      }
 
-      return response;
+      // Return response without the originalText field
+      const { originalText, ...cleanResponse } = response;
+      return cleanResponse as CachedResponse;
     } catch (error) {
       console.error('Failed to get cached response:', error);
       return null;
@@ -242,6 +305,64 @@ export class ResponseCache {
     return null;
   }
 
+  static hasStorageSpace(): boolean {
+    try {
+      // Try to estimate available space by attempting a small write
+      const testKey = 'storage_test_key';
+      const testValue = 'test';
+      localStorage.setItem(testKey, testValue);
+      localStorage.removeItem(testKey);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  static aggressiveCleanup(): void {
+    try {
+      const keys = Object.keys(localStorage).filter(key => key.startsWith(this.CACHE_PREFIX));
+      
+      if (keys.length === 0) return;
+
+      // Get all cache items with metadata
+      const cacheItems = keys.map(key => {
+        try {
+          const item = JSON.parse(localStorage.getItem(key) || '');
+          return { 
+            key, 
+            timestamp: item.timestamp || 0,
+            useCount: item.useCount || 0,
+            size: (localStorage.getItem(key) || '').length
+          };
+        } catch {
+          return { key, timestamp: 0, useCount: 0, size: 0 };
+        }
+      });
+
+      // Sort by priority: least used first, then oldest first
+      cacheItems.sort((a, b) => {
+        if (a.useCount !== b.useCount) {
+          return a.useCount - b.useCount; // Less used first
+        }
+        return a.timestamp - b.timestamp; // Older first
+      });
+
+      // Remove half of the cache items
+      const itemsToRemove = cacheItems.slice(0, Math.ceil(cacheItems.length / 2));
+      itemsToRemove.forEach(item => {
+        try {
+          localStorage.removeItem(item.key);
+        } catch (error) {
+          console.warn(`Failed to remove cache item ${item.key}:`, error);
+        }
+      });
+
+      console.log(`[ResponseCache] Aggressive cleanup completed: removed ${itemsToRemove.length} items`);
+    } catch (error) {
+      console.error('Failed to perform aggressive cleanup:', error);
+    }
+  }
+
   static cleanupOldCache(): void {
     try {
       const keys = Object.keys(localStorage).filter(key => key.startsWith(this.CACHE_PREFIX));
@@ -251,13 +372,19 @@ export class ResponseCache {
         const cacheItems = keys.map(key => {
           try {
             const item = JSON.parse(localStorage.getItem(key) || '');
-            return { key, timestamp: item.timestamp || 0 };
+            return { key, timestamp: item.timestamp || 0, useCount: item.useCount || 0 };
           } catch {
-            return { key, timestamp: 0 };
+            return { key, timestamp: 0, useCount: 0 };
           }
-        }).sort((a, b) => a.timestamp - b.timestamp);
+        }).sort((a, b) => {
+          // Prioritize keeping frequently used items
+          if (a.useCount !== b.useCount) {
+            return a.useCount - b.useCount; // Remove least used first
+          }
+          return a.timestamp - b.timestamp; // Then oldest first
+        });
 
-        // Remove oldest items
+        // Remove excess items
         const itemsToRemove = cacheItems.slice(0, keys.length - this.MAX_CACHE_SIZE);
         itemsToRemove.forEach(item => localStorage.removeItem(item.key));
       }

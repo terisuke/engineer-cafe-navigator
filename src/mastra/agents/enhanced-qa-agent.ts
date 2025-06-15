@@ -3,11 +3,11 @@ import { EmotionTagParser } from '../../lib/emotion-tag-parser';
 import { ragSearchTool } from '../tools/rag-search';
 import { GeneralWebSearchTool } from '../tools/general-web-search';
 import { SupportedLanguage } from '../types/config';
-import { SupabaseMemoryAdapter } from '@/lib/supabase-memory';
+import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
 
 export class EnhancedQAAgent extends Agent {
   private memory: any;
-  private supabaseMemory: SupabaseMemoryAdapter;
+  private simplifiedMemory: SimplifiedMemorySystem;
   private _tools: Map<string, any> = new Map();
 
   constructor(config: any) {
@@ -15,13 +15,17 @@ export class EnhancedQAAgent extends Agent {
       name: 'EnhancedQAAgent',
       model: config.llm.model,
       instructions: `You are a knowledgeable Q&A agent for Engineer Cafe in Fukuoka. 
+        Use the provided conversation history and knowledge base to give contextual responses.
         Answer questions concisely and directly. Keep responses brief - typically 1-2 sentences.
         Only provide the specific information requested. Avoid unnecessary details.
-        Use the RAG tools to search for accurate information.
-        You can also search for company-related information and calendar events when relevant.`,
+        Reference previous conversation when relevant to show memory of the interaction.`,
     });
     this.memory = config.memory || new Map();
-    this.supabaseMemory = new SupabaseMemoryAdapter('realtime');
+    // Set default language explicitly
+    if (!this.memory.has('language')) {
+      this.memory.set('language', 'ja');
+    }
+    this.simplifiedMemory = new SimplifiedMemorySystem('EnhancedQAAgent');
   }
 
   // Method to add tools to this agent
@@ -31,16 +35,25 @@ export class EnhancedQAAgent extends Agent {
 
   // Method to set language for this agent
   async setLanguage(language: SupportedLanguage) {
-    await this.supabaseMemory.set('language', language);
+    // Store language preference in memory for this agent
+    this.memory.set('language', language);
   }
 
   async answerQuestion(question: string): Promise<string> {
-    const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+    // Get conversation context first
+    const memoryContext = await this.simplifiedMemory.getContext(question, {
+      includeKnowledgeBase: false, // We'll handle knowledge search separately
+      language: 'ja' // We'll detect language from memory or default to 'ja'
+    });
+    
+    // Extract language from memory or default to 'ja'
+    const language: SupportedLanguage = this.memory.get('language') || 'ja';
     
     // Check if the question is about calendar/events or facility information
     const category = await this.categorizeQuestion(question);
     console.log('[EnhancedQAAgent] Question:', question);
     console.log('[EnhancedQAAgent] Detected category:', category);
+    console.log('[EnhancedQAAgent] Memory context available:', memoryContext.recentMessages.length > 0);
     
     let context = '';
     
@@ -57,8 +70,14 @@ export class EnhancedQAAgent extends Agent {
         return context;
       }
     } else {
-      // Check if query needs web search instead of RAG
-      if (GeneralWebSearchTool.shouldUseWebSearch(question, category)) {
+      // Check if this is a memory/conversation-related question
+      if (this.isMemoryRelatedQuestion(question)) {
+        console.log('[EnhancedQAAgent] Memory-related question detected');
+        // For memory questions, the context comes from conversation history
+        context = memoryContext.recentMessages.length > 0 
+          ? 'Recent conversation history is available' 
+          : 'No recent conversation history available';
+      } else if (GeneralWebSearchTool.shouldUseWebSearch(question, category)) {
         console.log('[EnhancedQAAgent] Using web search for general query');
         context = await this.performWebSearch(question);
       } else {
@@ -79,13 +98,33 @@ export class EnhancedQAAgent extends Agent {
       }
     }
     
-    const prompt = language === 'en'
-      ? `Answer ONLY the specific question asked: ${question}\nContext: ${context}\nProvide ONLY the requested information. Do not add extra details or explanations. Keep it to 1-2 sentences maximum.`
-      : `聞かれたことだけに答えてください: ${question}\n参考情報: ${context}\n聞かれた情報のみを答え、余計な説明は不要です。最大1-2文で答えてください。`;
+    // Build prompt with memory context
+    const conversationContext = memoryContext.contextString || '';
+    const fullContext = conversationContext ? `${conversationContext}\n\n参考情報: ${context}` : context;
+    
+    // Special handling for memory-related questions
+    const isMemoryQuestion = this.isMemoryRelatedQuestion(question);
+    
+    const prompt = isMemoryQuestion
+      ? (language === 'en'
+          ? `The user is asking about previous conversation. Use the conversation history to answer: ${question}\nConversation History: ${conversationContext}\nIf there is recent conversation history, reference what was discussed. If not, explain that you don't have previous conversation context.`
+          : `ユーザーは過去の会話について質問しています。会話履歴を使って答えてください: ${question}\n会話履歴: ${conversationContext}\n最近の会話履歴がある場合は、何について話したかを参照してください。ない場合は、過去の会話の文脈がないことを説明してください。`)
+      : (language === 'en'
+          ? `Answer the question using the conversation history and knowledge provided. Reference previous conversation when relevant: ${question}\nContext: ${fullContext}\nProvide ONLY the requested information. Keep it to 1-2 sentences maximum.`
+          : `会話履歴と提供された知識を使って質問に答えてください。関連する場合は以前の会話を参照してください: ${question}\n文脈: ${fullContext}\n聞かれた情報のみを答え、余計な説明は不要です。最大1-2文で答えてください。`);
     
     const response = await this.generate([
       { role: 'user', content: prompt }
     ]);
+    
+    // Store the Q&A interaction in memory with error handling
+    try {
+      await this.simplifiedMemory.addMessage('user', question);
+      await this.simplifiedMemory.addMessage('assistant', response.text);
+    } catch (error) {
+      console.error('[EnhancedQAAgent] Failed to store conversation in memory:', error);
+      // Continue execution even if memory storage fails
+    }
     
     // Auto-enhance response with emotion tags
     return EmotionTagParser.enhanceAgentResponse(response.text, 'qa', language);
@@ -125,7 +164,7 @@ export class EnhancedQAAgent extends Agent {
     }
 
     try {
-      const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      const language: SupportedLanguage = this.memory.get('language') || 'ja';
       
       // Get facility context from memory or knowledge base if available
       const facilityContext = await this.getFacilityKnowledgeBase();
@@ -154,7 +193,7 @@ export class EnhancedQAAgent extends Agent {
   private async getFacilityKnowledgeBase(): Promise<string> {
     // This method can be extended to fetch facility information from the knowledge base
     // For now, return basic facility information
-    const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+    const language: SupportedLanguage = this.memory.get('language') || 'ja';
     
     if (language === 'ja') {
       return `
@@ -180,7 +219,7 @@ Official X/Twitter: https://x.com/EngineerCafeJP
   }
 
   private async searchKnowledgeBase(query: string): Promise<string> {
-    const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+    const language: SupportedLanguage = this.memory.get('language') || 'ja';
     
     console.log('[EnhancedQAAgent] Starting RAG search for query:', query);
     
@@ -425,7 +464,7 @@ Official X/Twitter: https://x.com/EngineerCafeJP
   }
 
   async provideFallbackResponse(): Promise<string> {
-    const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+    const language: SupportedLanguage = this.memory.get('language') || 'ja';
     
     const fallback = language === 'en'
       ? "[sad]I don't have specific information about that. Would you like me to connect you with our staff for detailed assistance?[/sad]"
@@ -435,7 +474,7 @@ Official X/Twitter: https://x.com/EngineerCafeJP
   }
 
   async escalateToStaff(_question: string): Promise<string> {
-    const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+    const language: SupportedLanguage = this.memory.get('language') || 'ja';
     
     const message = language === 'en'
       ? "[happy]I've notified our staff about your inquiry. Someone will be with you shortly to provide detailed assistance.[/happy]"
@@ -457,7 +496,7 @@ Official X/Twitter: https://x.com/EngineerCafeJP
     }
 
     try {
-      const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      const language: SupportedLanguage = this.memory.get('language') || 'ja';
       
       const relevancePrompt = language === 'en'
         ? `Based ONLY on the following information, can you clearly answer this question: "${question}"?
@@ -498,7 +537,7 @@ ${context}
     }
 
     try {
-      const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      const language: SupportedLanguage = this.memory.get('language') || 'ja';
       
       console.log('[EnhancedQAAgent] Calling general web search with query:', query);
       const result = await webSearchTool.execute({
@@ -520,11 +559,31 @@ ${context}
       }
     } catch (error) {
       console.error('[EnhancedQAAgent] Web search error:', error);
-      const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      const language: SupportedLanguage = this.memory.get('language') || 'ja';
       return language === 'ja' 
         ? 'インターネット検索でエラーが発生しました。'
         : 'Error occurred during web search.';
     }
+  }
+
+  private isMemoryRelatedQuestion(question: string): boolean {
+    const normalizedQuestion = question.toLowerCase();
+    
+    // Japanese memory-related keywords
+    const japaneseMemoryKeywords = [
+      'さっき', '前に', '覚えて', '記憶', '質問', '聞いた', '話した', 
+      'どんな', '何を', '言った', '会話', '履歴', '先ほど'
+    ];
+    
+    // English memory-related keywords
+    const englishMemoryKeywords = [
+      'remember', 'recall', 'earlier', 'before', 'previous', 
+      'asked', 'said', 'mentioned', 'conversation', 'history'
+    ];
+    
+    const allKeywords = [...japaneseMemoryKeywords, ...englishMemoryKeywords];
+    
+    return allKeywords.some(keyword => normalizedQuestion.includes(keyword));
   }
 
 }

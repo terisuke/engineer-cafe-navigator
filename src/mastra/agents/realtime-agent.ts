@@ -2,6 +2,7 @@ import { EmotionData, EmotionManager } from '@/lib/emotion-manager';
 import { EmotionTagParser } from '@/lib/emotion-tag-parser';
 import { endPerformance, logPerformanceSummary, startPerformance } from '@/lib/performance-monitor';
 import { ConversationManager, SupabaseMemoryAdapter } from '@/lib/supabase-memory';
+import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
 import { TextChunker } from '@/lib/text-chunker';
 import { getEngineerCafeNavigator } from '@/mastra';
 import { Agent } from '@mastra/core/agent';
@@ -13,6 +14,7 @@ export class RealtimeAgent extends Agent {
   private interruptionEnabled: boolean = true;
   private voiceService: any;
   private supabaseMemory: SupabaseMemoryAdapter;
+  private simplifiedMemory: SimplifiedMemorySystem;
   private currentSessionId: string | null = null;
   private _tools: Map<string, any> = new Map();
   private config: any;
@@ -54,6 +56,7 @@ export class RealtimeAgent extends Agent {
     });
     this.voiceService = voiceService;
     this.supabaseMemory = new SupabaseMemoryAdapter('RealtimeAgent');
+    this.simplifiedMemory = new SimplifiedMemorySystem('RealtimeAgent');
     this.config = config;
   }
 
@@ -107,8 +110,27 @@ export class RealtimeAgent extends Agent {
         conversationHistory
       );
       
-      // Store conversation turn with emotion
+      // Store conversation turn with emotion (both long-term and short-term)
+      // Store conversation in memory systems
+      // TODO: Migration in progress - currently using both systems for compatibility
       await this.storeConversationTurn(text, cleanResponse, emotion);
+      
+      // Primary memory storage using SimplifiedMemorySystem
+      try {
+        await this.simplifiedMemory.addMessage('user', text, {
+          emotion: emotion?.emotion,
+          confidence: emotion?.confidence,
+          sessionId: this.currentSessionId || undefined,
+        });
+        await this.simplifiedMemory.addMessage('assistant', cleanResponse, {
+          emotion: emotion?.emotion,
+          confidence: emotion?.confidence,
+          sessionId: this.currentSessionId || undefined,
+        });
+      } catch (error) {
+        console.error('[RealtimeAgent] Failed to store in SimplifiedMemorySystem:', error);
+        // Fallback to legacy system if SimplifiedMemorySystem fails
+      }
       
       // Generate TTS audio for the response
       startPerformance('Text-to-Speech');
@@ -265,8 +287,26 @@ export class RealtimeAgent extends Agent {
       this.supabaseMemory.set('currentEmotion', emotion).catch(console.error);
       this.supabaseMemory.set('emotionTags', parsedResponse.emotions).catch(console.error);
       
-      // Store conversation turn in history (async, non-blocking)
+      // Store conversation in memory systems (async, non-blocking)
+      // TODO: Migration in progress - currently using both systems for compatibility
       this.storeConversationTurn(transcript, cleanResponse, emotion).catch(console.error);
+      
+      // Primary memory storage using SimplifiedMemorySystem
+      this.simplifiedMemory.addMessage('user', transcript, {
+        emotion: emotion?.emotion,
+        confidence: emotion?.confidence,
+        sessionId: this.currentSessionId || undefined,
+      }).catch((error) => {
+        console.error('[RealtimeAgent] Failed to store user message in SimplifiedMemorySystem:', error);
+      });
+      
+      this.simplifiedMemory.addMessage('assistant', cleanResponse, {
+        emotion: emotion?.emotion,
+        confidence: emotion?.confidence,
+        sessionId: this.currentSessionId || undefined,
+      }).catch((error) => {
+        console.error('[RealtimeAgent] Failed to store assistant message in SimplifiedMemorySystem:', error);
+      });
       
       // Convert CLEAN response to speech (without emotion tags and markdown)
       startPerformance('Text-to-Speech');
@@ -397,31 +437,38 @@ export class RealtimeAgent extends Agent {
     
     const currentMode = await this.supabaseMemory.get('currentMode') || 'welcome';
     
-    // Get conversation context
-    const conversationHistory = await this.supabaseMemory.get('conversationHistory') || [];
+    // Get comprehensive context using SimplifiedMemorySystem
+    const memoryContext = await this.simplifiedMemory.getContext(input, {
+      includeKnowledgeBase: true,
+      language: language as 'ja' | 'en'
+    });
     
-    // Build context-aware prompt
-    const prompt = this.buildContextualPrompt(input, language, currentMode, conversationHistory);
+    // Check if conversation is still active
+    const isActiveConversation = await this.simplifiedMemory.isConversationActive();
+    
+    // Build context-aware prompt with comprehensive memory
+    const prompt = this.buildContextualPrompt(input, language, currentMode, memoryContext, isActiveConversation);
     
     const response = await this.generate([
       { role: 'user', content: prompt }
     ]);
     const responseText = response.text;
     
-    // Update conversation history
-    conversationHistory.push(
-      { role: 'user', content: input, timestamp: Date.now() },
-      { role: 'assistant', content: responseText, timestamp: Date.now() }
-    );
+    // Parse emotion from response for context
+    const parsedResponse = EmotionTagParser.parseEmotionTags(responseText);
+    const primaryEmotion = parsedResponse.emotions?.[0]?.emotion || 'neutral';
     
-    // Keep only last 10 exchanges
-    if (conversationHistory.length > 20) {
-      conversationHistory.splice(0, conversationHistory.length - 20);
-    }
+    // Store conversation in SimplifiedMemorySystem
+    await this.simplifiedMemory.addMessage('user', input, {
+      sessionId: this.currentSessionId || undefined
+    });
     
-    await this.supabaseMemory.store('conversationHistory', conversationHistory);
+    await this.simplifiedMemory.addMessage('assistant', responseText, {
+      emotion: primaryEmotion,
+      sessionId: this.currentSessionId || undefined
+    });
     
-    // Store in conversation session if available
+    // Legacy: Also store in conversation session for compatibility
     if (this.currentSessionId) {
       await ConversationManager.addToHistory(this.currentSessionId, 'user', input);
       await ConversationManager.addToHistory(this.currentSessionId, 'assistant', responseText);
@@ -469,19 +516,28 @@ export class RealtimeAgent extends Agent {
     input: string, 
     language: SupportedLanguage, 
     mode: string, 
-    history: any[]
+    memoryContext: any,
+    isActiveConversation?: boolean
   ): string {
     const systemPrompt = language === 'en'
-      ? `You're an Engineer Cafe assistant. Respond briefly in English with emotion tags: [happy], [neutral], [excited], [relaxed]. 
+      ? `You're an Engineer Cafe assistant. Use the provided conversation history and knowledge base to give contextual responses. 
+         Respond briefly in English with emotion tags: [happy], [neutral], [excited], [relaxed]. 
          Example: "[happy] How can I help?" Keep responses short and natural.`
-      : `エンジニアカフェのアシスタントです。感情タグ付きで簡潔に日本語で応答: [happy], [neutral], [excited], [relaxed]
+      : `エンジニアカフェのアシスタントです。提供された会話履歴と知識ベースを使用して文脈のある回答をしてください。
+         感情タグ付きで簡潔に日本語で応答: [happy], [neutral], [excited], [relaxed]
          例: "[happy] いかがお手伝いしましょうか？" 短く自然に答えてください。`;
 
-    const contextHistory = history.length > 0 
-      ? `Previous: ${history.slice(-4).filter(h => h && h.content).map(h => `${h.role || 'user'}: ${h.content.slice(0, 50)}`).join(' | ')}\n\n`
-      : '';
+    // Use the comprehensive context from SimplifiedMemorySystem
+    let contextSection = '';
+    if (memoryContext && memoryContext.contextString && memoryContext.contextString.trim()) {
+      contextSection = `\n${memoryContext.contextString}\n\n`;
+    }
 
-    return `${systemPrompt}\n\n${contextHistory}User: ${input}\nAssistant:`;
+    const conversationStatus = isActiveConversation 
+      ? (language === 'en' ? ' (Continuing conversation)' : ' (会話継続中)')
+      : (language === 'en' ? ' (New conversation)' : ' (新しい会話)');
+
+    return `${systemPrompt}${conversationStatus}\n${contextSection}User: ${input}\nAssistant:`;
   }
 
   private determineCharacterAction(response: string, emotion?: EmotionData): string {
@@ -604,6 +660,8 @@ export class RealtimeAgent extends Agent {
 
   async clearConversationHistory(): Promise<void> {
     await this.supabaseMemory.store('conversationHistory', []);
+    // Also clear short-term memory
+    await this.simplifiedMemory.cleanup();
   }
 
   async getConversationSummary(): Promise<string> {
@@ -623,6 +681,51 @@ export class RealtimeAgent extends Agent {
       { role: 'user', content: summaryPrompt }
     ]);
     return summaryResponse.text;
+  }
+
+  // Short-term memory management methods
+  async getShortTermMemoryStats(): Promise<{
+    activeTurns: number;
+    oldestTurn: number | null;
+    newestTurn: number | null;
+    dominantEmotion: string | null;
+    timeSpan: number;
+    sessionSummary: string;
+  }> {
+    const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+    const sessionSummary = await this.simplifiedMemory.getSessionSummary(language);
+    const stats = await this.simplifiedMemory.getMemoryStats();
+    
+    return {
+      ...stats,
+      sessionSummary,
+    };
+  }
+
+  async isConversationActive(): Promise<boolean> {
+    return await this.simplifiedMemory.isConversationActive();
+  }
+
+  async promoteToLongTermMemory(key: string, data: any, reason: string): Promise<void> {
+    try {
+      const longTermData = {
+        data,
+        reason,
+        promotedAt: Date.now(),
+        originalSource: 'short_term_memory',
+      };
+
+      // Store in agent_memory without TTL for long-term persistence
+      await this.supabaseMemory.set(`long_term_${key}`, longTermData);
+      
+      console.log(`[RealtimeAgent] Promoted data to long-term memory: ${key} (${reason})`);
+    } catch (error) {
+      console.error(`[RealtimeAgent] Error promoting to long-term memory:`, error);
+    }
+  }
+
+  async cleanupShortTermMemory(): Promise<void> {
+    await this.simplifiedMemory.cleanup();
   }
 
   // Session management methods
