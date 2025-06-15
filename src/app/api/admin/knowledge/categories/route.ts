@@ -32,8 +32,8 @@ export async function GET() {
     if (srcError) throw srcError;
 
     // Process the data
-    const uniqueCategories = [...new Set((categories ?? []).map(c => c.category).filter(Boolean))];
-    const uniqueSources = [...new Set((sources ?? []).map(s => s.source).filter(Boolean))];
+    const uniqueCategories = Array.from(new Set((categories ?? []).map(c => c.category).filter(Boolean)));
+    const uniqueSources = Array.from(new Set((sources ?? []).map(s => s.source).filter(Boolean)));
     
     // Group subcategories by category
     const subcategoryGroups = (subcategories ?? []).reduce((acc, item) => {
@@ -48,7 +48,7 @@ export async function GET() {
 
     // Convert Sets to Arrays
     const subcategoryMap = Object.fromEntries(
-      Object.entries(subcategoryGroups).map(([cat, subs]) => [cat, [...subs]])
+      Object.entries(subcategoryGroups).map(([cat, subs]) => [cat, Array.from(subs)])
     );
 
     // Get languages
@@ -59,7 +59,7 @@ export async function GET() {
 
     if (langError) throw langError;
 
-    const uniqueLanguages = [...new Set(languages?.map(l => l.language).filter(Boolean))];
+    const uniqueLanguages = Array.from(new Set(languages?.map(l => l.language).filter(Boolean)));
 
     return NextResponse.json({
       categories: uniqueCategories,

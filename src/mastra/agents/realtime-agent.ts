@@ -337,8 +337,13 @@ export class RealtimeAgent extends Agent {
       }
       
       if (qaAgent && qaAgent.answerQuestion) {
+        // Ensure QA agent uses the same language as RealtimeAgent
+        if (qaAgent.setLanguage) {
+          await qaAgent.setLanguage(language);
+        }
+        
         if (process.env.NODE_ENV !== 'production') {
-          console.log('[RealtimeAgent] Calling QA agent with input:', input);
+          console.log('[RealtimeAgent] Calling QA agent with input:', input, 'language:', language);
         }
         const qaAnswer: string = await qaAgent.answerQuestion(input);
         if (process.env.NODE_ENV !== 'production') {
