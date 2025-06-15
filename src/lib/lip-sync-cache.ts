@@ -186,7 +186,7 @@ export class LipSyncCache {
    */
   private isValidCache(cached: CachedLipSyncData): boolean {
     const age = Date.now() - cached.timestamp;
-    return age < LipSyncCache.CACHE_EXPIRY && cached.data && cached.data.frames;
+    return age < LipSyncCache.CACHE_EXPIRY && cached.data && Array.isArray(cached.data.frames) && cached.data.frames.length > 0;
   }
 
   /**
@@ -198,7 +198,8 @@ export class LipSyncCache {
     const now = Date.now();
     
     // Clean memory cache
-    for (const [key, cached] of this.memoryCache.entries()) {
+    const memoryEntries = Array.from(this.memoryCache.entries());
+    for (const [key, cached] of memoryEntries) {
       if (!this.isValidCache(cached)) {
         this.memoryCache.delete(key);
       }
