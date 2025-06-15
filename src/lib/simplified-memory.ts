@@ -167,7 +167,7 @@ export class SimplifiedMemorySystem {
         .map(m => m.metadata?.emotion)
         .filter(Boolean) as string[];
       
-      const dominantEmotion = this.getMostFrequentEmotion(emotions) || 'neutral';
+      const dominantEmotion = getMostFrequentEmotion(emotions) || 'neutral';
 
       if (language === 'en') {
         return `Active conversation: ${userMessages} user messages, ${assistantMessages} responses. Mood: ${dominantEmotion}.`;
