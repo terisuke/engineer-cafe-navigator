@@ -59,10 +59,10 @@
     {
       "slideNumber": 4,
       "narration": {
-        "auto": "The basement has 4 distinctive spaces. MTG Space requires booking for 2 or more people via the website. Focus Space has 6 booths with complete silence and no talking allowed. Under Space has free address seating with extended screens and one soundproof room. Makers Space has 3D printers and laser cutters but requires initial training.",
+        "auto": "The basement has 4 distinctive spaces. Meeting Space requires booking for 2 or more people via the website. Focus Space has 6 booths with complete silence and no talking allowed. Under Space has free address seating with extended screens and one soundproof room. Makers Space has 3D printers and laser cutters but requires initial training.",
         "onEnter": "About the basement spaces in detail.",
         "onDemand": {
-          "mtg space": "Available for 2 or more people, requires advance booking via website. No same-day booking. Used in 2-hour slots.",
+          "meeting space": "Available for 2 or more people, requires advance booking via website. No same-day booking. Used in 2-hour slots.",
           "focus space": "6 booths available, no reservation required, but talking is strictly prohibited. This is a dedicated area for focused work.",
           "under space": "Free address style like the 1st floor, with extended screens available. Has one soundproof room available in 1-hour slots.",
           "makers space": "3D printers and laser cutters available. First-time users must book initial training via website. No same-day booking."
