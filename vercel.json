@@ -5,7 +5,7 @@
   "crons": [
     {
       "path": "/api/cron/update-knowledge-base",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 2 * * *"
     }
   ],
   "functions": {
