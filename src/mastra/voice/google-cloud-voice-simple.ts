@@ -4,6 +4,7 @@
  */
 
 import { GoogleAuth } from 'google-auth-library';
+import * as fs from 'fs';
 
 interface VoiceSettings {
   language: string;
@@ -51,35 +52,32 @@ export class GoogleCloudVoiceSimple {
   constructor() {
     // Check if credentials are provided as a path or JSON string
     const credentialsPath = process.env.GOOGLE_CLOUD_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    let credentials;
-    let keyFile;
+    let authOptions: any = {
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID
+    };
     
     if (credentialsPath) {
-      // Check if it's a file path or JSON string
-      if (credentialsPath.startsWith('./') || credentialsPath.startsWith('/') || credentialsPath.endsWith('.json')) {
+      // Check if it's a file path by checking if file exists
+      if (fs.existsSync(credentialsPath)) {
         // It's a file path
-        keyFile = credentialsPath;
+        authOptions.keyFile = credentialsPath;
       } else {
         // Try to parse as JSON
         try {
-          credentials = JSON.parse(credentialsPath);
+          authOptions.credentials = JSON.parse(credentialsPath);
         } catch (error) {
           console.error('Failed to parse Google Cloud credentials from environment variable:', error);
           // Fallback to default file path
-          keyFile = 'config/service-account-key.json';
+          authOptions.keyFile = 'config/service-account-key.json';
         }
       }
     } else {
       // No credentials provided, use default file path
-      keyFile = 'config/service-account-key.json';
+      authOptions.keyFile = 'config/service-account-key.json';
     }
     
-    this.auth = new GoogleAuth({
-      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-      credentials: credentials,
-      keyFile: keyFile,
-      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID
-    });
+    this.auth = new GoogleAuth(authOptions);
     
     // Default settings
     this.currentSettings = {

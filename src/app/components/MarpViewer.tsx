@@ -111,6 +111,7 @@ export default function MarpViewer({
   const [showAudioPermissionPrompt, setShowAudioPermissionPrompt] = useState(false);
   const [isNarrationInProgress, setIsNarrationInProgress] = useState(false);
   const [slideViewTimes, setSlideViewTimes] = useState<Map<number, number>>(new Map());
+  const [lipSyncCacheStats, setLipSyncCacheStats] = useState<any>(null);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -161,8 +162,11 @@ export default function MarpViewer({
 
   // Load slides and narration data when slideFile or language prop changes
   useEffect(() => {
-    loadSlideData(currentLanguage);
-  }, [slideFile, currentLanguage]);
+    // Only auto-load if autoPlay is enabled
+    if (autoPlay) {
+      loadSlideData(currentLanguage);
+    }
+  }, [slideFile, currentLanguage, autoPlay]);
 
   // Track slide view duration
   useEffect(() => {
@@ -291,10 +295,8 @@ export default function MarpViewer({
     try {
       setIsLoading(true);
       setError(null);
-      // Update language state only if changed to avoid unnecessary reload loops
-      if (requestedLang !== currentLanguage) {
-        setCurrentLanguage(requestedLang as 'ja' | 'en');
-      }
+      // Update language state
+      setCurrentLanguage(requestedLang as 'ja' | 'en');
 
       // Clear previous HTML to avoid showing outdated slide deck
       setRenderedHtml('');
@@ -325,9 +327,10 @@ export default function MarpViewer({
       });
 
       const result = await response.json();
+      
 
       // Ignore response if a newer loadSlideData was triggered in the meantime
-      if (result.success && requestedLang === currentLanguage) {
+      if (result.success) {
         if (result.slideData && result.slideData.slides) {
           setSlides(result.slideData.slides);
           setTotalSlides(result.slideData.slides.length);
@@ -568,9 +571,15 @@ export default function MarpViewer({
         try {
           const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
           const analyzer = new LipSyncAnalyzer();
-          const lipSyncData = await analyzer.analyzeLipSync(audioBlob);
           
-          console.log('[MarpViewer] Lip-sync analysis complete:', lipSyncData.frames.length, 'frames');
+          const analysisStartTime = performance.now();
+          const lipSyncData = await analyzer.analyzeLipSync(audioBlob);
+          const analysisTime = performance.now() - analysisStartTime;
+          
+          console.log('[MarpViewer] Lip-sync analysis complete:', lipSyncData.frames.length, 'frames', `in ${analysisTime.toFixed(1)}ms`);
+          
+          // Update cache stats for UI
+          setLipSyncCacheStats(analyzer.getCacheStats());
           
           // Schedule viseme updates
           let frameIndex = 0;
@@ -1141,7 +1150,20 @@ export default function MarpViewer({
 
           {/* Settings */}
           <button
-            onClick={() => setShowSettings(!showSettings)}
+            onClick={async () => {
+              setShowSettings(!showSettings);
+              if (!showSettings) {
+                // Update cache stats when opening settings
+                try {
+                  const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
+                  const analyzer = new LipSyncAnalyzer();
+                  setLipSyncCacheStats(analyzer.getCacheStats());
+                  analyzer.dispose();
+                } catch (error) {
+                  console.error('Failed to load cache stats:', error);
+                }
+              }
+            }}
             className={`p-2 rounded transition-colors ${
               showSettings ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
@@ -1234,66 +1256,72 @@ export default function MarpViewer({
 
         {/* Notes area */}
         {showNotes && (
-          <div className="w-1/3 bg-gray-50 border-l p-4 overflow-y-auto">
-            <h3 className="font-semibold mb-3">
-              {language === 'ja' ? 'スライドノート' : 'Slide Notes'}
-            </h3>
+          <div className="w-1/3 bg-gray-50 border-l flex flex-col">
+            <div className="p-4 border-b bg-white">
+              <h3 className="font-semibold">
+                {language === 'ja' ? 'スライドノート' : 'Slide Notes'}
+              </h3>
+            </div>
             
-            {/* Current slide info */}
-            {slides[currentSlide - 1] && (
-              <div className="mb-4">
-                <h4 className="font-medium text-gray-800 mb-2">
-                  {slides[currentSlide - 1].title || `Slide ${currentSlide}`}
-                </h4>
-                {slides[currentSlide - 1].notes && (
-                  <p className="text-sm text-gray-600 mb-3">
-                    {slides[currentSlide - 1].notes}
-                  </p>
-                )}
-              </div>
-            )}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Current slide info */}
+              {slides[currentSlide - 1] && (
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">
+                    {slides[currentSlide - 1].title || `Slide ${currentSlide}`}
+                  </h4>
+                  {slides[currentSlide - 1].notes && (
+                    <p className="text-sm text-gray-600">
+                      {slides[currentSlide - 1].notes}
+                    </p>
+                  )}
+                </div>
+              )}
 
-            {/* Narration info */}
-            {narrationData && (
-              <div className="mb-4">
-                <h4 className="font-medium text-gray-800 mb-2">
-                  {language === 'ja' ? 'ナレーション' : 'Narration'}
-                </h4>
-                {narrationData.slides[currentSlide - 1] && (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-2">
-                      <strong>Auto:</strong> {narrationData.slides[currentSlide - 1].narration.auto}
-                    </p>
-                    <p className="text-sm text-gray-600 mb-2">
-                      <strong>On Enter:</strong> {narrationData.slides[currentSlide - 1].narration.onEnter}
-                    </p>
-                    {Object.keys(narrationData.slides[currentSlide - 1].narration.onDemand).length > 0 && (
+              {/* Narration info */}
+              {narrationData && (
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">
+                    {language === 'ja' ? 'ナレーション' : 'Narration'}
+                  </h4>
+                  {narrationData.slides[currentSlide - 1] && (
+                    <div className="space-y-2">
                       <div>
-                        <strong className="text-sm">On Demand:</strong>
-                        <ul className="text-sm text-gray-600 mt-1">
-                          {Object.entries(narrationData.slides[currentSlide - 1].narration.onDemand).map(([key, value]) => (
-                            <li key={key} className="mb-1">
-                              <em>{key}:</em> {value}
-                            </li>
-                          ))}
-                        </ul>
+                        <strong className="text-sm text-gray-700">Auto:</strong>
+                        <p className="text-sm text-gray-600 mt-1">{narrationData.slides[currentSlide - 1].narration.auto}</p>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+                      <div>
+                        <strong className="text-sm text-gray-700">On Enter:</strong>
+                        <p className="text-sm text-gray-600 mt-1">{narrationData.slides[currentSlide - 1].narration.onEnter}</p>
+                      </div>
+                      {Object.keys(narrationData.slides[currentSlide - 1].narration.onDemand).length > 0 && (
+                        <div>
+                          <strong className="text-sm text-gray-700">On Demand:</strong>
+                          <ul className="text-sm text-gray-600 mt-1 space-y-1">
+                            {Object.entries(narrationData.slides[currentSlide - 1].narration.onDemand).map(([key, value]) => (
+                              <li key={key}>
+                                <em className="text-gray-500">{key}:</em> {value}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {/* Navigation hints */}
-            <div>
-              <h4 className="font-medium text-gray-800 mb-2">
-                {language === 'ja' ? 'ナビゲーション' : 'Navigation'}
-              </h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>← → {language === 'ja' ? 'スライド移動' : 'Navigate slides'}</li>
-                <li>Space {language === 'ja' ? '次のスライド' : 'Next slide'}</li>
-                <li>R {language === 'ja' ? '最初から' : 'Reset'}</li>
-              </ul>
+              {/* Navigation hints */}
+              <div>
+                <h4 className="font-medium text-gray-800 mb-2">
+                  {language === 'ja' ? 'ナビゲーション' : 'Navigation'}
+                </h4>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  <li>← → {language === 'ja' ? 'スライド移動' : 'Navigate slides'}</li>
+                  <li>Space {language === 'ja' ? '次のスライド' : 'Next slide'}</li>
+                  <li>R {language === 'ja' ? '最初から' : 'Reset'}</li>
+                </ul>
+              </div>
             </div>
           </div>
         )}
@@ -1458,13 +1486,46 @@ export default function MarpViewer({
                 </div>
               </div>
 
+              {/* Lip-sync Cache Management */}
+              <div className="bg-blue-50 p-3 rounded text-xs">
+                <div className="font-medium mb-2">
+                  {language === 'ja' ? 'リップシンクキャッシュ' : 'Lip-sync Cache'}
+                </div>
+                {lipSyncCacheStats ? (
+                  <div className="space-y-1">
+                    <div>Hit Rate: {lipSyncCacheStats.hitRate}%</div>
+                    <div>Memory: {lipSyncCacheStats.memoryEntries} entries</div>
+                    <div>Storage: {lipSyncCacheStats.localStorageEntries} entries</div>
+                    <div>Hits: {lipSyncCacheStats.hitCount} / Misses: {lipSyncCacheStats.missCount}</div>
+                  </div>
+                ) : (
+                  <div className="text-gray-500">No cache data available</div>
+                )}
+                <button
+                  onClick={async () => {
+                    try {
+                      const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
+                      const analyzer = new LipSyncAnalyzer();
+                      analyzer.clearCache();
+                      setLipSyncCacheStats(analyzer.getCacheStats());
+                      analyzer.dispose();
+                    } catch (error) {
+                      console.error('Failed to clear cache:', error);
+                    }
+                  }}
+                  className="mt-2 w-full px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                >
+                  {language === 'ja' ? 'キャッシュクリア' : 'Clear Cache'}
+                </button>
+              </div>
+
               {/* Performance Info */}
               <div className="bg-gray-50 p-3 rounded text-xs">
                 <div className="font-medium mb-1">
                   {language === 'ja' ? 'パフォーマンス情報' : 'Performance Info'}
                 </div>
                 <div className="space-y-1">
-                  <div>Cache Size: {audioCache.size} slides</div>
+                  <div>Audio Cache: {audioCache.size} slides</div>
                   <div>Retry Count: {retryCount}</div>
                   <div>Current Slide: {currentSlide}/{totalSlides}</div>
                 </div>

@@ -216,18 +216,27 @@ Official X/Twitter: https://x.com/EngineerCafeJP
         return clarificationMessage;
       }
       
-      // For saino-cafe queries, enhance search with specific terms
+      // For saino-cafe queries, enhance search with language-appropriate terms
       let searchQuery = normalizedQuery;
       if (category === 'saino-cafe') {
-        // Add saino-specific terms to improve RAG search accuracy
-        searchQuery = `saino ${normalizedQuery} 併設 カフェ バー`.replace(/\s+/g, ' ').trim();
+        // Add saino-specific terms to improve RAG search accuracy based on language
+        if (language === 'ja') {
+          searchQuery = `saino ${normalizedQuery} 併設 カフェ バー`.replace(/\s+/g, ' ').trim();
+        } else {
+          searchQuery = `saino ${normalizedQuery} adjoining cafe bar attached`.replace(/\s+/g, ' ').trim();
+        }
         console.log('[EnhancedQAAgent] Enhanced search query for Saino:', searchQuery);
       }
       
       // Also enhance if query contains saino-related terms but wasn't categorized as saino-cafe
-      if (normalizedQuery.includes('saino') || normalizedQuery.includes('カフェ&バー') || normalizedQuery.includes('併設')) {
+      if (normalizedQuery.includes('saino') || normalizedQuery.includes('カフェ&バー') || normalizedQuery.includes('併設') || 
+          normalizedQuery.includes('cafe&bar') || normalizedQuery.includes('adjoining')) {
         if (category !== 'saino-cafe') {
-          searchQuery = `saino ${normalizedQuery} 併設 カフェ バー`.replace(/\s+/g, ' ').trim();
+          if (language === 'ja') {
+            searchQuery = `saino ${normalizedQuery} 併設 カフェ バー`.replace(/\s+/g, ' ').trim();
+          } else {
+            searchQuery = `saino ${normalizedQuery} adjoining cafe bar attached`.replace(/\s+/g, ' ').trim();
+          }
           console.log('[EnhancedQAAgent] Enhanced search query for potential Saino query:', searchQuery);
         }
       }
@@ -260,7 +269,12 @@ Official X/Twitter: https://x.com/EngineerCafeJP
           }
         }
         
-        searchQuery = `地下 basement ${spaceSpecificTerms} ${normalizedQuery}`.replace(/\s+/g, ' ').trim();
+        // Add language-appropriate basement terms
+        if (language === 'ja') {
+          searchQuery = `地下 ${spaceSpecificTerms} ${normalizedQuery}`.replace(/\s+/g, ' ').trim();
+        } else {
+          searchQuery = `basement ${spaceSpecificTerms} ${normalizedQuery}`.replace(/\s+/g, ' ').trim();
+        }
         console.log('[EnhancedQAAgent] Enhanced search query for basement space:', searchQuery);
       }
       

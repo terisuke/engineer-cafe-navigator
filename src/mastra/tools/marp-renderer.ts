@@ -48,6 +48,10 @@ export class MarpRendererTool {
 
       // Read the markdown file
       const markdownPath = path.resolve(slideFile);
+      console.log(`[MarpRenderer] Attempting to read file: ${markdownPath}`);
+      console.log(`[MarpRenderer] Current working directory: ${process.cwd()}`);
+      console.log(`[MarpRenderer] Slide file parameter: ${slideFile}`);
+      
       const markdownContent = await fs.readFile(markdownPath, 'utf-8');
 
       // Parse frontmatter and content

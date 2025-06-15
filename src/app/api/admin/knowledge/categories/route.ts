@@ -31,11 +31,11 @@ export async function GET() {
     if (srcError) throw srcError;
 
     // Process the data
-    const uniqueCategories = [...new Set(categories?.map(c => c.category).filter(Boolean))];
-    const uniqueSources = [...new Set(sources?.map(s => s.source).filter(Boolean))];
+    const uniqueCategories = [...new Set((categories ?? []).map(c => c.category).filter(Boolean))];
+    const uniqueSources = [...new Set((sources ?? []).map(s => s.source).filter(Boolean))];
     
     // Group subcategories by category
-    const subcategoryGroups = subcategories?.reduce((acc, item) => {
+    const subcategoryGroups = (subcategories ?? []).reduce((acc, item) => {
       if (!item.category || !item.subcategory) return acc;
       
       if (!acc[item.category]) {

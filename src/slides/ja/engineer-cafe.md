@@ -8,7 +8,8 @@ theme: default
 class: lead
 ---
 
-# エンジニアカフェへようこそ  
+## エンジニアカフェへようこそ  
+
 Welcome to Engineer Cafe
 ![bg contain right:40%](/assets/images/engineercafelogo.png)
 
@@ -34,11 +35,14 @@ Welcome to Engineer Cafe
 |------------|----------------------|
 | メインホール     | 開放的・イベント時以外は無料 |
 | 地下4スペース  | 詳細は次ページ参照       |
-![bg contain right:40%](/assets/images/concentratespace.jpg)
+
+![bg contain right:40%](/backgrounds/IMG_5573.JPG)
 
 ---
 
 ## 地下スペース詳細
+
+![bg contain right:40%](/assets/images/concentratespace.jpg)
 
 | スペース         | 特徴                           |
 |--------------|------------------------------|
@@ -90,6 +94,7 @@ Welcome to Engineer Cafe
 ---
 
 ## 会員証について
+
 ![bg contain right:40%](/assets/images/membershipcards.jpg)
 
 - レーザー加工機で作成 ⇒ **再発行不可**  
@@ -118,6 +123,7 @@ Discord 招待コードも裏面に記載
 ---
 
 ## エンジニアカフェの想い
+
 ![bg contain right:45%](/assets/images/welcomeoerson.png)
 
 > ルールより「協力」  
@@ -131,7 +137,8 @@ Discord 招待コードも裏面に記載
 
 ---
 
-# ご清聴ありがとうございました
+## ご清聴ありがとうございました
+
 ![bg contain right:45%](/assets/images/regsterform.png)
 
 お問い合わせはスタッフまで

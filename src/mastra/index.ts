@@ -83,8 +83,16 @@ export class EngineerCafeNavigator {
     const ragSearchTool = new RAGSearchTool();
     const externalDataFetcherTool = new ExternalDataFetcherTool(this.config.external);
     const engineerCafeWebSearchTool = new EngineerCafeWebSearchTool();
-    const generalWebSearchTool = new GeneralWebSearchTool();
     const calendarServiceTool = new CalendarServiceTool();
+    
+    // Initialize GeneralWebSearchTool with error handling
+    let generalWebSearchTool: GeneralWebSearchTool | null = null;
+    try {
+      generalWebSearchTool = new GeneralWebSearchTool();
+    } catch (error) {
+      console.warn('Failed to initialize GeneralWebSearchTool:', error);
+      console.warn('Web search functionality will be disabled. Check GoogleGenerativeAI environment variables.');
+    }
 
     this.tools.set('slideControl', slideControlTool);
     this.tools.set('marpRenderer', marpRendererTool);
@@ -96,8 +104,12 @@ export class EngineerCafeNavigator {
     this.tools.set('ragSearch', ragSearchTool);
     this.tools.set('externalDataFetcher', externalDataFetcherTool);
     this.tools.set('engineerCafeWebSearch', engineerCafeWebSearchTool);
-    this.tools.set('generalWebSearch', generalWebSearchTool);
     this.tools.set('calendarService', calendarServiceTool);
+    
+    // Only register GeneralWebSearchTool if it was successfully initialized
+    if (generalWebSearchTool) {
+      this.tools.set('generalWebSearch', generalWebSearchTool);
+    }
     this.tools.set('voiceService', this.voiceService);
 
     // Register tools with agents

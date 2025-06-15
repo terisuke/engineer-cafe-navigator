@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "echo \"No tests configured yet\" && exit 0",
     "dev:clean": "rm -rf .next && next dev",
     "install:css": "sh scripts/install-css.sh",
     "seed:knowledge": "tsx -r dotenv/config scripts/seed-knowledge-base.ts",
@@ -20,7 +20,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.11.0",
+  "packageManager": "pnpm@10.12.1",
   "dependencies": {
     "@ai-sdk/google": "^1.2.18",
     "@ai-sdk/openai": "^1.3.3",

@@ -1,7 +1,10 @@
 /**
  * Lip-sync analyzer for VRM characters
  * Analyzes audio data to generate mouth shape animations
+ * Now with intelligent caching for faster repeated analysis
  */
+
+import { lipSyncCache } from './lip-sync-cache';
 
 export interface LipSyncFrame {
   time: number;
@@ -26,10 +29,25 @@ export class LipSyncAnalyzer {
   }
 
   /**
-   * Analyze audio blob and generate lip-sync data
+   * Analyze audio blob and generate lip-sync data with intelligent caching
    */
   async analyzeLipSync(audioBlob: Blob): Promise<LipSyncData> {
+    const startTime = performance.now();
+    
     try {
+      // First, check if we have cached results
+      console.log('[LipSyncAnalyzer] Checking cache for audio data...');
+      const cachedResult = await lipSyncCache.instance.getCachedLipSync(audioBlob);
+      
+      if (cachedResult) {
+        const cacheTime = performance.now() - startTime;
+        console.log(`[LipSyncAnalyzer] ✅ Cache hit! Retrieved in ${cacheTime.toFixed(1)}ms`);
+        return cachedResult;
+      }
+
+      console.log('[LipSyncAnalyzer] Cache miss, analyzing audio...');
+      const analysisStartTime = performance.now();
+      
       const arrayBuffer = await audioBlob.arrayBuffer();
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       
@@ -41,6 +59,8 @@ export class LipSyncAnalyzer {
       const frameInterval = 0.05; // 50ms
       const frameCount = Math.floor(duration / frameInterval);
       const frames: LipSyncFrame[] = [];
+
+      console.log(`[LipSyncAnalyzer] Processing ${frameCount} frames for ${duration.toFixed(2)}s audio`);
 
       for (let i = 0; i < frameCount; i++) {
         const startSample = Math.floor(i * frameInterval * sampleRate);
@@ -64,10 +84,21 @@ export class LipSyncAnalyzer {
         });
       }
 
-      return {
+      const lipSyncData: LipSyncData = {
         frames,
         duration
       };
+
+      const analysisTime = performance.now() - analysisStartTime;
+      console.log(`[LipSyncAnalyzer] ✅ Analysis completed in ${analysisTime.toFixed(1)}ms`);
+
+      // Cache the results for future use
+      await lipSyncCache.instance.cacheLipSync(audioBlob, lipSyncData);
+      
+      const totalTime = performance.now() - startTime;
+      console.log(`[LipSyncAnalyzer] Total time: ${totalTime.toFixed(1)}ms`);
+
+      return lipSyncData;
     } catch (error) {
       console.error('Error analyzing lip-sync:', error);
       throw error;
@@ -246,6 +277,27 @@ export class LipSyncAnalyzer {
       frames,
       duration
     };
+  }
+
+  /**
+   * Get cache statistics for monitoring
+   */
+  getCacheStats() {
+    return lipSyncCache.instance.getCacheStats();
+  }
+
+  /**
+   * Clear all cached lip-sync data
+   */
+  clearCache() {
+    lipSyncCache.instance.clearCache();
+  }
+
+  /**
+   * Get cache instance for advanced operations
+   */
+  getCache() {
+    return lipSyncCache.instance;
   }
 
   dispose() {

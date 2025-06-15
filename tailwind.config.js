@@ -40,6 +40,9 @@ module.exports = {
         '90': '90',
         '100': '100',
       },
+      touchAction: {
+        'manipulation': 'manipulation',
+      },
     },
   },
   plugins: [],

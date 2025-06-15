@@ -131,7 +131,7 @@ The knowledge base contains 84+ entries organized by:
 
 - **Multi-language Support**: Japanese/English UI and content with automatic language detection
 - **Real-time Voice Interactions**: Speech-to-text with interruption handling
-- **3D Character Animations**: Synchronized with voice output and emotion detection
+- **3D Character Animations**: Synchronized with voice output and emotion detection with intelligent lip-sync caching
 - **Slide Presentations**: Marp-based slides with voice narration
 - **Admin Knowledge Management**: Structured metadata editing with dropdowns and templates
 - **Hybrid AI Architecture**: Gemini for responses, OpenAI for embeddings
@@ -139,3 +139,49 @@ The knowledge base contains 84+ entries organized by:
 - **Voice Recognition**: Google Cloud STT with Service Account authentication
 - **WebSocket Support**: For external system integration
 - **No Test Framework**: Currently configured for production deployment
+
+### Lip-sync System
+
+The application features an advanced lip-sync system for VRM character animations:
+
+#### **Core Components**
+- **LipSyncAnalyzer** (`/src/lib/lip-sync-analyzer.ts`): Real-time audio analysis for mouth shape generation
+- **LipSyncCache** (`/src/lib/lip-sync-cache.ts`): Intelligent caching system for performance optimization
+- **5 Viseme Types**: A, I, U, E, O mouth shapes plus Closed state
+
+#### **Caching System Features**
+- **Audio Fingerprinting**: Generates unique hashes from audio data for cache keys
+- **Hybrid Storage**: Memory cache for speed + localStorage for persistence
+- **Auto-cleanup**: 7-day expiration with automatic old entry removal
+- **Size Management**: 10MB max cache size, 100 entry limit
+- **Performance Monitoring**: Hit rate tracking and detailed statistics
+
+#### **Performance Benefits**
+- **First Analysis**: 4-8 seconds for new audio processing
+- **Cached Results**: 10-50ms retrieval time for repeated audio
+- **Efficient Storage**: Compressed frame data with intelligent deduplication
+- **Memory Management**: Automatic cleanup prevents storage bloat
+
+#### **User Interface**
+- **Settings Panel**: Real-time cache statistics display
+- **Cache Management**: One-click cache clearing functionality
+- **Performance Metrics**: Hit rate, entry counts, and usage statistics
+- **Debug Mode**: Detailed timing information in development
+
+#### **Technical Details**
+- **Frame Rate**: 20fps mouth shape updates (50ms intervals)
+- **Audio Analysis**: FFT-based frequency analysis for vowel detection
+- **Storage Format**: JSON serialization with timestamp metadata
+- **Error Handling**: Graceful fallbacks when cache fails
+- **Cross-session**: Persistent cache across browser restarts
+
+#### **Cache Key Generation**
+```typescript
+// Audio fingerprinting process:
+1. File size hash
+2. Sample data points throughout audio
+3. Checksum calculation
+4. Collision-resistant final hash
+```
+
+This system dramatically reduces lip-sync processing time for repeated slide presentations while maintaining high-quality mouth animations.

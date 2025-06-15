@@ -8,7 +8,8 @@ theme: default
 class: lead
 ---
 
-# Welcome to Engineer Cafe
+## Welcome to Engineer Cafe
+
 ![bg contain right:40%](/assets/images/engineercafelogo.png)
 
 <!-- _narration: Welcome everyone to Engineer Cafe, a public space where engineers can learn, connect and grow. This deck explains our facilities and how to use them. -->
@@ -16,6 +17,7 @@ class: lead
 ---
 
 ## What is Engineer Cafe?
+
 ![bg contain right:35%](/assets/images/engineerfriendlogo.png)
 
 - Established Aug 2019  
@@ -28,23 +30,26 @@ class: lead
 ---
 
 ## Co-working Spaces
-![bg contain right:40%](/assets/images/concentratespace.jpg)
 
-| Space            | Features                  |
-|------------------|---------------------------|
-| Main Hall        | Open, free when no events |
-| 4 Basement Spaces| See next page for details |
+![bg contain right:40%](/backgrounds/IMG_5573.JPG)
+
+| Space             | Features                  |
+|-------------------|---------------------------|
+| Main Hall         | Open, free when no events |
+| 4 Basement Spaces | See next page for details |
 
 ---
 
 ## Basement Spaces Detail
 
-| Space         | Features                           |
-|---------------|-----------------------------------|
-| MTG Space     | 2+ people・Website booking・2h slots |
-| Focus Space   | 6 booths・No booking・Silent only    |
-| Under Space   | Free address・Extended screens・1 soundproof room |
-| Makers Space  | 3D printer・Laser cutter・Training required |
+![bg contain right:40%](/assets/images/concentratespace.jpg)
+
+| Space        | Features                                        |
+|--------------|-------------------------------------------------|
+| MTG Space    | 2+ people・Website booking・2h slots              |
+| Focus Space  | 6 booths・No booking・Silent only                 |
+| Under Space  | Free address・Extended screens・1 soundproof room |
+| Makers Space | 3D printer・Laser cutter・Training required       |
 
 **Note:** No talking / calls in the Focus Space
 
@@ -53,6 +58,7 @@ class: lead
 ---
 
 ## Time Slots & Extensions
+
 ![bg contain right:45%](/assets/images/discord.jpg)
 
 - Standard 2 h (1 h for soundproof rooms)
@@ -78,6 +84,7 @@ class: lead
 ---
 
 ## How to Register
+
 ![bg contain left:35%](/assets/images/engineercafewifi.png)
 
 1. Connect to Wi-Fi  
@@ -101,7 +108,23 @@ class: lead
 
 ---
 
+## Reception for Next Visits
+
+![bg contain right:45%](/assets/images/discord.jpg)
+
+1. Specify your workspace  
+2. Get neck holder (with Wi-Fi info)  
+3. Leaving 15+ min → Temporary exit (no belongings left; staff may move items for verification)  
+4. Return neck holder when leaving
+
+Discord invite code on the back
+
+<!-- _narration: For your next visit, tell reception your preferred workspace. The neck holder has Wi-Fi and Discord info. If leaving for over 15 minutes, take all belongings—staff may need to check unattended items. Please return the holder when you leave. -->
+
+---
+
 ## Our Philosophy
+
 ![bg contain right:45%](/assets/images/welcomeoerson.png)
 
 > Fewer rules, more collaboration
@@ -114,9 +137,11 @@ class: lead
 
 ---
 
-# Thank you!
+## Thank you!
+
 ![bg contain right:45%](/assets/images/regsterform.png)
 
-Talk to any staff member if you have questions
+Scan to register
+Talk to any staff member
 
 <!-- _narration: That concludes the guide. Feel free to reach out to our team any time. -->

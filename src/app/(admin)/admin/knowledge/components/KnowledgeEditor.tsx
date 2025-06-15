@@ -41,6 +41,8 @@ export function KnowledgeEditor({ entry, onSave, onCancel }: KnowledgeEditorProp
     metadata: entry?.metadata || {},
   });
   const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
   const [categoryData, setCategoryData] = useState<CategoryData | null>(null);
   const [metadataTemplates, setMetadataTemplates] = useState<MetadataTemplates | null>(null);
   const [showCustomCategory, setShowCustomCategory] = useState(false);
@@ -54,6 +56,9 @@ export function KnowledgeEditor({ entry, onSave, onCancel }: KnowledgeEditorProp
   useEffect(() => {
     const loadData = async () => {
       try {
+        setDataLoading(true);
+        setDataError(null);
+        
         const [categoriesRes, templatesRes] = await Promise.all([
           fetch('/api/admin/knowledge/categories'),
           fetch('/api/admin/knowledge/metadata-templates')
@@ -62,14 +67,21 @@ export function KnowledgeEditor({ entry, onSave, onCancel }: KnowledgeEditorProp
         if (categoriesRes.ok) {
           const catData = await categoriesRes.json();
           setCategoryData(catData);
+        } else {
+          throw new Error(`Failed to load categories: ${categoriesRes.status}`);
         }
         
         if (templatesRes.ok) {
           const templateData = await templatesRes.json();
           setMetadataTemplates(templateData);
+        } else {
+          throw new Error(`Failed to load templates: ${templatesRes.status}`);
         }
       } catch (error) {
         console.error('Failed to load data:', error);
+        setDataError(error instanceof Error ? error.message : 'Failed to load data');
+      } finally {
+        setDataLoading(false);
       }
     };
     
@@ -243,7 +255,7 @@ export function KnowledgeEditor({ entry, onSave, onCancel }: KnowledgeEditorProp
             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         );
-      case 'tags':
+      case 'tags': {
         const tagsArray = Array.isArray(value) ? value : (typeof value === 'string' ? value.split(',').map(t => t.trim()).filter(Boolean) : []);
         return (
           <div className="flex-1">
@@ -268,6 +280,7 @@ export function KnowledgeEditor({ entry, onSave, onCancel }: KnowledgeEditorProp
             )}
           </div>
         );
+      }
       default:
         return (
           <input
@@ -291,6 +304,43 @@ export function KnowledgeEditor({ entry, onSave, onCancel }: KnowledgeEditorProp
       };
     });
   };
+
+  // Show loading state
+  if (dataLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">データを読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (dataError) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800">エラーが発生しました</h3>
+            <p className="mt-1 text-sm text-red-700">{dataError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 text-sm bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded-md"
+            >
+              再読み込み
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -547,7 +597,7 @@ export function KnowledgeEditor({ entry, onSave, onCancel }: KnowledgeEditorProp
             
             {/* Quick add common metadata fields */}
             {Object.entries(metadataFieldTypes).map(([fieldKey, config]) => {
-              if (!formData.metadata.hasOwnProperty(fieldKey)) {
+              if (!Object.hasOwn(formData.metadata, fieldKey)) {
                 return (
                   <button
                     key={fieldKey}

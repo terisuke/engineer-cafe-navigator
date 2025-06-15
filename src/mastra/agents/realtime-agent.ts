@@ -196,20 +196,24 @@ export class RealtimeAgent extends Agent {
       const result = await this.voiceService.speechToText(audioBase64, currentLang);
       performanceSteps['Speech-to-Text'] = endPerformance('Speech-to-Text');
       
-      console.log('[RealtimeAgent] STT result:', {
-        success: result.success,
-        transcript: result.transcript,
-        confidence: result.confidence,
-        error: result.error
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[RealtimeAgent] STT result:', {
+          success: result.success,
+          transcript: result.transcript,
+          confidence: result.confidence,
+          error: result.error
+        });
+      }
       
       // Check confidence threshold (ignore very low-confidence STT results)
       if (!result.success || !result.transcript || !result.transcript.trim()) {
-        console.log('[RealtimeAgent] STT failed validation:', {
-          success: result.success,
-          hasTranscript: !!result.transcript,
-          transcriptTrimmed: result.transcript ? result.transcript.trim() : null
-        });
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[RealtimeAgent] STT failed validation:', {
+            success: result.success,
+            hasTranscript: !!result.transcript,
+            transcriptTrimmed: result.transcript ? result.transcript.trim() : null
+          });
+        }
         this.conversationState = 'idle';
         return {
           transcript: '',
