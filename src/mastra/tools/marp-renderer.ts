@@ -48,6 +48,11 @@ export class MarpRendererTool {
 
       // Read the markdown file
       const markdownPath = path.resolve(slideFile);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[MarpRenderer] Attempting to read file: ${path.basename(markdownPath)}`);
+        console.log(`[MarpRenderer] Slide file parameter: ${slideFile}`);
+      }
+      
       const markdownContent = await fs.readFile(markdownPath, 'utf-8');
 
       // Parse frontmatter and content
@@ -93,7 +98,9 @@ export class MarpRendererTool {
     const themePath = path.join(process.cwd(), 'src', 'slides', 'themes', `${themeName}.css`);
     try {
       // Use process.cwd() to get the project root directory
-      console.log(`Attempting to load theme from: ${themePath}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`Attempting to load theme from: ${path.basename(themePath)}`);
+      }
       const themeCSS = await fs.readFile(themePath, 'utf-8');
       
       // Apply custom theme

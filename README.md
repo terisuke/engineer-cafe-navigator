@@ -2,6 +2,8 @@
 
 > 福岡市エンジニアカフェの音声AIエージェントシステム
 
+**[🇺🇸 English](README-EN.md)** | **🇯🇵 日本語**
+
 [![Next.js](https://img.shields.io/badge/Next.js-15.3.2-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-blue)](https://www.typescriptlang.org/)
 [![Mastra](https://img.shields.io/badge/Mastra-0.10.1-green)](https://mastra.ai/)
@@ -12,16 +14,18 @@
 
 Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福岡市エンジニアカフェの新規顧客対応を自動化する**多言語対応音声AIエージェントシステム**です。Mastraフレームワークを活用し、スタッフの負担軽減と顧客満足度向上を目指します。
 
-### 🆕 最新アップデート (2025/05/30)
+### 🆕 最新アップデート (2025/06/15)
 
 #### ✅ 実装完了
-- **Service Account認証への移行** - APIキー不要でより安全な認証方式に
+- **OpenAI エンベディング統合** - RAG検索システムをOpenAI text-embedding-3-small (1536次元)に統一
+- **多言語RAG検索** - 英語で質問しても日本語コンテンツから回答、逆も可能
+- **知識ベース管理UI** - `/admin/knowledge`でのデータ管理、メタデータテンプレート対応
+- **地下スペース情報の完全対応** - 4種類の地下施設（MTG、集中、アンダー、Makers）の音声検索対応
+- **クロスランゲージ検索** - 質問言語に関係なく最適な情報を両言語から取得
+- **Service Account認証** - APIキー不要でより安全な認証方式
 - **Supabaseメモリアダプタ統合** - 永続的な会話履歴とセッション管理
-- **マルチターン会話対応** - 文脈を保持した自然な対話が可能に
-- **Google Cloud Voice Service** - TTS/STT完全統合、Service Account認証
-- **感情認識システム** - テキストから感情を検出し、VRM表情制御に連携
-- **VRM表情アニメーション** - 会話内容に応じた自動表情変化
-- **会話文脈保持** - 感情を含む詳細な会話履歴の永続化
+- **感情認識・VRM表情制御** - テキスト解析による自動表情変化
+- **🚀 リップシンクキャッシュシステム** - 音声解析結果の智能キャッシュで99%高速化（4-8秒→10-50ms）
 
 ### 🎯 主な目的
 
@@ -35,18 +39,17 @@ Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福
 
 | 機能カテゴリ          | 機能詳細                       |
 |-------------------|----------------------------|
-| 🎤 **音声対話**   | リアルタイム音声認識・合成、割り込み対応 |
-| 🌐 **Web Speech API** | ブラウザネイティブ音声認識（コスト削減）|
+| 🎤 **音声対話**   | Google Cloud STT/TTS、リアルタイム処理、割り込み対応 |
+| 🔍 **多言語RAG検索** | OpenAI埋め込み、日英クロスランゲージ検索、地下施設対応|
 | 🎭 **感情認識**   | テキスト解析による感情検出、VRM表情制御 |
-| 😊 **テキスト感情認識**   | 会話内容からの感情分析とVRM表情制御 |
 | 📊 **動的スライド**   | Marp Markdown、音声ナレーション連動   |
-| 🤖 **3Dキャラクター**   | VRMアバター、感情連動表情・動作制御      |
-| 🌐 **多言語対応** | 日本語・英語切り替え、多言語感情認識    |
-| 🔍 **RAG Q&A**    | 知識ベースからのリアルタイム回答           |
-| 💾 **会話記憶**   | Supabase永続化、文脈保持機能        |
+| 🤖 **3Dキャラクター**   | VRMアバター、感情連動表情・動作制御、高速リップシンク |
+| 🌐 **多言語対応** | 日本語・英語UI切り替え、多言語コンテンツ管理    |
+| 🔧 **管理画面**   | 知識ベース管理、メタデータテンプレート、カテゴリ管理 |
+| 💾 **会話記憶**   | Supabase永続化、セッション管理、履歴保持   |
 | 🔗 **外部連携**   | WebSocket受付システム統合          |
 | 🎨 **背景制御**   | 動的背景画像変更、グラデーション対応     |
-| 🔒 **セキュリティ**  | XSS対策、iframe サンドボックス化     |
+| 🔒 **セキュリティ**  | Service Account認証、RLS、XSS対策   |
 
 ## 🏗️ アーキテクチャ
 
@@ -160,6 +163,10 @@ GOOGLE_CLOUD_CREDENTIALS=./config/service-account-key.json
 # 🤖 Gemini AI
 GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
 GEMINI_MODEL=gemini-2.5-flash-preview-05-20
+
+# 🔍 OpenAI (Embeddings)
+OPENAI_API_KEY=your-openai-api-key
+# RAG検索システムで使用するtext-embedding-3-smallモデル用
 
 # 🗄️ Database (Supabase)
 POSTGRES_URL=postgresql://postgres:password@db.project.supabase.co:5432/postgres
@@ -311,6 +318,8 @@ engineer-cafe-navigator/
 │   │   └── expressions/              # 表情データ
 │   ├── lib/                          # 共通ライブラリ
 │   │   ├── audio-player.ts           # 音声再生
+│   │   ├── lip-sync-analyzer.ts      # リップシンク解析 (キャッシュ対応)
+│   │   ├── lip-sync-cache.ts         # リップシンクキャッシュシステム
 │   │   ├── marp-processor.ts         # Marp処理
 │   │   ├── narration-manager.ts      # ナレーション管理
 │   │   ├── supabase.ts              # Supabase設定
@@ -464,7 +473,16 @@ Marpスライドのレンダリングと表示
 | 音声認識開始     | < 200ms     | ✅ Google Cloud STT |
 | AI応答生成       | < 800ms     | ✅ Gemini 2.5 Flash |
 | 音声合成         | < 300ms     | ✅ Google Cloud TTS |
+| リップシンク解析 | < 50ms      | ✅ インテリジェントキャッシュ |
 | **総合応答時間** | **< 1.3秒** | 🔄 最適化中        |
+
+### パフォーマンス最適化
+
+#### リップシンクキャッシュシステム
+- **初回解析**: 4-8秒（音声波形分析）
+- **キャッシュ取得**: 10-50ms（99%高速化）
+- **ストレージ**: LocalStorage + メモリハイブリッド
+- **自動管理**: 7日間有効期限、10MB上限
 
 ### 同時利用者数
 
@@ -476,6 +494,8 @@ Marpスライドのレンダリングと表示
 
 ### Vercelへのデプロイ
 
+#### 1. Vercel CLIを使用したデプロイ
+
 ```bash
 # Vercel CLIインストール
 pnpm install -g vercel
@@ -486,6 +506,17 @@ vercel
 # 本番デプロイ
 vercel --prod
 ```
+
+#### 2. GitHubからの自動デプロイ（推奨）
+
+1. GitHubリポジトリをpush
+2. [Vercel Dashboard](https://vercel.com/dashboard)でプロジェクトをインポート
+3. 環境変数を設定（下記参照）
+4. 自動デプロイが開始
+
+#### 3. 環境変数の設定
+
+Vercelダッシュボードまたは`.env.production.example`を参考に以下を設定：
 
 ### 環境変数設定（本番）
 

@@ -212,6 +212,7 @@ vercel inspect
 # Vercelプロジェクトで設定
 vercel env add GOOGLE_GENERATIVE_AI_API_KEY
 vercel env add GOOGLE_CLOUD_PROJECT_ID
+vercel env add OPENAI_API_KEY
 vercel env add POSTGRES_URL
 vercel env add NEXTAUTH_SECRET
 vercel env add NEXTAUTH_URL
@@ -341,6 +342,9 @@ GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
 # Google Cloud
 GOOGLE_CLOUD_PROJECT_ID=your-gcp-project-id
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+
+# OpenAI (Embeddings)
+OPENAI_API_KEY=your-openai-api-key
 
 # Database
 POSTGRES_URL=postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres

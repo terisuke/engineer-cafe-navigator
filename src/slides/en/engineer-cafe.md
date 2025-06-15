@@ -8,13 +8,17 @@ theme: default
 class: lead
 ---
 
-# Welcome to Engineer Cafe
+## Welcome to Engineer Cafe
+
+![bg contain right:40%](/assets/images/engineercafelogo.png)
 
 <!-- _narration: Welcome everyone to Engineer Cafe, a public space where engineers can learn, connect and grow. This deck explains our facilities and how to use them. -->
 
 ---
 
 ## What is Engineer Cafe?
+
+![bg contain right:35%](/assets/images/engineerfriendlogo.png)
 
 - Established Aug 2019  
 - Part of "Engineer-Friendly City Fukuoka"  
@@ -27,11 +31,25 @@ class: lead
 
 ## Co-working Spaces
 
-| Space       | Features                  |
-|-------------|---------------------------|
-| Main Hall   | Open, free when no events |
-| Under Space | Basement, relaxed         |
-| Focus Space | 6 silent cubicles         |
+![bg contain right:40%](/backgrounds/IMG_5573.JPG)
+
+| Space             | Features                  |
+|-------------------|---------------------------|
+| Main Hall         | Open, free when no events |
+| 4 Basement Spaces | See next page for details |
+
+---
+
+## Basement Spaces Detail
+
+![bg contain right:40%](/assets/images/concentratespace.jpg)
+
+| Space        | Features                                        |
+|--------------|-------------------------------------------------|
+| MTG Space    | 2+ people・Website booking・2h slots              |
+| Focus Space  | 6 booths・No booking・Silent only                 |
+| Under Space  | Free address・Extended screens・1 soundproof room |
+| Makers Space | 3D printer・Laser cutter・Training required       |
 
 **Note:** No talking / calls in the Focus Space
 
@@ -40,6 +58,8 @@ class: lead
 ---
 
 ## Time Slots & Extensions
+
+![bg contain right:45%](/assets/images/discord.jpg)
 
 - Standard 2 h (1 h for soundproof rooms)
 - Unlimited extensions if seats are free
@@ -52,6 +72,7 @@ class: lead
 ---
 
 ## Cultural-Property Etiquette
+![bg contain right:45%](/assets/images/notalloweat.png)
 
 - The Red-Brick Culture Hall is a national Important Cultural Property
 - Food & drinks ✖  
@@ -64,8 +85,10 @@ class: lead
 
 ## How to Register
 
+![bg contain left:35%](/assets/images/engineercafewifi.png)
+
 1. Connect to Wi-Fi  
-   - **engnrcf-guest-2.4GHz** / **akarenga-112years**  
+   - **engnrcf-guest-5GHz** / **akarenga-112years**  
 2. Scan the QR code, fill in the form  
 3. Show your screen to staff when entering your ID
 
@@ -74,6 +97,7 @@ class: lead
 ---
 
 ## About Membership Cards
+![bg contain right:40%](/assets/images/membershipcards.jpg)
 
 - Laser-cut on site → **cannot be re-issued**  
 - Lost card?  
@@ -82,24 +106,26 @@ class: lead
 - NFC/IC card & mobile wallet linking available  
 - One neck strap per person (no re-supply)
 
-<!-- _narration: Your card is unique and not reissuable, but we can look you up if it's lost. You can also link the ID to an NFC card or phone for smooth entry. -->
-
 ---
 
-## Reception on Future Visits
+## Reception for Next Visits
 
-1. Tell us which space you want  
-2. Receive a neck holder (Wi-Fi printed on back)  
-3. Leaving >15 min → temporary checkout (do NOT leave belongings; staff may move them for security)  
-4. Return neck holder on exit
+![bg contain right:45%](/assets/images/discord.jpg)
 
-Discord invite code is printed on the holder
+1. Specify your workspace  
+2. Get neck holder (with Wi-Fi info)  
+3. Leaving 15+ min → Temporary exit (no belongings left; staff may move items for verification)  
+4. Return neck holder when leaving
 
-<!-- _narration: At reception just specify the space. Your neck holder shows Wi-Fi and a Discord invite. If you leave for more than 15 minutes, do not leave your belongings behind; staff may move them to confirm. Please return the holder when you leave. -->
+Discord invite code on the back
+
+<!-- _narration: For your next visit, tell reception your preferred workspace. The neck holder has Wi-Fi and Discord info. If leaving for over 15 minutes, take all belongings—staff may need to check unattended items. Please return the holder when you leave. -->
 
 ---
 
 ## Our Philosophy
+
+![bg contain right:45%](/assets/images/welcomeoerson.png)
 
 > Fewer rules, more collaboration
 
@@ -111,8 +137,11 @@ Discord invite code is printed on the holder
 
 ---
 
-# Thank you!
+## Thank you!
 
-Talk to any staff member if you have questions
+![bg contain right:45%](/assets/images/regsterform.png)
+
+Scan to register
+Talk to any staff member
 
 <!-- _narration: That concludes the guide. Feel free to reach out to our team any time. -->

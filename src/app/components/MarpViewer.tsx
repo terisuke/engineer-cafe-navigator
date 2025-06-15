@@ -3,7 +3,7 @@
 import { useKeyboardControls } from '@/app/hooks/useKeyboardControls';
 import { audioStateManager } from '@/lib/audio-state-manager';
 import { ChevronLeft, ChevronRight, Keyboard, MessageCircle, Pause, Play, RotateCcw, Settings } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import SlideDebugPanel from './SlideDebugPanel';
 
 interface SlideData {
@@ -111,9 +111,12 @@ export default function MarpViewer({
   const [showAudioPermissionPrompt, setShowAudioPermissionPrompt] = useState(false);
   const [isNarrationInProgress, setIsNarrationInProgress] = useState(false);
   const [slideViewTimes, setSlideViewTimes] = useState<Map<number, number>>(new Map());
+  const [lipSyncCacheStats, setLipSyncCacheStats] = useState<any>(null);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentRequestIdRef = useRef<string>('');
 
   // Analytics tracking
   const trackPresentationEvent = (event: string, data: any) => {
@@ -159,12 +162,14 @@ export default function MarpViewer({
     }
   };
 
-  // Load slides and narration data
+  // Load slides and narration data when slideFile or language prop changes
   useEffect(() => {
-    loadSlideData();
-  }, [slideFile, language]);
-
-  // Simplified: removed complex event system for direct advancement
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[MarpViewer] useEffect triggered - slideFile: ${slideFile}, currentLanguage: ${currentLanguage}`);
+    }
+    // Always load slide data when slideFile or language changes
+    loadSlideData(currentLanguage);
+  }, [slideFile, currentLanguage]); // Remove loadSlideData from dependencies to avoid circular reference
 
   // Track slide view duration
   useEffect(() => {
@@ -215,14 +220,28 @@ export default function MarpViewer({
   // Listen for auto-start presentation event from parent
   useEffect(() => {
     const handleAutoStartPresentation = (event: CustomEvent) => {
-      if (event.detail?.autoPlay && !isPlaying) {
+      if (event.detail?.autoPlay) {
         // Set character to neutral expression for slide presentation
         if (onExpressionControl) {
           onExpressionControl('neutral', 1.0);
         }
         
+        // Stop any currently playing presentation first
+        if (isPlaying) {
+          setIsPlaying(false);
+          setCurrentSlide(1);
+          setRenderedHtml('');
+        }
+        
         // Load slides with specified language
         const eventLanguage = event.detail?.language || 'ja';
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[MarpViewer] Auto-start presentation event received for language: ${eventLanguage}`);
+        }
+        
+        // Force update the current language state immediately
+        setCurrentLanguage(eventLanguage as 'ja' | 'en');
+        
         loadSlideData(eventLanguage).then(() => {
           setIsPlaying(true);
         });
@@ -289,14 +308,56 @@ export default function MarpViewer({
   }, [currentSlide, renderedHtml]);
 
 
-  const loadSlideData = async (language: string = 'ja') => {
+  const loadSlideData = useCallback(async (requestedLang: string = 'ja') => {
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    const currentRequestId = `${requestedLang}-${Date.now()}-${Math.random()}`;
+    currentRequestIdRef.current = currentRequestId;
+    
     try {
+      
       setIsLoading(true);
       setError(null);
-      setCurrentLanguage(language as 'ja' | 'en'); // Update current language state
+      // Update language state
+      setCurrentLanguage(requestedLang as 'ja' | 'en');
+
+      // Clear previous HTML to avoid showing outdated slide deck
+      setRenderedHtml('');
 
       // Determine the slide file path based on language
-      const languageSlideFile = language === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
+      const languageSlideFile = requestedLang === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[MarpViewer] Loading slides for language: ${requestedLang} (Request ID: ${currentRequestId})`);
+        console.log(`[MarpViewer] Base slideFile: ${slideFile}`);
+        console.log(`[MarpViewer] Language-specific slideFile: ${languageSlideFile}`);
+      }
+
+      // Prepare request body
+      const requestBody = {
+        action: 'render_with_narration',
+        slideFile: languageSlideFile, // Use language-specific slide file
+        theme: 'engineer-cafe',
+        outputFormat: 'both',
+        language: requestedLang, // Add language parameter
+        requestId: currentRequestId, // Add request ID for tracking
+        options: {
+          // Ensure proper Marp rendering options
+          html: true,
+          markdown: {
+            breaks: true,
+          },
+        },
+      };
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[MarpViewer] Sending request body:`, requestBody);
+      }
 
       // Render slides with narration
       const response = await fetch('/api/marp', {
@@ -304,24 +365,25 @@ export default function MarpViewer({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          action: 'render_with_narration',
-          slideFile: languageSlideFile, // Use language-specific slide file
-          theme: 'engineer-cafe',
-          outputFormat: 'both',
-          language: language, // Add language parameter
-          options: {
-            // Ensure proper Marp rendering options
-            html: true,
-            markdown: {
-              breaks: true,
-            },
-          },
-        }),
+        body: JSON.stringify(requestBody),
+        signal: abortControllerRef.current.signal, // Add abort signal
       });
 
       const result = await response.json();
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[MarpViewer] Slide loading API response for ${requestedLang} (Request ID: ${currentRequestId}):`, result);
+      }
 
+      // Check if this is still the current request
+      if (currentRequestIdRef.current !== currentRequestId) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[MarpViewer] Ignoring outdated response for ${requestedLang} (Request ID: ${currentRequestId})`);
+        }
+        return;
+      }
+
+      // Ignore response if a newer loadSlideData was triggered in the meantime
       if (result.success) {
         if (result.slideData && result.slideData.slides) {
           setSlides(result.slideData.slides);
@@ -425,12 +487,31 @@ export default function MarpViewer({
         setError(result.error || 'Failed to load slides');
       }
     } catch (error) {
+      // Don't show error if request was aborted
+      if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[MarpViewer] Request for ${requestedLang} was aborted`);
+        }
+        return;
+      }
+      
+      // Check if this is still the current request before showing error
+      if (currentRequestIdRef.current !== currentRequestId) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[MarpViewer] Ignoring error from outdated request for ${requestedLang}`);
+        }
+        return;
+      }
+      
       console.error('Error loading slides:', error);
       setError('Error loading slides');
     } finally {
-      setIsLoading(false);
+      // Only clear loading if this is still the current request
+      if (currentRequestIdRef.current === currentRequestId) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [slideFile]); // Include slideFile as dependency
 
 
   const narrateCurrentSlide = async () => {
@@ -458,6 +539,19 @@ export default function MarpViewer({
           language: currentLanguage, // Use current language state instead of prop
         }),
       });
+      
+      // Check if response is ok
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        console.error('Non-JSON response received:', textResponse);
+        throw new Error('Invalid response format - expected JSON');
+      }
       
       result = await response.json();
       
@@ -563,9 +657,15 @@ export default function MarpViewer({
         try {
           const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
           const analyzer = new LipSyncAnalyzer();
-          const lipSyncData = await analyzer.analyzeLipSync(audioBlob);
           
-          console.log('[MarpViewer] Lip-sync analysis complete:', lipSyncData.frames.length, 'frames');
+          const analysisStartTime = performance.now();
+          const lipSyncData = await analyzer.analyzeLipSync(audioBlob);
+          const analysisTime = performance.now() - analysisStartTime;
+          
+          console.log('[MarpViewer] Lip-sync analysis complete:', lipSyncData.frames.length, 'frames', `in ${analysisTime.toFixed(1)}ms`);
+          
+          // Update cache stats for UI
+          setLipSyncCacheStats(analyzer.getCacheStats());
           
           // Schedule viseme updates
           let frameIndex = 0;
@@ -995,7 +1095,24 @@ export default function MarpViewer({
         }),
       });
 
+      // Check if response is ok
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        console.error('Non-JSON response received:', textResponse);
+        throw new Error('Invalid response format - expected JSON');
+      }
+
       const result = await response.json();
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[MarpViewer] API response:`, result);
+      }
 
       if (result.success) {
         onQuestionAsked?.(questionText);
@@ -1035,7 +1152,7 @@ export default function MarpViewer({
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={() => loadSlideData()}
+            onClick={() => loadSlideData(currentLanguage)}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
           >
             {currentLanguage === 'ja' ? '再試行' : 'Retry'}
@@ -1136,7 +1253,20 @@ export default function MarpViewer({
 
           {/* Settings */}
           <button
-            onClick={() => setShowSettings(!showSettings)}
+            onClick={async () => {
+              setShowSettings(!showSettings);
+              if (!showSettings) {
+                // Update cache stats when opening settings
+                try {
+                  const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
+                  const analyzer = new LipSyncAnalyzer();
+                  setLipSyncCacheStats(analyzer.getCacheStats());
+                  analyzer.dispose();
+                } catch (error) {
+                  console.error('Failed to load cache stats:', error);
+                }
+              }
+            }}
             className={`p-2 rounded transition-colors ${
               showSettings ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
@@ -1229,66 +1359,72 @@ export default function MarpViewer({
 
         {/* Notes area */}
         {showNotes && (
-          <div className="w-1/3 bg-gray-50 border-l p-4 overflow-y-auto">
-            <h3 className="font-semibold mb-3">
-              {language === 'ja' ? 'スライドノート' : 'Slide Notes'}
-            </h3>
+          <div className="w-1/3 bg-gray-50 border-l flex flex-col">
+            <div className="p-4 border-b bg-white">
+              <h3 className="font-semibold">
+                {language === 'ja' ? 'スライドノート' : 'Slide Notes'}
+              </h3>
+            </div>
             
-            {/* Current slide info */}
-            {slides[currentSlide - 1] && (
-              <div className="mb-4">
-                <h4 className="font-medium text-gray-800 mb-2">
-                  {slides[currentSlide - 1].title || `Slide ${currentSlide}`}
-                </h4>
-                {slides[currentSlide - 1].notes && (
-                  <p className="text-sm text-gray-600 mb-3">
-                    {slides[currentSlide - 1].notes}
-                  </p>
-                )}
-              </div>
-            )}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Current slide info */}
+              {slides[currentSlide - 1] && (
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">
+                    {slides[currentSlide - 1].title || `Slide ${currentSlide}`}
+                  </h4>
+                  {slides[currentSlide - 1].notes && (
+                    <p className="text-sm text-gray-600">
+                      {slides[currentSlide - 1].notes}
+                    </p>
+                  )}
+                </div>
+              )}
 
-            {/* Narration info */}
-            {narrationData && (
-              <div className="mb-4">
-                <h4 className="font-medium text-gray-800 mb-2">
-                  {language === 'ja' ? 'ナレーション' : 'Narration'}
-                </h4>
-                {narrationData.slides[currentSlide - 1] && (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-2">
-                      <strong>Auto:</strong> {narrationData.slides[currentSlide - 1].narration.auto}
-                    </p>
-                    <p className="text-sm text-gray-600 mb-2">
-                      <strong>On Enter:</strong> {narrationData.slides[currentSlide - 1].narration.onEnter}
-                    </p>
-                    {Object.keys(narrationData.slides[currentSlide - 1].narration.onDemand).length > 0 && (
+              {/* Narration info */}
+              {narrationData && (
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">
+                    {language === 'ja' ? 'ナレーション' : 'Narration'}
+                  </h4>
+                  {narrationData.slides[currentSlide - 1] && (
+                    <div className="space-y-2">
                       <div>
-                        <strong className="text-sm">On Demand:</strong>
-                        <ul className="text-sm text-gray-600 mt-1">
-                          {Object.entries(narrationData.slides[currentSlide - 1].narration.onDemand).map(([key, value]) => (
-                            <li key={key} className="mb-1">
-                              <em>{key}:</em> {value}
-                            </li>
-                          ))}
-                        </ul>
+                        <strong className="text-sm text-gray-700">Auto:</strong>
+                        <p className="text-sm text-gray-600 mt-1">{narrationData.slides[currentSlide - 1].narration.auto}</p>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+                      <div>
+                        <strong className="text-sm text-gray-700">On Enter:</strong>
+                        <p className="text-sm text-gray-600 mt-1">{narrationData.slides[currentSlide - 1].narration.onEnter}</p>
+                      </div>
+                      {Object.keys(narrationData.slides[currentSlide - 1].narration.onDemand).length > 0 && (
+                        <div>
+                          <strong className="text-sm text-gray-700">On Demand:</strong>
+                          <ul className="text-sm text-gray-600 mt-1 space-y-1">
+                            {Object.entries(narrationData.slides[currentSlide - 1].narration.onDemand).map(([key, value]) => (
+                              <li key={key}>
+                                <em className="text-gray-500">{key}:</em> {value}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {/* Navigation hints */}
-            <div>
-              <h4 className="font-medium text-gray-800 mb-2">
-                {language === 'ja' ? 'ナビゲーション' : 'Navigation'}
-              </h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>← → {language === 'ja' ? 'スライド移動' : 'Navigate slides'}</li>
-                <li>Space {language === 'ja' ? '次のスライド' : 'Next slide'}</li>
-                <li>R {language === 'ja' ? '最初から' : 'Reset'}</li>
-              </ul>
+              {/* Navigation hints */}
+              <div>
+                <h4 className="font-medium text-gray-800 mb-2">
+                  {language === 'ja' ? 'ナビゲーション' : 'Navigation'}
+                </h4>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  <li>← → {language === 'ja' ? 'スライド移動' : 'Navigate slides'}</li>
+                  <li>Space {language === 'ja' ? '次のスライド' : 'Next slide'}</li>
+                  <li>R {language === 'ja' ? '最初から' : 'Reset'}</li>
+                </ul>
+              </div>
             </div>
           </div>
         )}
@@ -1453,13 +1589,46 @@ export default function MarpViewer({
                 </div>
               </div>
 
+              {/* Lip-sync Cache Management */}
+              <div className="bg-blue-50 p-3 rounded text-xs">
+                <div className="font-medium mb-2">
+                  {language === 'ja' ? 'リップシンクキャッシュ' : 'Lip-sync Cache'}
+                </div>
+                {lipSyncCacheStats ? (
+                  <div className="space-y-1">
+                    <div>Hit Rate: {lipSyncCacheStats.hitRate}%</div>
+                    <div>Memory: {lipSyncCacheStats.memoryEntries} entries</div>
+                    <div>Storage: {lipSyncCacheStats.localStorageEntries} entries</div>
+                    <div>Hits: {lipSyncCacheStats.hitCount} / Misses: {lipSyncCacheStats.missCount}</div>
+                  </div>
+                ) : (
+                  <div className="text-gray-500">No cache data available</div>
+                )}
+                <button
+                  onClick={async () => {
+                    try {
+                      const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
+                      const analyzer = new LipSyncAnalyzer();
+                      analyzer.clearCache();
+                      setLipSyncCacheStats(analyzer.getCacheStats());
+                      analyzer.dispose();
+                    } catch (error) {
+                      console.error('Failed to clear cache:', error);
+                    }
+                  }}
+                  className="mt-2 w-full px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                >
+                  {language === 'ja' ? 'キャッシュクリア' : 'Clear Cache'}
+                </button>
+              </div>
+
               {/* Performance Info */}
               <div className="bg-gray-50 p-3 rounded text-xs">
                 <div className="font-medium mb-1">
                   {language === 'ja' ? 'パフォーマンス情報' : 'Performance Info'}
                 </div>
                 <div className="space-y-1">
-                  <div>Cache Size: {audioCache.size} slides</div>
+                  <div>Audio Cache: {audioCache.size} slides</div>
                   <div>Retry Count: {retryCount}</div>
                   <div>Current Slide: {currentSlide}/{totalSlides}</div>
                 </div>

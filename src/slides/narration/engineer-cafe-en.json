@@ -42,39 +42,56 @@
     {
       "slideNumber": 3,
       "narration": {
-        "auto": "You can choose from three areas. Remember the Focus Space is a strict quiet zone; tell reception if you need to move seats.",
+        "auto": "Our coworking spaces include the Main Hall and 4 basement spaces. The Main Hall is free to use when there are no events. Let me explain the basement spaces in detail on the next page.",
         "onEnter": "About our coworking spaces.",
         "onDemand": {
           "main hall": "The open Main Hall is free to use when there are no events.",
-          "under space": "The Under Space in the basement offers a relaxed atmosphere.",
-          "focus space": "The Focus Space has 6 seats with complete silence. Talking and web meetings are prohibited.",
-          "seat movement": "Please notify reception if you need to move seats."
+          "basement spaces": "There are 4 distinctive spaces in the basement. I'll explain them in detail on the next page.",
+          "events": "The Main Hall may have usage restrictions during events.",
+          "fee": "All spaces are completely free to use."
         }
       },
       "transitions": {
-        "next": "Let me explain about operating hours and extensions.",
+        "next": "Let me explain the basement spaces in detail.",
         "previous": "Going back to What is Engineer Cafe."
       }
     },
     {
       "slideNumber": 4,
       "narration": {
-        "auto": "Operating hours are 9 AM to 10 PM. Seats are allotted in two-hour blocks but you may extend as often as you like when space is available. Request extensions via staff or Discord.",
-        "onEnter": "About operating hours and extensions.",
+        "auto": "The basement has 4 distinctive spaces. MTG Space requires booking for 2 or more people via the website. Focus Space has 6 booths with complete silence and no talking allowed. Under Space has free address seating with extended screens and one soundproof room. Makers Space has 3D printers and laser cutters but requires initial training.",
+        "onEnter": "About the basement spaces in detail.",
         "onDemand": {
-          "operating hours": "Operating hours are 9 AM to 10 PM.",
-          "basic time": "Basic usage time is 2 hours. Soundproof rooms are limited to 1 hour only.",
-          "extensions": "Extensions are unlimited if space is available.",
-          "application method": "You can request extensions directly from staff or through the Discord reception channel."
+          "mtg space": "Available for 2 or more people, requires advance booking via website. No same-day booking. Used in 2-hour slots.",
+          "focus space": "6 booths available, no reservation required, but talking is strictly prohibited. This is a dedicated area for focused work.",
+          "under space": "Free address style like the 1st floor, with extended screens available. Has one soundproof room available in 1-hour slots.",
+          "makers space": "3D printers and laser cutters available. First-time users must book initial training via website. No same-day booking."
         }
       },
       "transitions": {
-        "next": "Let me explain about cultural property etiquette.",
+        "next": "Let me explain about time slots and extensions.",
         "previous": "Going back to coworking spaces."
       }
     },
     {
       "slideNumber": 5,
+      "narration": {
+        "auto": "Seats are allotted in two-hour blocks but you may extend as often as you like when space is available. Request extensions via staff or Discord. Soundproof rooms are limited to 1-hour slots.",
+        "onEnter": "About time slots and extensions.",
+        "onDemand": {
+          "basic time": "Basic usage time is 2 hours. Soundproof rooms are limited to 1 hour only.",
+          "extensions": "Extensions are unlimited if space is available.",
+          "application method": "You can request extensions directly from staff or through the Discord reception channel.",
+          "discord": "Discord invitation code is printed on the back of the neck holder."
+        }
+      },
+      "transitions": {
+        "next": "Let me explain about cultural property etiquette.",
+        "previous": "Going back to basement spaces."
+      }
+    },
+    {
+      "slideNumber": 6,
       "narration": {
         "auto": "Because the hall is a protected cultural asset, food is prohibited. Sealed drinks are the only exception—and straws are still not allowed.",
         "onEnter": "About cultural property etiquette.",
@@ -87,16 +104,16 @@
       },
       "transitions": {
         "next": "Let me explain the registration process.",
-        "previous": "Going back to operating hours and extensions."
+        "previous": "Going back to time slots and extensions."
       }
     },
     {
-      "slideNumber": 6,
+      "slideNumber": 7,
       "narration": {
         "auto": "Start by connecting to our guest Wi-Fi, then register via the QR code. Please enter the membership ID together with staff to avoid mistakes.",
         "onEnter": "About the registration process.",
         "onDemand": {
-          "wi-fi": "SSID is engnrcf-guest-2.4GHz, password is akarenga-112years.",
+          "wi-fi": "SSID is engnrcf-guest-5GHz, password is akarenga-112years.",
           "qr code": "Scan the QR code provided at reception to access the registration form.",
           "membership id": "Staff will assist with entering your membership ID to prevent errors.",
           "security": "Registration information is properly managed and personal information is protected."
@@ -108,7 +125,7 @@
       }
     },
     {
-      "slideNumber": 7,
+      "slideNumber": 8,
       "narration": {
         "auto": "Your card is unique and not reissuable, but we can look you up if it's lost. You can also link the ID to an NFC card or phone for smooth entry.",
         "onEnter": "About membership cards.",
@@ -120,26 +137,8 @@
         }
       },
       "transitions": {
-        "next": "Let me explain about reception for future visits.",
+        "next": "Let me explain about our philosophy.",
         "previous": "Going back to registration process."
-      }
-    },
-    {
-      "slideNumber": 8,
-      "narration": {
-        "auto": "At reception just specify the space. Your neck holder shows Wi-Fi and a Discord invite. If you leave for more than 15 minutes, do NOT leave your belongings behind; staff may move them for security. Please return the holder when you leave.",
-        "onEnter": "About reception for future visits.",
-        "onDemand": {
-          "space specification": "At reception, please specify Main Hall, Under Space, or Focus Space.",
-          "neck holder": "Wi-Fi information is printed on the back of the neck holder.",
-          "leaving": "If leaving for more than 15 minutes, please check out temporarily and do NOT leave belongings; staff may move them for security.",
-          "belongings": "Do NOT leave your belongings behind; staff may move them for security confirmation.",
-          "discord": "Discord invitation code is also printed on the back of the neck holder."
-        }
-      },
-      "transitions": {
-        "next": "Let me talk about Engineer Cafe's philosophy.",
-        "previous": "Going back to membership cards."
       }
     },
     {
@@ -156,7 +155,7 @@
       },
       "transitions": {
         "next": "Thank you for your attention.",
-        "previous": "Going back to reception for future visits."
+        "previous": "Going back to membership cards."
       }
     },
     {
@@ -172,8 +171,57 @@
         }
       },
       "transitions": {
-        "next": null,
+        "next": "That concludes the guide.",
         "previous": "Going back to Engineer Cafe's philosophy."
+      }
+    },
+    {
+      "slideNumber": 11,
+      "narration": {
+        "auto": "Thank you for your attention. We hope this guide helps you make the most of Engineer Cafe. Feel free to reach out to our team any time!",
+        "onEnter": "Thank you for watching this presentation.",
+        "onDemand": {
+          "operating hours": "Operating hours are 9 AM to 10 PM.",
+          "location": "We're located in Fukuoka City's Red Brick Culture Hall.",
+          "free": "This is a completely free public facility.",
+          "questions": "Please feel free to ask staff any questions you may have."
+        }
+      },
+      "transitions": {
+        "next": "Let's conclude the presentation.",
+        "previous": "Going back to our philosophy."
+      }
+    },
+    {
+      "slideNumber": 12,
+      "narration": {
+        "auto": "Remember, you can use our reception desk for future visits - just show your card at reception for easy access. Staff are always available to help.",
+        "onEnter": "Information about reception for next visits.",
+        "onDemand": {
+          "card usage": "Show your membership card at reception for quick entry.",
+          "staff assistance": "Reception staff can help with any questions or needs.",
+          "next visits": "For future visits, you don't need to go through the full registration process again."
+        }
+      },
+      "transitions": {
+        "next": "Thank you for your attention.",
+        "previous": "Going back to the conclusion."
+      }
+    },
+    {
+      "slideNumber": 13,
+      "narration": {
+        "auto": "Thank you for your attention. We hope this guide helps you make the most of Engineer Cafe. Feel free to reach out to our team any time!",
+        "onEnter": "Final thank you screen.",
+        "onDemand": {
+          "visit again": "We look forward to seeing you at Engineer Cafe!",
+          "questions": "Please don't hesitate to ask staff any questions.",
+          "community": "Join our vibrant community of engineers and creators."
+        }
+      },
+      "transitions": {
+        "next": null,
+        "previous": "Going back to reception information."
       }
     }
   ]

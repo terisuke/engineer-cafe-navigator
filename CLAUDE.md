@@ -19,24 +19,9 @@ pnpm lint                   # Run Next.js linting
 # CSS Dependencies
 pnpm install:css            # Install correct Tailwind CSS v3 dependencies
 
-# Testing
-pnpm test:api               # Run API endpoint tests
-pnpm test:rag               # Test RAG search functionality
-pnpm test:external-apis     # Test external API integrations
-pnpm test:local             # Run local setup tests
-pnpm test:production        # Production deployment tests
-
-# RAG & Knowledge Base
-pnpm seed:knowledge         # Seed knowledge base
-pnpm migrate:embeddings     # Migrate embeddings
-pnpm test:external-data     # Test external data fetcher
-
-# Monitoring & Analysis
-pnpm monitor:baseline       # Collect performance baseline
-pnpm monitor:migration      # Monitor migration status
-pnpm compare:implementations # Compare implementation performance
-pnpm validate:production    # Validate production readiness
-pnpm check:deployment       # Check deployment readiness
+# Knowledge Base Management
+pnpm seed:knowledge         # Seed knowledge base with initial data
+pnpm migrate:embeddings     # Migrate existing knowledge to OpenAI embeddings
 ```
 
 ## ⚠️ CRITICAL: Tailwind CSS Version
@@ -51,7 +36,8 @@ pnpm check:deployment       # Check deployment readiness
 ### Technology Stack
 - **Frontend**: Next.js 15 (App Router) + React 19 + TypeScript
 - **AI Framework**: Mastra 0.9.4 for agent orchestration
-- **AI Model**: Google Gemini 2.5 Flash Preview
+- **AI Model**: Google Gemini 2.5 Flash Preview (for responses)
+- **Embeddings**: OpenAI text-embedding-3-small (1536 dimensions for vector search)
 - **Voice**: Google Cloud Speech-to-Text/Text-to-Speech
 - **3D Graphics**: Three.js with @pixiv/three-vrm
 - **Database**: PostgreSQL with pgvector extension
@@ -74,7 +60,8 @@ The application follows a multi-layered architecture:
 
 3. **Data Layer**: Supabase/PostgreSQL with pgvector
    - Conversation sessions, history, and analytics
-   - Knowledge base with vector embeddings (1536 dimensions)
+   - Knowledge base with vector embeddings (1536 dimensions, OpenAI)
+   - Multi-language support (Japanese/English content)
    - Agent memory for state persistence
 
 ### Key API Endpoints
@@ -86,12 +73,14 @@ The application follows a multi-layered architecture:
 - **POST /api/character**: VRM character control
 - **POST /api/qa**: Q&A interactions
 - **POST /api/external**: External system integration
+- **GET/POST /admin/knowledge**: Knowledge base management interface
 
 ### Environment Configuration
 
 Required environment variables:
 - `GOOGLE_CLOUD_PROJECT_ID`: GCP project for speech services
-- `GOOGLE_GENERATIVE_AI_API_KEY`: Gemini API key
+- `GOOGLE_GENERATIVE_AI_API_KEY`: Gemini API key for AI responses
+- `OPENAI_API_KEY`: OpenAI API key for embeddings (1536 dimensions)
 - `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Public Supabase access
 - `SUPABASE_SERVICE_ROLE_KEY`: Server-side Supabase access
 - Service account key at `config/service-account-key.json`
@@ -110,20 +99,89 @@ All tables have Row Level Security (RLS) enabled with service role access.
 ### Development Workflow
 
 1. Start the development server with `pnpm dev`
-2. VRM character models should be placed in `public/characters/models/`
-3. Slide content in Marp format goes in `src/slides/`
-4. Narration JSON files in `src/slides/narration/`
-5. Use Mastra agents for AI interactions
-6. Voice processing uses Google Cloud services with base64 audio encoding
+2. Access admin interface at `/admin/knowledge` for content management
+3. VRM character models should be placed in `public/characters/models/`
+4. Slide content in Marp format goes in `src/slides/`
+5. Narration JSON files in `src/slides/narration/`
+6. Use Mastra agents for AI interactions
+7. Voice processing uses Google Cloud services with base64 audio encoding
+8. Knowledge base entries support rich metadata with importance levels and tags
+
+### RAG Search System
+
+The application uses a sophisticated multi-language RAG (Retrieval-Augmented Generation) system:
+
+- **Multi-language Knowledge Base**: Supports both Japanese and English content
+- **Cross-language Search**: English questions can retrieve Japanese content and vice versa
+- **OpenAI Embeddings**: Uses text-embedding-3-small model for semantic search
+- **Vector Database**: PostgreSQL with pgvector for similarity search
+- **Admin Interface**: Web-based knowledge management at `/admin/knowledge`
+- **Smart Query Enhancement**: Automatically enhances queries for better basement space detection
+- **Duplicate Removal**: Intelligent deduplication of cross-language results
+
+### Knowledge Base Structure
+
+The knowledge base contains 84+ entries organized by:
+- **Categories**: 設備/Facilities, 基本情報/General, 料金/Pricing, etc.
+- **Subcategories**: Specific facility types (地下MTGスペース, Basement Focus Space, etc.)
+- **Languages**: Japanese (ja) and English (en) versions
+- **Metadata**: Importance levels, tags, last updated timestamps
 
 ### Key Considerations
 
-- The app is designed for multi-language support (Japanese/English)
-- Real-time voice interactions with interruption handling
-- 3D character animations synchronized with voice output
-- Slide presentations with voice narration
-- WebSocket support for external system integration
-- Voice recognition using Google Cloud STT with Service Account authentication
-- Emotion detection from text for character expression control
-- No test framework is currently configured
-- Enhanced voice API with facial expression is planned but not yet implemented
+- **Multi-language Support**: Japanese/English UI and content with automatic language detection
+- **Real-time Voice Interactions**: Speech-to-text with interruption handling
+- **3D Character Animations**: Synchronized with voice output and emotion detection with intelligent lip-sync caching
+- **Slide Presentations**: Marp-based slides with voice narration
+- **Admin Knowledge Management**: Structured metadata editing with dropdowns and templates
+- **Hybrid AI Architecture**: Gemini for responses, OpenAI for embeddings
+- **Cross-language RAG**: Questions in one language can retrieve answers from content in either language
+- **Voice Recognition**: Google Cloud STT with Service Account authentication
+- **WebSocket Support**: For external system integration
+- **No Test Framework**: Currently configured for production deployment
+
+### Lip-sync System
+
+The application features an advanced lip-sync system for VRM character animations:
+
+#### **Core Components**
+- **LipSyncAnalyzer** (`/src/lib/lip-sync-analyzer.ts`): Real-time audio analysis for mouth shape generation
+- **LipSyncCache** (`/src/lib/lip-sync-cache.ts`): Intelligent caching system for performance optimization
+- **5 Viseme Types**: A, I, U, E, O mouth shapes plus Closed state
+
+#### **Caching System Features**
+- **Audio Fingerprinting**: Generates unique hashes from audio data for cache keys
+- **Hybrid Storage**: Memory cache for speed + localStorage for persistence
+- **Auto-cleanup**: 7-day expiration with automatic old entry removal
+- **Size Management**: 10MB max cache size, 100 entry limit
+- **Performance Monitoring**: Hit rate tracking and detailed statistics
+
+#### **Performance Benefits**
+- **First Analysis**: 4-8 seconds for new audio processing
+- **Cached Results**: 10-50ms retrieval time for repeated audio
+- **Efficient Storage**: Compressed frame data with intelligent deduplication
+- **Memory Management**: Automatic cleanup prevents storage bloat
+
+#### **User Interface**
+- **Settings Panel**: Real-time cache statistics display
+- **Cache Management**: One-click cache clearing functionality
+- **Performance Metrics**: Hit rate, entry counts, and usage statistics
+- **Debug Mode**: Detailed timing information in development
+
+#### **Technical Details**
+- **Frame Rate**: 20fps mouth shape updates (50ms intervals)
+- **Audio Analysis**: FFT-based frequency analysis for vowel detection
+- **Storage Format**: JSON serialization with timestamp metadata
+- **Error Handling**: Graceful fallbacks when cache fails
+- **Cross-session**: Persistent cache across browser restarts
+
+#### **Cache Key Generation**
+```typescript
+// Audio fingerprinting process:
+1. File size hash
+2. Sample data points throughout audio
+3. Checksum calculation
+4. Collision-resistant final hash
+```
+
+This system dramatically reduces lip-sync processing time for repeated slide presentations while maintaining high-quality mouth animations.

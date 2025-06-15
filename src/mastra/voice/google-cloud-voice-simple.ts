@@ -4,6 +4,7 @@
  */
 
 import { GoogleAuth } from 'google-auth-library';
+import * as fs from 'fs';
 
 interface VoiceSettings {
   language: string;
@@ -49,24 +50,46 @@ export class GoogleCloudVoiceSimple {
   private currentSettings: VoiceSettings;
 
   constructor() {
-    // Parse credentials from environment variable if available
-    const credentialsJson = process.env.GOOGLE_CLOUD_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    let credentials;
+    // Check if credentials are provided as a path or JSON string
+    const credentialsPath = process.env.GOOGLE_CLOUD_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    let authOptions: any = {
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID
+    };
     
-    if (credentialsJson) {
-      try {
-        credentials = JSON.parse(credentialsJson);
-      } catch (error) {
-        console.error('Failed to parse Google Cloud credentials from environment variable:', error);
+    if (credentialsPath) {
+      // Server-side only: Check if it's a file path by checking if file exists
+      if (typeof window === 'undefined' && fs.existsSync(credentialsPath)) {
+        // It's a file path (server-side only)
+        authOptions.keyFile = credentialsPath;
+      } else {
+        // Try to parse as JSON
+        try {
+          authOptions.credentials = JSON.parse(credentialsPath);
+        } catch (error) {
+          console.error('Failed to parse Google Cloud credentials from environment variable:', error);
+          // Fallback to default file path (server-side only)
+          if (typeof window === 'undefined') {
+            const defaultKeyPath = 'config/service-account-key.json';
+            if (fs.existsSync(defaultKeyPath)) {
+              authOptions.keyFile = defaultKeyPath;
+            } else {
+              throw new Error(`Service account key file not found at ${defaultKeyPath}. Please provide valid credentials.`);
+            }
+          }
+        }
+      }
+    } else if (typeof window === 'undefined') {
+      // No credentials provided, use default file path (server-side only)
+      const defaultKeyPath = 'config/service-account-key.json';
+      if (fs.existsSync(defaultKeyPath)) {
+        authOptions.keyFile = defaultKeyPath;
+      } else {
+        throw new Error(`Service account key file not found at ${defaultKeyPath}. Please set GOOGLE_CLOUD_CREDENTIALS environment variable.`);
       }
     }
     
-    this.auth = new GoogleAuth({
-      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-      credentials: credentials,
-      keyFile: credentials ? undefined : 'config/service-account-key.json', // Fallback to file for local development
-      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID
-    });
+    this.auth = new GoogleAuth(authOptions);
     
     // Default settings
     this.currentSettings = {
@@ -154,12 +177,16 @@ export class GoogleCloudVoiceSimple {
 
       const result = await response.json();
       
+      console.log('Speech-to-Text API response:', JSON.stringify(result, null, 2));
+      
       if (result.results && result.results.length > 0 && result.results[0].alternatives && result.results[0].alternatives.length > 0) {
         const transcript = result.results[0].alternatives[0].transcript;
         const confidence = result.results[0].alternatives[0].confidence || 0;
         
+        console.log(`Raw transcript from API: "${transcript}" (type: ${typeof transcript})`);
+        
         // Check if transcript is valid
-        if (!transcript || typeof transcript !== 'string') {
+        if (!transcript || typeof transcript !== 'string' || transcript.trim().length === 0) {
           console.log('Speech-to-Text: Empty or invalid transcript');
           return {
             success: false,
@@ -167,14 +194,16 @@ export class GoogleCloudVoiceSimple {
           };
         }
         
-        console.log(`Speech-to-Text successful: "${transcript}" (confidence: ${confidence})`);
+        const trimmedTranscript = transcript.trim();
+        console.log(`Speech-to-Text successful: "${trimmedTranscript}" (confidence: ${confidence})`);
         
         return {
           success: true,
-          transcript: transcript.trim(),
+          transcript: trimmedTranscript,
           confidence
         };
       } else {
+        console.log('No transcription results in API response:', result);
         return {
           success: false,
           error: 'No transcription results'

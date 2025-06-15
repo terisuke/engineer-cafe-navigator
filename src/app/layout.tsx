@@ -35,7 +35,7 @@ export default function RootLayout({
     <html lang="ja" className={`${inter.variable} ${notoSansJP.variable}`}>
       <head>
         <link rel="icon" href="/assets/images/favicon.ico" />
-        <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js" integrity="sha384-gzn2n++arkvyhdNLmUf1s6F5NZ8iAbZ7FhIt+Zw7Jlf1n/vNTmZ3+cYr7S4ogyco%" crossOrigin="anonymous"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js" integrity="sha384-hkdWrJct7B7QgkF6qkHOd8QKEb2Kqmq3R6gOTbKhvEcxBFo8wD2EbGm9CbPZhqnW" crossOrigin="anonymous"></script>
       </head>
       <body className="font-sans antialiased min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
         {children}

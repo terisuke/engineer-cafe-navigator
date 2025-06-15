@@ -806,22 +806,22 @@ export default function Home() {
                   
                   {/* Voice interaction controls - only show when not in slide mode */}
                   {!showSlideMode && (
-                    <div className="absolute bottom-8 left-0 right-0 px-8">
+                    <div className="absolute bottom-12 md:bottom-16 left-0 right-0 px-8 md:px-12">
                       <div className="container mx-auto">
                         {!isVoiceActive ? (
                           // Language selection buttons - grouped layout
-                          <div className="flex flex-col sm:flex-row sm:justify-between items-center sm:items-end gap-6 sm:gap-4">
+                          <div className="flex flex-col lg:flex-row lg:justify-between items-center lg:items-end gap-8 lg:gap-6">
                             {/* Japanese buttons group - left side */}
-                            <div className="flex flex-col gap-4 w-full sm:w-auto">
+                            <div className="flex flex-col gap-6 w-full lg:w-auto">
                               <button
                                 onClick={() => {
                                   handleLanguageVoiceStart('ja');
                                   setIsVoiceActive(true);
                                 }}
-                                className="flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[240px] md:min-w-[280px] touch-manipulation"
+                                className="flex items-center justify-center gap-4 px-8 py-6 md:py-8 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[280px] md:min-w-[320px] touch-manipulation"
                               >
-                                <MessageSquare className="w-6 h-6" />
-                                <span className="text-base md:text-lg font-semibold">日本語で話しかける</span>
+                                <MessageSquare className="w-7 h-7 md:w-8 md:h-8" />
+                                <span className="text-lg md:text-xl font-semibold">日本語で話しかける</span>
                               </button>
                               <button
                                 onClick={() => {
@@ -835,24 +835,24 @@ export default function Home() {
                                     window.dispatchEvent(autoPlayEvent);
                                   }, 100);
                                 }}
-                                className="flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[240px] md:min-w-[280px] touch-manipulation"
+                                className="flex items-center justify-center gap-4 px-8 py-6 md:py-8 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[280px] md:min-w-[320px] touch-manipulation"
                               >
-                                <UserPlus className="w-6 h-6" />
-                                <span className="text-base md:text-lg font-semibold">初めての方へ</span>
+                                <UserPlus className="w-7 h-7 md:w-8 md:h-8" />
+                                <span className="text-lg md:text-xl font-semibold">初めての方へ</span>
                               </button>
                             </div>
                             
                             {/* English buttons group - right side */}
-                            <div className="flex flex-col gap-4 w-full sm:w-auto">
+                            <div className="flex flex-col gap-6 w-full lg:w-auto">
                               <button
                                 onClick={() => {
                                   handleLanguageVoiceStart('en');
                                   setIsVoiceActive(true);
                                 }}
-                                className="flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[240px] md:min-w-[280px] touch-manipulation"
+                                className="flex items-center justify-center gap-4 px-8 py-6 md:py-8 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[280px] md:min-w-[320px] touch-manipulation"
                               >
-                                <MessageSquare className="w-6 h-6" />
-                                <span className="text-base md:text-lg font-semibold">Speak English</span>
+                                <MessageSquare className="w-7 h-7 md:w-8 md:h-8" />
+                                <span className="text-lg md:text-xl font-semibold">Speak English</span>
                               </button>
                               <button
                                 onClick={() => {
@@ -866,18 +866,18 @@ export default function Home() {
                                     window.dispatchEvent(autoPlayEvent);
                                   }, 100);
                                 }}
-                                className="flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[240px] md:min-w-[280px] touch-manipulation"
+                                className="flex items-center justify-center gap-4 px-8 py-6 md:py-8 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[280px] md:min-w-[320px] touch-manipulation"
                               >
-                                <UserPlus className="w-6 h-6" />
-                                <span className="text-base md:text-lg font-semibold">For first-time users</span>
+                                <UserPlus className="w-7 h-7 md:w-8 md:h-8" />
+                                <span className="text-lg md:text-xl font-semibold">For first-time users</span>
                               </button>
                             </div>
                           </div>
                         ) : (
                           // Voice control interface
                           <div className="flex flex-col items-center gap-4">
-                            <div className="bg-white/90 backdrop-blur-sm rounded-xl px-6 py-3 shadow-lg">
-                              <span className="text-sm font-medium text-gray-700">
+                            <div className="bg-white/90 backdrop-blur-sm rounded-xl px-8 py-4 shadow-lg">
+                              <span className="text-base md:text-lg font-medium text-gray-700">
                                 {currentLanguage === 'ja' ? '会話中（日本語）' : 'Conversation (English)'}
                               </span>
                             </div>
@@ -888,14 +888,14 @@ export default function Home() {
                               onMouseUp={stopVoiceRecording}
                               onTouchStart={startVoiceRecording}
                               onTouchEnd={stopVoiceRecording}
-                              className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 ${
+                              className={`w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center shadow-xl transition-all duration-200 ${
                                 isListening 
                                   ? 'bg-red-500 hover:bg-red-600 scale-110' 
                                   : 'bg-blue-500 hover:bg-blue-600 hover:scale-105'
                               }`}
                             >
                               <svg 
-                                className="w-8 h-8 text-white" 
+                                className="w-10 h-10 md:w-12 md:h-12 text-white" 
                                 fill="none" 
                                 stroke="currentColor" 
                                 viewBox="0 0 24 24"
@@ -910,7 +910,7 @@ export default function Home() {
                             </button>
                             
                             <div className="text-center">
-                              <p className="text-sm text-gray-600">
+                              <p className="text-base md:text-lg text-gray-600">
                                 {isListening 
                                   ? (currentLanguage === 'ja' ? '聞いています...' : 'Listening...') 
                                   : (currentLanguage === 'ja' ? 'ボタンを押しながら話してください' : 'Hold to speak')
@@ -929,7 +929,7 @@ export default function Home() {
                                   setVoiceRecorder(null);
                                 }
                               }}
-                              className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+                              className="px-6 py-3 md:py-4 bg-gray-500 hover:bg-gray-600 text-white text-base md:text-lg rounded-xl transition-colors touch-manipulation"
                             >
                               {currentLanguage === 'ja' ? '会話を終了' : 'End conversation'}
                             </button>

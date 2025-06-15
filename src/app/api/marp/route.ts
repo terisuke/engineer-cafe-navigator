@@ -42,7 +42,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      const rawBody = await request.text();
+      if (!rawBody || rawBody.trim() === '') {
+        return NextResponse.json(
+          { error: 'Request body is empty' },
+          { status: 400 }
+        );
+      }
+      body = JSON.parse(rawBody);
+    } catch (error) {
+      console.error('Failed to parse JSON body:', error);
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
+    
     const { action, slideFile, theme, outputFormat, slideNumber } = body;
 
     switch (action) {
@@ -122,9 +139,13 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        console.log(`[MARP API] render_with_narration request:`, { slideFile, theme, outputFormat });
+
         // Render slides
         // Handle language-specific slide files (e.g., "en/engineer-cafe" -> "src/slides/en/engineer-cafe.md")
         const narrationSlideFilePath = slideFile.endsWith('.md') ? `src/slides/${slideFile}` : `src/slides/${slideFile}.md`;
+        
+        console.log(`[MARP API] Constructed slide file path: ${narrationSlideFilePath}`);
         
         const slidesResult = await marpTool.execute({
           slideFile: narrationSlideFilePath,
@@ -133,6 +154,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (!slidesResult.success) {
+          console.error(`[MARP API] Slides rendering failed:`, slidesResult.error);
           return NextResponse.json({
             success: false,
             error: slidesResult.error,

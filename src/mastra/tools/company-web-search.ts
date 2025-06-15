@@ -137,7 +137,7 @@ export class EngineerCafeWebSearchTool {
       return `エンジニアカフェは福岡市が運営するITエンジニア向けの公共施設です。
 公式サイト: https://engineercafe.jp
 公式X: https://x.com/EngineerCafeJP
-営業時間: 9:00-22:00（年中無休）
+営業時間: 9:00-22:00、休館日: 毎月最終月曜日（祝日の場合は翌平日）と年末年始（12/29-1/3）
 利用料金: 完全無料
 所在地: 福岡市中央区天神`;
     } else {

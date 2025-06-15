@@ -1,4 +1,7 @@
 {
+  "buildCommand": "pnpm build",
+  "devCommand": "pnpm dev",
+  "installCommand": "pnpm install",
   "crons": [
     {
       "path": "/api/cron/update-knowledge-base",
@@ -14,6 +17,19 @@
     },
     "src/app/api/knowledge/search/route.ts": {
       "maxDuration": 10
+    },
+    "src/app/api/slides/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/character/route.ts": {
+      "maxDuration": 10
+    },
+    "src/app/api/marp/route.ts": {
+      "maxDuration": 15
     }
-  }
+  },
+  "env": {
+    "NEXT_RUNTIME": "nodejs"
+  },
+  "regions": ["hnd1"]
 }

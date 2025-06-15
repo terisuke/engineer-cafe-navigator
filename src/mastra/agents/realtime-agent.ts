@@ -196,8 +196,24 @@ export class RealtimeAgent extends Agent {
       const result = await this.voiceService.speechToText(audioBase64, currentLang);
       performanceSteps['Speech-to-Text'] = endPerformance('Speech-to-Text');
       
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[RealtimeAgent] STT result:', {
+          success: result.success,
+          transcript: result.transcript,
+          confidence: result.confidence,
+          error: result.error
+        });
+      }
+      
       // Check confidence threshold (ignore very low-confidence STT results)
       if (!result.success || !result.transcript || !result.transcript.trim()) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[RealtimeAgent] STT failed validation:', {
+            success: result.success,
+            hasTranscript: !!result.transcript,
+            transcriptTrimmed: result.transcript ? result.transcript.trim() : null
+          });
+        }
         this.conversationState = 'idle';
         return {
           transcript: '',
@@ -308,14 +324,40 @@ export class RealtimeAgent extends Agent {
   async generateResponse(input: string): Promise<string> {
     let language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
     
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[RealtimeAgent] generateResponse called with input:', input);
+    }
+    
     // Try RAG via existing QA-agent first
     try {
       const navigator = getEngineerCafeNavigator(this.config);
       const qaAgent = navigator.getAgent('qa') as EnhancedQAAgent | undefined;
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[RealtimeAgent] QA agent available:', !!qaAgent);
+      }
+      
       if (qaAgent && qaAgent.answerQuestion) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[RealtimeAgent] Calling QA agent with input:', input);
+        }
         const qaAnswer: string = await qaAgent.answerQuestion(input);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[RealtimeAgent] QA agent response:', qaAnswer ? qaAnswer.substring(0, 200) + '...' : 'null/empty');
+        }
+        
         if (qaAnswer && qaAnswer.trim()) {
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[RealtimeAgent] Using QA agent response');
+          }
           return qaAnswer;
+        } else {
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[RealtimeAgent] QA agent returned empty response, falling back to standard response');
+          }
+        }
+      } else {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[RealtimeAgent] QA agent not available or missing answerQuestion method');
         }
       }
     } catch (err) {
