@@ -85,7 +85,7 @@ Welcome to Engineer Cafe
 ## 会員登録手順
 
 1. Wi-Fi 接続  
-   - SSID: **engnrcf-guest-2.4GHz**  
+   - SSID: **engnrcf-guest-5GHz**  
    - PASS: **akarenga-112years**
 ![bg contain left:35%](/assets/images/engineercafewifi.png)
 2. QRコードでフォーム入力  

@@ -88,7 +88,7 @@ class: lead
 ![bg contain left:35%](/assets/images/engineercafewifi.png)
 
 1. Connect to Wi-Fi  
-   - **engnrcf-guest-2.4GHz** / **akarenga-112years**  
+   - **engnrcf-guest-5GHz** / **akarenga-112years**  
 2. Scan the QR code, fill in the form  
 3. Show your screen to staff when entering your ID
 

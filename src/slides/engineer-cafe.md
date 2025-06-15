@@ -117,7 +117,7 @@ Welcome to Engineer Cafe
 ### 簡単3ステップ
 
 1. **Wi-Fi 接続**  
-   - SSID: **engnrcf-guest-2.4GHz**  
+   - SSID: **engnrcf-guest-5GHz**  
    - PASS: **akarenga-112years**
 2. **QRコードでフォーム入力**  
 3. **会員番号はスタッフと一緒に確認**

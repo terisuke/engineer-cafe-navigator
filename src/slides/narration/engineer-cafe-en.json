@@ -113,7 +113,7 @@
         "auto": "Start by connecting to our guest Wi-Fi, then register via the QR code. Please enter the membership ID together with staff to avoid mistakes.",
         "onEnter": "About the registration process.",
         "onDemand": {
-          "wi-fi": "SSID is engnrcf-guest-2.4GHz, password is akarenga-112years.",
+          "wi-fi": "SSID is engnrcf-guest-5GHz, password is akarenga-112years.",
           "qr code": "Scan the QR code provided at reception to access the registration form.",
           "membership id": "Staff will assist with entering your membership ID to prevent errors.",
           "security": "Registration information is properly managed and personal information is protected."
@@ -171,8 +171,57 @@
         }
       },
       "transitions": {
-        "next": null,
+        "next": "That concludes the guide.",
         "previous": "Going back to Engineer Cafe's philosophy."
+      }
+    },
+    {
+      "slideNumber": 11,
+      "narration": {
+        "auto": "Thank you for your attention. We hope this guide helps you make the most of Engineer Cafe. Feel free to reach out to our team any time!",
+        "onEnter": "Thank you for watching this presentation.",
+        "onDemand": {
+          "operating hours": "Operating hours are 9 AM to 10 PM.",
+          "location": "We're located in Fukuoka City's Red Brick Culture Hall.",
+          "free": "This is a completely free public facility.",
+          "questions": "Please feel free to ask staff any questions you may have."
+        }
+      },
+      "transitions": {
+        "next": "Let's conclude the presentation.",
+        "previous": "Going back to our philosophy."
+      }
+    },
+    {
+      "slideNumber": 12,
+      "narration": {
+        "auto": "Remember, you can use our reception desk for future visits - just show your card at reception for easy access. Staff are always available to help.",
+        "onEnter": "Information about reception for next visits.",
+        "onDemand": {
+          "card usage": "Show your membership card at reception for quick entry.",
+          "staff assistance": "Reception staff can help with any questions or needs.",
+          "next visits": "For future visits, you don't need to go through the full registration process again."
+        }
+      },
+      "transitions": {
+        "next": "Thank you for your attention.",
+        "previous": "Going back to the conclusion."
+      }
+    },
+    {
+      "slideNumber": 13,
+      "narration": {
+        "auto": "Thank you for your attention. We hope this guide helps you make the most of Engineer Cafe. Feel free to reach out to our team any time!",
+        "onEnter": "Final thank you screen.",
+        "onDemand": {
+          "visit again": "We look forward to seeing you at Engineer Cafe!",
+          "questions": "Please don't hesitate to ask staff any questions.",
+          "community": "Join our vibrant community of engineers and creators."
+        }
+      },
+      "transitions": {
+        "next": null,
+        "previous": "Going back to reception information."
       }
     }
   ]
