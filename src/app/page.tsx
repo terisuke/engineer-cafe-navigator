@@ -2,7 +2,7 @@
 
 import { audioStateManager } from '@/lib/audio-state-manager';
 import { preprocessTTS } from '@/utils/tts-preprocess';
-import { MessageSquare, Presentation, Settings, UserPlus, Volume2, VolumeX } from 'lucide-react';
+import { MessageSquare, Presentation, Settings, UserPlus, Volume2, VolumeX, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import BackgroundSelector, { BackgroundOption } from './components/BackgroundSelector';
 import CharacterAvatar from './components/CharacterAvatar';
@@ -969,6 +969,13 @@ export default function Home() {
                         <Presentation className="w-5 h-5 text-primary" />
                         <h2 className="text-lg font-semibold text-gray-800">プレゼンテーション & Q&A</h2>
                       </div>
+                      <button
+                        onClick={() => setShowSlideMode(false)}
+                        className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        title="初期画面に戻る"
+                      >
+                        <X className="w-5 h-5 text-gray-600" />
+                      </button>
                     </div>
                     <div className="h-[calc(100%-4rem)]">
                       <MarpViewer 
