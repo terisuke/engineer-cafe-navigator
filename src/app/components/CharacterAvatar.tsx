@@ -6,7 +6,7 @@ import { LipSyncAnalyzer } from '@/lib/lip-sync-analyzer';
 import { VRMBlendShapeController, VRMUtils } from '@/lib/vrm-utils';
 import { VRM, VRMLoaderPlugin } from '@pixiv/three-vrm';
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
-import { Maximize2, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -1077,15 +1077,6 @@ useEffect(() => {
     link.click();
   };
 
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      containerRef.current.requestFullscreen();
-    }
-  };
 
   if (error) {
     return (
@@ -1129,13 +1120,6 @@ useEffect(() => {
             <Settings className="w-5 h-5" />
           </button>
 
-          <button
-            onClick={toggleFullscreen}
-            className="p-2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full shadow-md transition-colors"
-            title="Fullscreen"
-          >
-            <Maximize2 className="w-5 h-5" />
-          </button>
         </div>
       )}
 

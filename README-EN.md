@@ -14,9 +14,13 @@
 
 Engineer Cafe Navigator is a **multilingual voice AI agent system** that automates customer service for Fukuoka City Engineer Cafe. Built with the Mastra framework, it aims to reduce staff workload and improve customer satisfaction.
 
-### 🆕 Latest Updates (2025/06/15)
+### 🆕 Latest Updates (2025/06/19)
 
 #### ✅ Completed Features
+- **🎯 Production Monitoring** - Real-time performance monitoring and alert system
+- **🔄 Automated Knowledge Base Updates** - Connpass/Google Calendar sync every 6 hours
+- **📊 Metrics Collection** - Detailed tracking of RAG search, cache efficiency, API usage
+- **🔐 Google Embeddings API Support** - text-embedding-004 (768 dimensions) and OpenAI (1536 dimensions) hybrid
 - **OpenAI Embedding Integration** - Unified RAG search system with OpenAI text-embedding-3-small (1536 dimensions)
 - **Multilingual RAG Search** - English questions can retrieve Japanese content and vice versa
 - **Knowledge Base Management UI** - Data management at `/admin/knowledge` with metadata templates
@@ -26,6 +30,7 @@ Engineer Cafe Navigator is a **multilingual voice AI agent system** that automat
 - **Supabase Memory Adapter Integration** - Persistent conversation history and session management
 - **Emotion Recognition & VRM Expression Control** - Automatic facial expression changes via text analysis
 - **🚀 Lip-sync Cache System** - Intelligent audio analysis caching for 99% speed improvement (4-8s → 10-50ms)
+- **🧠 SimplifiedMemorySystem** - Unified memory architecture with 3-minute conversation context retention
 
 ### 🎯 Main Objectives
 
@@ -87,7 +92,7 @@ graph TB
 ### 🛠️ Technology Stack
 
 #### Core Technologies
-- **Framework**: [Mastra 0.10.1](https://mastra.ai/) - AI Agent Development Framework
+- **Framework**: [Mastra 0.10.5](https://mastra.ai/) - AI Agent Development Framework
 - **Frontend**: [Next.js 15.3.2](https://nextjs.org/) + [TypeScript 5.8.3](https://www.typescriptlang.org/)
 - **AI/ML**: [Google Gemini 2.5 Flash Preview](https://ai.google.dev/)
 - **Voice Processing**: [Google Cloud Speech-to-Text/Text-to-Speech](https://cloud.google.com/speech-to-text)
@@ -96,6 +101,7 @@ graph TB
 - **3D Character**: [Three.js 0.176.0](https://threejs.org/) + [@pixiv/three-vrm 3.4.0](https://github.com/pixiv/three-vrm)
 - **Slide System**: [Marp Core 4.1.0](https://marp.app/) (Markdown Presentation Ecosystem)
 - **Database**: [PostgreSQL](https://www.postgresql.org/) + [Supabase 2.49.8](https://supabase.com/)
+- **Embeddings**: [Google text-embedding-004](https://cloud.google.com/vertex-ai/docs/generative-ai/embeddings/get-text-embeddings) + [OpenAI text-embedding-3-small](https://platform.openai.com/docs/guides/embeddings)
 - **Styling**: [Tailwind CSS v3.4.17](https://tailwindcss.com/) ⚠️ **Important: Using v3**
 
 #### Security & Quality
@@ -167,6 +173,15 @@ GEMINI_MODEL=gemini-2.5-flash-preview-05-20
 # 🔍 OpenAI (Embeddings)
 OPENAI_API_KEY=your-openai-api-key
 # For RAG search system using text-embedding-3-small model
+
+# 🔓 CRON Jobs (Production)
+CRON_SECRET=your-cron-secret
+# For automated job authentication
+
+# 📅 Google Calendar (Optional)
+GOOGLE_CALENDAR_CLIENT_ID=your-calendar-client-id
+GOOGLE_CALENDAR_CLIENT_SECRET=your-calendar-client-secret
+# For calendar sync OAuth2 authentication
 
 # 🗄️ Database (Supabase)
 POSTGRES_URL=postgresql://postgres:password@db.project.supabase.co:5432/postgres
@@ -262,6 +277,38 @@ pnpm run dev
 
 The application will start at http://localhost:3000 🎉
 
+## 🛠️ Development Commands
+
+```bash
+# Development
+pnpm dev                    # Start development server (http://localhost:3000)
+pnpm dev:clean              # Clean cache and start dev server
+
+# Build & Production
+pnpm build                  # Create production build
+pnpm start                  # Start production server
+
+# Code Quality
+pnpm lint                   # Run Next.js linting
+
+# CSS Dependencies
+pnpm install:css            # Install correct Tailwind CSS v3 dependencies
+
+# Knowledge Base Management
+pnpm seed:knowledge         # Seed knowledge base with initial data
+pnpm migrate:embeddings     # Migrate existing knowledge to OpenAI embeddings
+pnpm import:knowledge       # Import knowledge from markdown files
+pnpm import:narrations      # Import slide narrations
+
+# Database Management
+pnpm db:migrate             # Run database migrations
+pnpm db:setup-admin         # Setup admin knowledge interface
+
+# CRON Jobs (Production)
+pnpm cron:update-knowledge  # Manually trigger knowledge base update
+pnpm cron:update-slides     # Manually trigger slide update
+```
+
 ## 📁 Project Structure
 
 ```
@@ -322,10 +369,12 @@ engineer-cafe-navigator/
 │   │   ├── lip-sync-cache.ts         # Lip-sync cache system
 │   │   ├── marp-processor.ts         # Marp processing
 │   │   ├── narration-manager.ts      # Narration management
+│   │   ├── simplified-memory.ts      # Unified memory system
 │   │   ├── supabase.ts              # Supabase configuration
 │   │   ├── supabase-memory.ts       # Supabase memory management
 │   │   ├── voice-recorder.ts         # Voice recording
 │   │   ├── vrm-utils.ts             # VRM utilities
+│   │   ├── knowledge-base-updater.ts # Automated knowledge base updates
 │   │   └── websocket-manager.ts      # WebSocket management
 │   └── types/                        # Type definitions
 │       └── supabase.ts              # Supabase type definitions
@@ -618,9 +667,10 @@ curl http://localhost:3000/api/marp?action=health
 pnpm run dev         # Start development server
 pnpm run build       # Build
 pnpm run lint        # ESLint check
-pnpm run test:api    # API tests
-pnpm run test:rag    # RAG search tests
-pnpm run test:external-apis # External API tests
+
+# Monitoring
+curl http://localhost:3000/api/monitoring/dashboard # Performance dashboard
+curl http://localhost:3000/api/health/knowledge    # Knowledge base health check
 ```
 
 ## 🔐 Security
@@ -720,6 +770,58 @@ const ratelimit = new Ratelimit({
 - ✅ **New Registration Completion Rate**: +10% improvement
 - ✅ **Multilingual Support Efficiency**: 80% reduction
 
+## 🏭 Production Features
+
+### Monitoring System
+
+The application includes a comprehensive production monitoring system:
+
+#### **Real-time Performance Dashboard**
+- **Endpoint**: `/api/monitoring/dashboard`
+- **Metrics Tracked**:
+  - RAG search performance (latency, success rates)
+  - Cache hit rates and efficiency
+  - External API usage and costs
+  - Error rates and types
+  - Percentile latencies (p50, p95, p99)
+  - System health indicators
+
+#### **Alert System**
+- **Webhook Integration**: `/api/alerts/webhook`
+- **Alert Types**:
+  - Performance degradation
+  - Error rate spikes
+  - Knowledge base health issues
+  - External API failures
+
+### Automated Knowledge Base Updates
+
+#### **CRON Job System**
+- **Update Frequency**: Every 6 hours
+- **Authentication**: Secured with CRON_SECRET
+- **Endpoints**:
+  - `/api/cron/update-knowledge-base`: Syncs external data sources
+  - `/api/cron/update-slides`: Updates presentation content
+
+#### **External Data Sources**
+- **Connpass Events**: Automatic import of Engineer Cafe events
+- **Google Calendar**: OAuth2 integration for schedule sync
+- **Website Scraping**: Placeholder for future content updates
+
+### Enhanced Memory System Features
+
+#### **Atomic Operations**
+- Thread-safe memory updates
+- Optimistic concurrency control
+- Batch processing capabilities
+- Automatic conflict resolution
+
+#### **Performance Optimizations**
+- Hash-based message indexing
+- Efficient TTL cleanup via Supabase
+- Memory-aware query routing
+- Cached context building
+
 ## 🗺️ Roadmap
 
 ### 📅 Phase 1 (Completed): MVP Implementation
@@ -727,12 +829,14 @@ const ratelimit = new Ratelimit({
 - [x] Slide presentations
 - [x] 3D character integration
 - [x] Multilingual support (Japanese/English)
+- [x] Production monitoring
+- [x] Automated knowledge base updates
 
-### 📅 Phase 2 (Planned): Advanced Interaction
-- [ ] Improved conversation context understanding
-- [ ] Emotion recognition & expression
-- [ ] Customizable characters
-- [ ] Additional language support
+### 📅 Phase 2 (Completed): Advanced Interaction
+- [x] Improved conversation context understanding
+- [x] Emotion recognition & expression
+- [x] Customizable characters
+- [x] SimplifiedMemorySystem with 3-minute context
 
 ### 📅 Phase 3 (Future): Extended Features
 - [ ] Reservation system integration
@@ -798,6 +902,8 @@ This project is published under the [MIT License](LICENSE).
 - **[🔒 Security Guide](docs/SECURITY.md)** - Security measures & threat analysis
 - **[🛠️ Development Guide](docs/DEVELOPMENT.md)** - Technical specifications for developers
 - **[🚀 Deployment Guide](docs/DEPLOYMENT.md)** - Production environment deployment procedures
+- **[📊 Monitoring Guide](docs/MONITORING.md)** - Performance monitoring & alert setup
+- **[🔄 Automation Guide](docs/AUTOMATION.md)** - CRON & external integration setup
 
 ### Security Highlights
 - ✅ **XSS Protection**: HTML sanitization implemented
