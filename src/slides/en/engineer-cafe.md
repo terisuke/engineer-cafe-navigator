@@ -139,7 +139,7 @@ Discord invite code on the back
 
 ## Thank you!
 
-![bg contain right:45%](/assets/images/regsterform.png)
+![bg contain right:45%](/assets/images/registerform_EN.png)
 
 Scan to register
 Talk to any staff member
