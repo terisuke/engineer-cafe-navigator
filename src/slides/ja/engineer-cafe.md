@@ -139,7 +139,7 @@ Discord 招待コードも裏面に記載
 
 ## ご清聴ありがとうございました
 
-![bg contain right:45%](/assets/images/regsterform.png)
+![bg contain right:45%](/assets/images/registerform_JA.png)
 
 お問い合わせはスタッフまで
 
