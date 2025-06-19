@@ -22,6 +22,16 @@ pnpm install:css            # Install correct Tailwind CSS v3 dependencies
 # Knowledge Base Management
 pnpm seed:knowledge         # Seed knowledge base with initial data
 pnpm migrate:embeddings     # Migrate existing knowledge to OpenAI embeddings
+pnpm import:knowledge       # Import knowledge from markdown files
+pnpm import:narrations      # Import slide narrations
+
+# Database Management
+pnpm db:migrate             # Run database migrations
+pnpm db:setup-admin         # Setup admin knowledge interface
+
+# CRON Jobs (Production)
+pnpm cron:update-knowledge  # Manually trigger knowledge base update
+pnpm cron:update-slides     # Manually trigger slide update
 ```
 
 ## ⚠️ CRITICAL: Tailwind CSS Version
@@ -36,12 +46,15 @@ pnpm migrate:embeddings     # Migrate existing knowledge to OpenAI embeddings
 ### Technology Stack
 - **Frontend**: Next.js 15.3.2 (App Router) + React 19.1.0 + TypeScript 5.8.3
 - **AI Framework**: Mastra 0.10.5 for agent orchestration
-- **AI Model**: Google Gemini 2.5 Flash Preview (for responses)
-- **Embeddings**: OpenAI text-embedding-3-small (1536 dimensions for vector search)
+- **AI Models**: 
+  - Google Gemini 2.5 Flash Preview (for responses)
+  - Google text-embedding-004 (768 dimensions, padded to 1536 for compatibility)
+  - OpenAI text-embedding-3-small (1536 dimensions as fallback)
 - **Voice**: Google Cloud Speech-to-Text/Text-to-Speech
 - **3D Graphics**: Three.js 0.176.0 with @pixiv/three-vrm 3.4.1
 - **Database**: PostgreSQL with pgvector extension
-- **Backend Services**: Supabase
+- **Backend Services**: Supabase 2.49.8
+- **External Integrations**: Connpass API, Google Calendar API
 
 ### Architecture Overview
 
@@ -60,12 +73,15 @@ The application follows a multi-layered architecture:
 
 3. **Data Layer**: Supabase/PostgreSQL with pgvector
    - Conversation sessions, history, and analytics
-   - Knowledge base with vector embeddings (1536 dimensions, OpenAI)
+   - Knowledge base with vector embeddings (1536 dimensions)
    - Multi-language support (Japanese/English content)
    - Intelligent agent memory with 3-minute TTL for conversational continuity
+   - Production monitoring metrics and system health tracking
+   - Automated knowledge base synchronization
 
 ### Key API Endpoints
 
+#### Core Functionality
 - **POST /api/voice**: Voice processing (speech recognition, AI response, TTS)
 - **GET /api/backgrounds**: Get available background images
 - **POST /api/marp**: Marp markdown slide rendering
@@ -73,7 +89,21 @@ The application follows a multi-layered architecture:
 - **POST /api/character**: VRM character control
 - **POST /api/qa**: Q&A interactions
 - **POST /api/external**: External system integration
+
+#### Admin & Management
 - **GET/POST /admin/knowledge**: Knowledge base management interface
+- **/api/admin/knowledge/categories**: Category management
+- **/api/admin/knowledge/metadata-templates**: Metadata template management
+- **/api/admin/knowledge/import**: Batch import with duplicate detection
+
+#### Monitoring & Health
+- **/api/monitoring/dashboard**: Real-time performance metrics
+- **/api/health/knowledge**: Knowledge base health check
+- **/api/alerts/webhook**: Alert webhook system
+
+#### Automated Updates (CRON)
+- **/api/cron/update-knowledge-base**: Auto-sync external data (6-hour intervals)
+- **/api/cron/update-slides**: Auto-update slide content
 
 ### Environment Configuration
 
@@ -83,18 +113,32 @@ Required environment variables:
 - `OPENAI_API_KEY`: OpenAI API key for embeddings (1536 dimensions)
 - `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Public Supabase access
 - `SUPABASE_SERVICE_ROLE_KEY`: Server-side Supabase access
+- `CRON_SECRET`: Authentication for CRON job endpoints
+- `GOOGLE_CALENDAR_CLIENT_ID` & `GOOGLE_CALENDAR_CLIENT_SECRET`: Calendar OAuth2 (optional)
 - Service account key at `config/service-account-key.json`
 
 ### Database Schema
 
 The application uses Supabase with the following main tables:
+
+#### Core Tables
 - `conversation_sessions`: Visitor sessions with language and mode
 - `conversation_history`: Chat messages with audio URLs
 - `knowledge_base`: RAG knowledge with vector embeddings (1536 dimensions)
-- `agent_memory`: Key-value storage for agent state and short-term memory
+- `agent_memory`: Key-value storage for agent state and short-term memory (with TTL)
 - `conversation_analytics`: Usage metrics and analytics
 
-All tables have Row Level Security (RLS) enabled with service role access.
+#### Monitoring & Metrics Tables
+- `rag_search_metrics`: Search performance tracking
+- `external_api_metrics`: External API usage and performance
+- `knowledge_base_metrics`: Knowledge base health metrics
+- `system_metrics`: Overall system performance baselines
+
+#### Features
+- All tables have Row Level Security (RLS) enabled with service role access
+- Automatic TTL-based cleanup for agent_memory
+- Optimistic concurrency control for memory operations
+- Comprehensive indexing for performance optimization
 
 ### Memory Architecture
 
@@ -116,6 +160,8 @@ A streamlined memory implementation that replaces the previous complex multi-lay
 - **Emotion Tracking**: Stores and retrieves emotional context from conversations for personalized responses
 - **Memory-aware Question Handling**: Special processing for memory-related questions ("さっき何を聞いた？", "Do you remember...?")
 - **Performance Optimized**: Message indexing and hash-based cache keys for efficient retrieval
+- **Atomic Operations**: Thread-safe memory operations with optimistic concurrency control
+- **Batch Processing**: Efficient batch operations for memory cleanup and updates
 
 **Agent Integration:**
 - **RealtimeAgent**: Uses SimplifiedMemorySystem for context-aware voice interactions with 3-minute conversation window
@@ -180,7 +226,11 @@ The application uses a sophisticated multi-language RAG (Retrieval-Augmented Gen
 
 - **Multi-language Knowledge Base**: Supports both Japanese and English content
 - **Cross-language Search**: English questions can retrieve Japanese content and vice versa
-- **OpenAI Embeddings**: Uses text-embedding-3-small model for semantic search
+- **Hybrid Embeddings**: 
+  - Primary: Google text-embedding-004 (768 dimensions, padded to 1536)
+  - Fallback: OpenAI text-embedding-3-small (1536 dimensions)
+- **Duplicate Detection**: Automatic duplicate checking on knowledge base insert
+- **Batch Import**: Efficient batch processing with duplicate tracking
 - **Vector Database**: PostgreSQL with pgvector for similarity search
 - **Admin Interface**: Web-based knowledge management at `/admin/knowledge`
 - **Smart Query Enhancement**: Automatically enhances queries for better basement space detection
@@ -206,6 +256,7 @@ The knowledge base contains 84+ entries organized by:
 - **Cross-language RAG**: Questions in one language can retrieve answers from content in either language
 - **Voice Recognition**: Google Cloud STT with Service Account authentication
 - **WebSocket Support**: For external system integration
+- **Streamlined UI**: Fullscreen controls removed from character display for cleaner interface
 - **No Test Framework**: Currently configured for production deployment
 
 ### Lip-sync System
@@ -280,3 +331,89 @@ The system recognizes memory-related questions in both languages:
 - **Reduced Repetition**: No need to repeat context in follow-up questions
 - **Personalized Responses**: Agents can acknowledge and build upon previous interactions
 - **Seamless Transitions**: Smooth conversation flow between different types of questions
+
+## Production Features
+
+### Monitoring System
+
+The application includes a comprehensive production monitoring system:
+
+#### **Real-time Performance Dashboard**
+- **Endpoint**: `/api/monitoring/dashboard`
+- **Metrics Tracked**:
+  - RAG search performance (latency, success rates)
+  - Cache hit rates and efficiency
+  - External API usage and costs
+  - Error rates and types
+  - Percentile latencies (p50, p95, p99)
+  - System health indicators
+
+#### **Alert System**
+- **Webhook Integration**: `/api/alerts/webhook`
+- **Alert Types**:
+  - Performance degradation
+  - Error rate spikes
+  - Knowledge base health issues
+  - External API failures
+
+#### **Metrics Storage**
+- Automatic aggregation of performance data
+- Historical trending and analysis
+- Baseline tracking for anomaly detection
+
+### Automated Knowledge Base Updates
+
+#### **CRON Job System**
+- **Update Frequency**: Every 6 hours
+- **Authentication**: Secured with CRON_SECRET
+- **Endpoints**:
+  - `/api/cron/update-knowledge-base`: Syncs external data sources
+  - `/api/cron/update-slides`: Updates presentation content
+
+#### **External Data Sources**
+- **Connpass Events**: Automatic import of Engineer Cafe events
+- **Google Calendar**: OAuth2 integration for schedule sync
+- **Website Scraping**: Placeholder for future content updates
+
+#### **Update Features**
+- Automatic cleanup of expired events
+- Duplicate detection and merging
+- Multi-language content generation
+- Error recovery and retry logic
+
+### Enhanced Memory System Features
+
+#### **Atomic Operations**
+- Thread-safe memory updates
+- Optimistic concurrency control
+- Batch processing capabilities
+- Automatic conflict resolution
+
+#### **Performance Optimizations**
+- Hash-based message indexing
+- Efficient TTL cleanup via Supabase
+- Memory-aware query routing
+- Cached context building
+
+### Knowledge Base Enhancements
+
+#### **Google Embeddings Integration**
+- Uses text-embedding-004 (768 dimensions)
+- Automatic padding to 1536 dimensions for compatibility
+- Faster embedding generation
+- Lower API costs
+
+#### **Admin Features**
+- Metadata template management
+- Category hierarchy management
+- Batch import with progress tracking
+- Duplicate detection and resolution
+
+### Script Tools
+
+Utility scripts for maintenance and migration:
+- `scripts/import-markdown-knowledge.ts`: Import knowledge from markdown
+- `scripts/import-slide-narrations.ts`: Import slide narrations
+- `scripts/setup-admin-knowledge.ts`: Initialize admin interface
+- `scripts/update-database-schema.ts`: Schema migrations
+- `scripts/migrate-all-knowledge.ts`: Comprehensive migration tool

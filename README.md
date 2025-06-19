@@ -322,10 +322,12 @@ engineer-cafe-navigator/
 │   │   ├── lip-sync-cache.ts         # リップシンクキャッシュシステム
 │   │   ├── marp-processor.ts         # Marp処理
 │   │   ├── narration-manager.ts      # ナレーション管理
+│   │   ├── simplified-memory.ts      # 統一メモリシステム
 │   │   ├── supabase.ts              # Supabase設定
 │   │   ├── supabase-memory.ts       # Supabaseメモリ管理
 │   │   ├── voice-recorder.ts         # 音声録音
 │   │   ├── vrm-utils.ts             # VRMユーティリティ
+│   │   ├── knowledge-base-updater.ts # 知識ベース自動更新
 │   │   └── websocket-manager.ts      # WebSocket管理
 │   └── types/                        # 型定義
 │       └── supabase.ts              # Supabase型定義
