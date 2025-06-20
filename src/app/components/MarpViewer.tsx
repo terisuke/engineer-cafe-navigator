@@ -116,6 +116,7 @@ export default function MarpViewer({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const narrationAbortControllerRef = useRef<AbortController | null>(null);
   const currentRequestIdRef = useRef<string>('');
 
   // Analytics tracking
@@ -526,6 +527,9 @@ export default function MarpViewer({
     try {
       let result: any = null;
       
+      // Create new AbortController for this narration
+      narrationAbortControllerRef.current = new AbortController();
+      
       // Determine the slide file path based on current language
       const languageSlideFile = currentLanguage === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
       
@@ -538,6 +542,7 @@ export default function MarpViewer({
           slideFile: languageSlideFile, // Use language-specific slide file
           language: currentLanguage, // Use current language state instead of prop
         }),
+        signal: narrationAbortControllerRef.current.signal,
       });
       
       // Check if response is ok
@@ -592,7 +597,12 @@ export default function MarpViewer({
         setIsNarrationInProgress(false);
       }
     } catch (error) {
-      console.error('[MarpViewer] Error narrating slide:', error);
+      // Check if the error is due to abort
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('[MarpViewer] Narration aborted by user action');
+      } else {
+        console.error('[MarpViewer] Error narrating slide:', error);
+      }
       setIsNarrating(false);
       setIsNarrationInProgress(false);
     }
@@ -741,6 +751,15 @@ export default function MarpViewer({
 
 
   const stopAutoPlay = () => {
+    console.log('[MarpViewer] Stopping auto-play and all audio');
+    
+    // Abort any pending narration API calls
+    if (narrationAbortControllerRef.current) {
+      console.log('[MarpViewer] Aborting narration API request');
+      narrationAbortControllerRef.current.abort();
+      narrationAbortControllerRef.current = null;
+    }
+    
     if (autoPlayTimerRef.current) {
       clearTimeout(autoPlayTimerRef.current);
       autoPlayTimerRef.current = null;
@@ -830,8 +849,8 @@ export default function MarpViewer({
       // Stop current narration when manually advancing
       if (isPlaying) {
         console.log('[MarpViewer] Stopping auto-play due to manual navigation');
+        setIsPlaying(false); // Set this first to prevent new narrations
         stopAutoPlay();
-        setIsPlaying(false);
       }
       
       const newSlide = currentSlide + 1;
@@ -846,8 +865,8 @@ export default function MarpViewer({
       // Stop current narration when manually navigating
       if (isPlaying) {
         console.log('[MarpViewer] Stopping auto-play due to manual navigation');
+        setIsPlaying(false); // Set this first to prevent new narrations
         stopAutoPlay();
-        setIsPlaying(false);
       }
       
       const newSlide = currentSlide - 1;
