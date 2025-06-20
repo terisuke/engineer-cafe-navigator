@@ -827,6 +827,13 @@ export default function MarpViewer({
     }
     
     if (currentSlide < totalSlides) {
+      // Stop current narration when manually advancing
+      if (isPlaying) {
+        console.log('[MarpViewer] Stopping auto-play due to manual navigation');
+        stopAutoPlay();
+        setIsPlaying(false);
+      }
+      
       const newSlide = currentSlide + 1;
       setCurrentSlide(newSlide);
       onSlideChange?.(newSlide);
@@ -836,6 +843,13 @@ export default function MarpViewer({
 
   const previousSlide = async () => {
     if (currentSlide > 1) {
+      // Stop current narration when manually navigating
+      if (isPlaying) {
+        console.log('[MarpViewer] Stopping auto-play due to manual navigation');
+        stopAutoPlay();
+        setIsPlaying(false);
+      }
+      
       const newSlide = currentSlide - 1;
       setCurrentSlide(newSlide);
       onSlideChange?.(newSlide);
@@ -846,6 +860,13 @@ export default function MarpViewer({
 
   const gotoSlide = async (slideNumber: number) => {
     if (slideNumber >= 1 && slideNumber <= totalSlides) {
+      // Stop current narration when manually jumping to a slide
+      if (isPlaying) {
+        console.log('[MarpViewer] Stopping auto-play due to manual navigation');
+        stopAutoPlay();
+        setIsPlaying(false);
+      }
+      
       setCurrentSlide(slideNumber);
       onSlideChange?.(slideNumber);
       // Don't await to avoid blocking UI
@@ -875,6 +896,9 @@ export default function MarpViewer({
       onExpressionControl('neutral', 1.0);
       console.log('[MarpViewer] Set character to neutral for slide presentation');
     }
+    
+    // Resume from current slide (not from the beginning)
+    console.log(`[MarpViewer] Starting/resuming auto-play from slide ${currentSlide}`);
     
     // Test audio permission by playing a silent audio
     try {
