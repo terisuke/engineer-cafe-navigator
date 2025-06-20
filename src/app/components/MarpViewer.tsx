@@ -116,6 +116,7 @@ export default function MarpViewer({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const narrationAbortControllerRef = useRef<AbortController | null>(null);
   const currentRequestIdRef = useRef<string>('');
 
   // Analytics tracking
@@ -526,6 +527,9 @@ export default function MarpViewer({
     try {
       let result: any = null;
       
+      // Create new AbortController for this narration
+      narrationAbortControllerRef.current = new AbortController();
+      
       // Determine the slide file path based on current language
       const languageSlideFile = currentLanguage === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
       
@@ -538,6 +542,7 @@ export default function MarpViewer({
           slideFile: languageSlideFile, // Use language-specific slide file
           language: currentLanguage, // Use current language state instead of prop
         }),
+        signal: narrationAbortControllerRef.current.signal,
       });
       
       // Check if response is ok
@@ -592,7 +597,12 @@ export default function MarpViewer({
         setIsNarrationInProgress(false);
       }
     } catch (error) {
-      console.error('[MarpViewer] Error narrating slide:', error);
+      // Check if the error is due to abort
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('[MarpViewer] Narration aborted by user action');
+      } else {
+        console.error('[MarpViewer] Error narrating slide:', error);
+      }
       setIsNarrating(false);
       setIsNarrationInProgress(false);
     }
@@ -741,6 +751,15 @@ export default function MarpViewer({
 
 
   const stopAutoPlay = () => {
+    console.log('[MarpViewer] Stopping auto-play and all audio');
+    
+    // Abort any pending narration API calls
+    if (narrationAbortControllerRef.current) {
+      console.log('[MarpViewer] Aborting narration API request');
+      narrationAbortControllerRef.current.abort();
+      narrationAbortControllerRef.current = null;
+    }
+    
     if (autoPlayTimerRef.current) {
       clearTimeout(autoPlayTimerRef.current);
       autoPlayTimerRef.current = null;
@@ -827,6 +846,13 @@ export default function MarpViewer({
     }
     
     if (currentSlide < totalSlides) {
+      // Stop current narration when manually advancing
+      if (isPlaying) {
+        console.log('[MarpViewer] Stopping auto-play due to manual navigation');
+        setIsPlaying(false); // Set this first to prevent new narrations
+        stopAutoPlay();
+      }
+      
       const newSlide = currentSlide + 1;
       setCurrentSlide(newSlide);
       onSlideChange?.(newSlide);
@@ -836,6 +862,13 @@ export default function MarpViewer({
 
   const previousSlide = async () => {
     if (currentSlide > 1) {
+      // Stop current narration when manually navigating
+      if (isPlaying) {
+        console.log('[MarpViewer] Stopping auto-play due to manual navigation');
+        setIsPlaying(false); // Set this first to prevent new narrations
+        stopAutoPlay();
+      }
+      
       const newSlide = currentSlide - 1;
       setCurrentSlide(newSlide);
       onSlideChange?.(newSlide);
@@ -846,6 +879,13 @@ export default function MarpViewer({
 
   const gotoSlide = async (slideNumber: number) => {
     if (slideNumber >= 1 && slideNumber <= totalSlides) {
+      // Stop current narration when manually jumping to a slide
+      if (isPlaying) {
+        console.log('[MarpViewer] Stopping auto-play due to manual navigation');
+        stopAutoPlay();
+        setIsPlaying(false);
+      }
+      
       setCurrentSlide(slideNumber);
       onSlideChange?.(slideNumber);
       // Don't await to avoid blocking UI
@@ -875,6 +915,9 @@ export default function MarpViewer({
       onExpressionControl('neutral', 1.0);
       console.log('[MarpViewer] Set character to neutral for slide presentation');
     }
+    
+    // Resume from current slide (not from the beginning)
+    console.log(`[MarpViewer] Starting/resuming auto-play from slide ${currentSlide}`);
     
     // Test audio permission by playing a silent audio
     try {
