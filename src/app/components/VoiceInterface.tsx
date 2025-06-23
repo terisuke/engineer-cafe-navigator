@@ -99,6 +99,13 @@ export default function VoiceInterface({
         mobileAudioServiceRef.current.dispose();
       }
     };
+  }, []);
+
+  // Update mobile audio service volume
+  useEffect(() => {
+    if (mobileAudioServiceRef.current) {
+      mobileAudioServiceRef.current.setVolume(volume);
+    }
   }, [volume]);
 
   // Update language when prop changes
@@ -389,21 +396,12 @@ export default function VoiceInterface({
       
       console.log('[AUDIO] Starting mobile audio playback...', { volume, audioUrlLength: audioUrl.length });
       
-      // Use mobile audio service for better compatibility
+      // Ensure mobile audio service is available (should already be initialized by useEffect)
       if (!mobileAudioServiceRef.current) {
-        mobileAudioServiceRef.current = new MobileAudioService({
-          volume: volume,
-          onPlay: () => setIsSpeaking(true),
-          onEnded: () => setIsSpeaking(false),
-          onError: (error) => {
-            console.error('[AUDIO] Mobile audio service error:', error);
-            setError(`Audio playback error: ${error.message}`);
-          }
-        });
+        console.error('[AUDIO] MobileAudioService not initialized');
+        setError('Audio service not available');
+        return;
       }
-      
-      // Update volume
-      mobileAudioServiceRef.current.setVolume(volume);
 
       // Import performance monitor functions
       const { measurePerformance } = await import('@/lib/performance-monitor');
@@ -484,21 +482,7 @@ export default function VoiceInterface({
         }
       })();
 
-      // Ensure MobileAudioService is initialized and update volume
-      if (!mobileAudioServiceRef.current) {
-        mobileAudioServiceRef.current = new MobileAudioService({
-          volume: volume,
-          onPlay: () => setIsSpeaking(true),
-          onEnded: () => setIsSpeaking(false),
-          onError: (error) => {
-            console.error('[AUDIO] Mobile audio service error:', error);
-            setError(`Audio playback error: ${error.message}`);
-          }
-        });
-      } else {
-        // Update volume for existing instance
-        mobileAudioServiceRef.current.setVolume(volume);
-      }
+      // Audio service should already be initialized by useEffect
       
       // Set up audio ended handler for this specific playback
       const handleAudioEnd = () => {
