@@ -606,7 +606,6 @@ export default function Home() {
   // Play audio with lip-sync
   const playAudioWithLipSync = async (audioBase64: string) => {
     try {
-      console.log('[Main] Playing audio with lip-sync');
       
       const audioData = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
       const audioBlob = new Blob([audioData], { type: 'audio/mp3' });
@@ -617,14 +616,16 @@ export default function Home() {
 
       // Perform lip-sync analysis
       if (setVisemeFunction) {
-        console.log('[Main] Starting lip-sync analysis with direct viseme control');
         
         try {
           const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
           const analyzer = new LipSyncAnalyzer();
+          
+          // Initialize analyzer after user interaction
+          await analyzer.initialize();
+          
           const lipSyncData = await analyzer.analyzeLipSync(audioBlob);
           
-          console.log('[Main] Lip-sync analysis complete:', lipSyncData.frames.length, 'frames');
           
           // Schedule viseme updates
           let frameIndex = 0;
@@ -632,34 +633,34 @@ export default function Home() {
             if (frameIndex < lipSyncData.frames.length && audio.currentTime >= 0) {
               const frame = lipSyncData.frames[frameIndex];
               
-              console.log(`[Main] Lip-sync frame ${frameIndex}:`, frame.mouthShape, 'intensity:', frame.mouthOpen);
               setVisemeFunction(frame.mouthShape, frame.mouthOpen);
               
               frameIndex++;
               setTimeout(updateLipSync, 50); // 20fps
             } else if (frameIndex >= lipSyncData.frames.length) {
-              console.log('[Main] Lip-sync animation complete');
               setVisemeFunction('Closed', 0); // Reset to closed mouth
             }
           };
           
           // Start lip-sync when audio starts
           audio.onplay = () => {
-            console.log('[Main] Audio started, beginning lip-sync animation');
             updateLipSync();
           };
           
           analyzer.dispose();
         } catch (lipSyncError) {
-          console.warn('[Main] Lip-sync analysis failed:', lipSyncError);
+          // Fallback: play without lip-sync
+          if (lipSyncError instanceof Error && 
+              (lipSyncError.message.includes('not allowed') || 
+               lipSyncError.message.includes('permission'))) {
+            console.warn(currentLanguage === 'ja' ? 
+              '音声のみ再生します' : 'Playing audio only');
+          }
         }
-      } else {
-        console.warn('[Main] Viseme control function not available');
       }
 
       audio.onended = () => {
         URL.revokeObjectURL(audioUrl);
-        console.log('[Main] Audio ended');
         
         // Reset only the viseme (mouth shape) to closed, but keep the current expression
         if (setVisemeFunction) {
@@ -671,7 +672,7 @@ export default function Home() {
 
       await audio.play();
     } catch (error) {
-      console.error('[Main] Error playing audio with lip-sync:', error);
+      console.error('Audio playback failed:', error);
     }
   };
 

@@ -45,9 +45,20 @@ export class AudioPlayer {
       // Set up event listeners
       this.setupEventListeners();
 
-      // Start playing
-      await this.audio.play();
-      this.isPlaying = true;
+      // Start playing with iOS/Safari compatibility
+      try {
+        await this.audio.play();
+        this.isPlaying = true;
+      } catch (playError: any) {
+        // Handle autoplay policy restrictions
+        if (playError.name === 'NotAllowedError') {
+          console.warn('Autoplay blocked. User interaction required.');
+          // Store the audio for later playback after user interaction
+          this.onError?.(new Error('Playback requires user interaction. Please tap to continue.'));
+        } else {
+          throw playError;
+        }
+      }
     } catch (error) {
       this.onError?.(new Error(`Failed to play audio: ${error}`));
     }
@@ -101,8 +112,24 @@ export class AudioPlayer {
 
   resume(): void {
     if (this.audio && !this.isPlaying) {
-      this.audio.play();
-      this.isPlaying = true;
+      this.audio.play().then(() => {
+        this.isPlaying = true;
+      }).catch((error) => {
+        console.error('Resume playback failed:', error);
+        this.onError?.(new Error('Resume playback failed'));
+      });
+    }
+  }
+
+  // Method to retry playback after user interaction
+  async retryPlayback(): Promise<void> {
+    if (this.audio) {
+      try {
+        await this.audio.play();
+        this.isPlaying = true;
+      } catch (error) {
+        this.onError?.(new Error(`Retry playback failed: ${error}`));
+      }
     }
   }
 

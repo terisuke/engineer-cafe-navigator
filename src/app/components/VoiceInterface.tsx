@@ -32,6 +32,7 @@ export default function VoiceInterface({
   const [loadingMessage, setLoadingMessage] = useState('');
   const [autoListen, setAutoListen] = useState(true); // Auto-listen after response
   const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
   
   // Custom setVolume that also updates audio queue
   const setVolume = (newVolume: number) => {
@@ -42,42 +43,59 @@ export default function VoiceInterface({
   };
   
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioQueueRef = useRef<AudioQueue | null>(null);
   
+
+  // Audio unlock function
+  const unlockAudio = async () => {
+    if (audioUnlocked) return;
+
+    try {
+      // Basic audio context unlock
+      if (audioContextRef.current?.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+      setAudioUnlocked(true);
+    } catch (error) {
+      console.warn('[AUDIO] Audio unlock failed:', error);
+    }
+  };
 
   // Initialize audio context with user gesture handling
   useEffect(() => {
     const initAudioContext = () => {
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        console.log('AudioContext initialized, state:', audioContextRef.current.state);
       }
       
       // Resume audio context if it's suspended
       if (audioContextRef.current?.state === 'suspended') {
-        audioContextRef.current.resume().then(() => {
-          console.log('AudioContext resumed');
-        });
+        audioContextRef.current.resume();
       }
     };
     
     // Initialize on mount
     initAudioContext();
-    
-    // Also initialize on first user interaction
-    const handleUserInteraction = () => {
+
+    // Also initialize on first user interaction with improved detection
+    const handleUserInteraction = async (event: Event) => {
+      console.log('[AUDIO] First user interaction detected:', event.type);
       initAudioContext();
+      
+      // Comprehensive iOS audio unlock
+      await unlockAudio();
+      
       // Remove listener after first interaction
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('touchstart', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
     };
     
     document.addEventListener('click', handleUserInteraction);
     document.addEventListener('touchstart', handleUserInteraction);
+    document.addEventListener('keydown', handleUserInteraction);
     
     return () => {
       document.removeEventListener('click', handleUserInteraction);
@@ -165,43 +183,61 @@ export default function VoiceInterface({
     try {
       setError(null);
       
+      // Initialize and unlock audio for iOS - this is critical!
+      console.log('[AUDIO] Preparing audio unlock for iOS...');
+      
       // Ensure audio context is initialized and running
-      if (audioContextRef.current?.state === 'suspended') {
-        await audioContextRef.current.resume();
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
       
-      // Use Google Cloud STT
+      if (audioContextRef.current?.state === 'suspended') {
+        await audioContextRef.current.resume();
+        console.log('[AUDIO] AudioContext resumed in startListening');
+      }
+      
+      // Ensure iOS audio is unlocked
+      await unlockAudio();
+      
+      // Import VoiceRecorder
+      const { VoiceRecorder } = await import('@/lib/voice-recorder');
+      
       setIsLoading(true);
       setLoadingMessage(currentLanguage === 'ja' ? 'マイクにアクセス中...' : 'Accessing microphone...');
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          channelCount: 1,
-          sampleRate: 16000,
-          echoCancellation: true,
-          noiseSuppression: true,
+      
+      // Create and initialize VoiceRecorder instance
+      const recorder = new VoiceRecorder(
+        (audioBlob: Blob) => {
+          // onDataAvailable callback
+          processAudioInput(audioBlob);
+        },
+        (error: Error) => {
+          // onError callback
+          console.error('VoiceRecorder error:', error);
+          setError(error.message);
+          setIsLoading(false);
+          setLoadingMessage('');
+          setIsRecording(false);
+          setIsListening(false);
+          setConversationState('idle');
         }
-      });
-
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
-
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        processAudioInput(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
+      );
+      
+      // Initialize the recorder (handles iOS-specific requirements)
+      await recorder.initialize();
+      
+      // Check if initialization was successful
+      if (!recorder.isInitialized()) {
+        // Error already handled by onError callback
+        return;
+      }
+      
+      // Store recorder reference
+      (window as any).currentVoiceRecorder = recorder;
+      
+      // Start recording
+      recorder.start();
+      
       setIsRecording(true);
       setIsListening(true);
       setConversationState('listening');
@@ -217,8 +253,16 @@ export default function VoiceInterface({
 
   // Stop voice recording
   const stopListening = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+    if (isRecording) {
+      const recorder = (window as any).currentVoiceRecorder;
+      if (recorder) {
+        recorder.stop();
+        // Cleanup will happen after stop
+        setTimeout(() => {
+          recorder.cleanup();
+          delete (window as any).currentVoiceRecorder;
+        }, 100);
+      }
       setIsRecording(false);
       setIsListening(false);
       setConversationState('processing');
@@ -243,6 +287,7 @@ export default function VoiceInterface({
           action: 'process_voice',
           audioData: audioBase64,
           sessionId: generateSessionId(),
+          language: currentLanguage, // 重要：言語設定を明示的に指定
         }),
       });
 
@@ -264,8 +309,21 @@ export default function VoiceInterface({
         });
         
         if (result.audioResponse && !isMuted) {
-          console.log('Starting audio playback...');
-          await playAudioResponse(result.audioResponse);
+          console.log('[DEBUG] Starting audio playback...');
+          console.log('[DEBUG] Audio response length:', result.audioResponse.length);
+          try {
+            await playAudioResponse(result.audioResponse);
+            console.log('[DEBUG] Audio playback completed successfully');
+          } catch (audioError) {
+            console.error('[DEBUG] Audio playback failed:', audioError);
+            // Fallback: show manual play button
+            setError(currentLanguage === 'ja' 
+              ? '🔊 音声再生に失敗しました。下のボタンをタップして再生してください。' 
+              : '🔊 Audio playback failed. Tap the button below to play.');
+            setConversationState('idle');
+            setIsLoading(false);
+            setLoadingMessage('');
+          }
         } else {
           console.log('Audio playback skipped:', {
             hasAudioResponse: !!result.audioResponse,
@@ -304,89 +362,69 @@ export default function VoiceInterface({
   };
 
   // Play streaming audio response
-  const playStreamingAudioResponse = async (audioChunks: string[]) => {
-    try {
-      setIsLoading(true);
-      setLoadingMessage(currentLanguage === 'ja' ? 'ストリーミング音声を準備中...' : 'Preparing streaming audio...');
-      setIsSpeaking(true);
-      setConversationState('speaking');
-      
-      // Initialize audio queue
-      if (!audioQueueRef.current) {
-        audioQueueRef.current = new AudioQueue();
-      }
-      
-      // Set volume
-      audioQueueRef.current.setVolume(volume);
-      
-      // Set callback for when streaming finishes
-      audioQueueRef.current.setOnFinished(() => {
-        setIsSpeaking(false);
-        setConversationState('idle');
-        setIsLoading(false);
-        setLoadingMessage('');
-        
-        // Auto-listen if enabled
-        if (autoListen && !isMuted) {
-          setTimeout(() => {
-            console.log('Auto-listening after streaming response...');
-            startListening();
-          }, 1000);
-        }
-      });
-      
-      // Enqueue all chunks
-      audioChunks.forEach((chunk, index) => {
-        audioQueueRef.current!.add({
-          id: `chunk-${index}`,
-          audioData: chunk,
-          text: `chunk-${index}`,
-          priority: index,
-          emotion: currentEmotion || undefined
-        });
-      });
-      
-      console.log(`Queued ${audioChunks.length} audio chunks for playback`);
-      
-      // Clear loading state once chunks are queued
-      setIsLoading(false);
-      setLoadingMessage('');
-    } catch (error: any) {
-      console.error('Error playing streaming audio:', error);
-      setIsSpeaking(false);
-      setConversationState('idle');
-      setError(formatError(error, currentLanguage));
-    }
-  };
 
   // Play audio response
   const playAudioResponse = async (audioBase64: string) => {
     try {
-      console.log('playAudioResponse called with audioBase64 length:', audioBase64?.length);
+      console.log('[AUDIO] playAudioResponse called with audioBase64 length:', audioBase64?.length);
+      console.log('[AUDIO] Current state:', { isSpeaking, isLoading, conversationState });
+      
+      
+      // Attempt audio unlock for mobile devices
+      try {
+        await unlockAudio();
+      } catch (error) {
+        console.warn('[AUDIO] Audio unlock failed, continuing with standard playback');
+      }
       setIsLoading(true);
       setLoadingMessage(currentLanguage === 'ja' ? '音声を再生準備中...' : 'Preparing audio playback...');
       setIsSpeaking(true);
       setConversationState('speaking');
 
-      // Stop any currently playing audio
+      // Stop any currently playing audio and clean up
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
+        currentAudioRef.current.src = '';  // Clear source to free memory
         currentAudioRef.current = null;
       }
+      
+      // Clean up audio queue if exists
+      if (audioQueueRef.current) {
+        audioQueueRef.current.clear();
+      }
 
+      console.log('[AUDIO] Converting base64 to audio...');
       const audioData = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
       const audioBlob = new Blob([audioData], { type: 'audio/mp3' });
       const audioUrl = URL.createObjectURL(audioBlob);
-
+      
+      console.log('[AUDIO] Creating audio element...', { volume, audioUrlLength: audioUrl.length });
       const audio = new Audio(audioUrl);
       audio.volume = volume;
       currentAudioRef.current = audio;
+      
+      // Add more event listeners for debugging
+      audio.addEventListener('loadstart', () => console.log('[AUDIO] Loading started'));
+      audio.addEventListener('loadeddata', () => console.log('[AUDIO] Data loaded'));
+      audio.addEventListener('canplay', () => console.log('[AUDIO] Can play'));
+      audio.addEventListener('playing', () => console.log('[AUDIO] Playing'));
+      audio.addEventListener('pause', () => console.log('[AUDIO] Paused'));
+      audio.addEventListener('waiting', () => console.log('[AUDIO] Waiting for data'));
+      audio.addEventListener('stalled', () => console.log('[AUDIO] Stalled'));
 
       // Import performance monitor functions
       const { measurePerformance } = await import('@/lib/performance-monitor');
 
+      // Skip lip-sync for very large audio files to improve performance
+      const skipLipSync = audioBlob.size > 500000;
+      
       // Start lip-sync analysis in background (non-blocking)
       const lipSyncPromise = (async () => {
+        if (skipLipSync) {
+          console.log('Skipping lip-sync for performance (large file)');
+          return;
+        }
+        
         try {
           console.log('Starting lip-sync analysis for audio blob:', audioBlob.size, 'bytes');
           
@@ -433,7 +471,7 @@ export default function VoiceInterface({
                 .catch(console.error);
               
               frameIndex++;
-              setTimeout(updateLipSync, 50); // 20fps
+              setTimeout(updateLipSync, 100); // 10fps for better performance
             } else {
               console.log('Lip-sync animation complete or audio stopped');
             }
@@ -454,12 +492,22 @@ export default function VoiceInterface({
       })();
 
       audio.onended = () => {
+        console.log('[AUDIO] Audio playback ended');
         setIsSpeaking(false);
         setConversationState('idle');
         setIsLoading(false);
         setLoadingMessage('');
-        URL.revokeObjectURL(audioUrl);
-        currentAudioRef.current = null;
+        
+        // Clean up audio resources
+        if (currentAudioRef.current) {
+          currentAudioRef.current.src = '';
+          currentAudioRef.current = null;
+        }
+        
+        // Revoke object URL after a delay to ensure cleanup
+        setTimeout(() => {
+          URL.revokeObjectURL(audioUrl);
+        }, 100);
         
         // Stop lip-sync
         fetch('/api/character', {
@@ -517,49 +565,90 @@ export default function VoiceInterface({
       setLoadingMessage('');
       
       // Play audio with retry on autoplay failure
+      console.log('[AUDIO] Attempting to play audio...', { audioUnlocked });
+      
+      // Check if audio was unlocked earlier
+      if (!audioUnlocked) {
+        console.log('[AUDIO] Audio not unlocked yet, will require user interaction');
+      }
+      
       try {
         await audio.play();
-        console.log('Audio playback started successfully');
+        console.log('[AUDIO] Audio playback started successfully');
         
-        // Start lip-sync processing in background (non-blocking)
-        lipSyncPromise.catch(error => {
-          console.warn('Lip-sync processing error (non-critical):', error);
-        });
+        // Skip lip-sync processing entirely on iOS
+        if (!skipLipSync) {
+          // Start lip-sync processing in background (non-blocking)
+          lipSyncPromise.catch(error => {
+            console.warn('Lip-sync processing error (non-critical):', error);
+          });
+        }
       } catch (playError: any) {
         console.error('Audio playback failed:', playError);
         
         // If autoplay was blocked, show a message and retry on next user interaction
         if (playError.name === 'NotAllowedError') {
-          console.log('Autoplay blocked, waiting for user interaction...');
+          console.log('[AUDIO] Autoplay blocked, waiting for user interaction...');
+          
+          // Store the audio for later playback
+          const storedAudio = audio;
           
           // Create a one-time click handler to retry playback
-          const retryPlayback = async () => {
+          const retryPlayback = async (event: Event) => {
+            console.log('[AUDIO] User interaction detected, retrying playback...');
             try {
+              // Resume AudioContext if needed
               if (audioContextRef.current?.state === 'suspended') {
                 await audioContextRef.current.resume();
+                console.log('[AUDIO] AudioContext resumed');
               }
-              await audio.play();
-              console.log('Audio playback started after user interaction');
+              
+              // Try to play the stored audio
+              await storedAudio.play();
+              console.log('[AUDIO] Audio playback started after user interaction');
+              
+              // Clear the error message
+              setError(null);
+              
+              // Skip lip-sync processing entirely on iOS
+              if (!skipLipSync) {
+                lipSyncPromise.catch(error => {
+                  console.warn('Lip-sync processing error (non-critical):', error);
+                });
+              }
+              
             } catch (retryError) {
-              console.error('Retry playback failed:', retryError);
+              console.error('[AUDIO] Retry playback failed:', retryError);
+              setError(currentLanguage === 'ja' 
+                ? '音声再生に失敗しました。ページを更新してください。' 
+                : 'Audio playback failed. Please refresh the page.');
             }
+            
+            // Remove event listeners
             document.removeEventListener('click', retryPlayback);
             document.removeEventListener('touchstart', retryPlayback);
+            document.removeEventListener('keydown', retryPlayback);
           };
           
+          // Add multiple event listeners for user interaction
           document.addEventListener('click', retryPlayback, { once: true });
           document.addEventListener('touchstart', retryPlayback, { once: true });
+          document.addEventListener('keydown', retryPlayback, { once: true });
           
-          // Update UI to show user needs to click
+          // Update UI to show user needs to interact
           setError(currentLanguage === 'ja' 
-            ? '音声を再生するには画面をクリックしてください' 
-            : 'Click anywhere to play audio');
+            ? '🔊 音声を再生するには画面をタップしてください' 
+            : '🔊 Tap anywhere to play audio');
+          
+          // Don't throw the error, just wait for user interaction
+          return;
         } else {
+          console.log('[AUDIO] Other playback error:', playError);
           throw playError;
         }
       }
     } catch (error: any) {
-      console.error('Error playing audio:', error);
+      console.error('[AUDIO] Error playing audio:', error);
       setIsSpeaking(false);
       setConversationState('idle');
       setIsLoading(false);
@@ -1064,6 +1153,7 @@ export default function VoiceInterface({
           </div>
         </div>
       )}
+
 
       {/* Action Buttons */}
       <div className="flex flex-col gap-2">

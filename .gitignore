@@ -48,3 +48,7 @@ coverage/
 # Supabase CLI artifacts
 supabase/.temp/
 supabase/.branches/
+
+# Local HTTPS certificates
+certificates/
+*.pem

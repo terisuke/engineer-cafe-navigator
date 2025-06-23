@@ -167,10 +167,41 @@ export class AudioQueue {
           reject(new Error('Audio playback failed'));
         };
 
-        audio.play().catch(error => {
-          URL.revokeObjectURL(audioUrl);
-          this.currentAudio = null;
-          reject(error);
+        // Try to play with iOS/Safari compatibility
+        audio.play().then(() => {
+          console.log('Audio queue playback started successfully');
+        }).catch(error => {
+          console.error('Audio queue playback failed:', error);
+          
+          // Handle autoplay policy restrictions
+          if (error.name === 'NotAllowedError') {
+            console.warn('Autoplay blocked in audio queue. User interaction required.');
+            
+            // Create a one-time click handler to retry playback
+            const retryPlayback = async () => {
+              try {
+                await audio.play();
+                console.log('Audio queue playback started after user interaction');
+              } catch (retryError) {
+                console.error('Retry playback failed in audio queue:', retryError);
+                URL.revokeObjectURL(audioUrl);
+                this.currentAudio = null;
+                reject(retryError);
+              }
+              document.removeEventListener('click', retryPlayback);
+              document.removeEventListener('touchstart', retryPlayback);
+            };
+            
+            document.addEventListener('click', retryPlayback, { once: true });
+            document.addEventListener('touchstart', retryPlayback, { once: true });
+            
+            // Don't reject immediately - wait for user interaction
+            console.log('Waiting for user interaction to play audio...');
+          } else {
+            URL.revokeObjectURL(audioUrl);
+            this.currentAudio = null;
+            reject(error);
+          }
         });
       } catch (error) {
         reject(error);
