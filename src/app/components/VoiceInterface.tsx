@@ -58,10 +58,16 @@ export default function VoiceInterface({
     if (audioUnlocked) return;
 
     try {
-      // Basic audio context unlock
-      if (audioContextRef.current?.state === 'suspended') {
+      // Initialize AudioContext if it doesn't exist
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+
+      // Resume AudioContext if suspended
+      if (audioContextRef.current.state === 'suspended') {
         await audioContextRef.current.resume();
       }
+      
       setAudioUnlocked(true);
     } catch (error) {
       console.warn('[AUDIO] Audio unlock failed:', error);
