@@ -49,6 +49,7 @@ export default function VoiceInterface({
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioQueueRef = useRef<AudioQueue | null>(null);
   const mobileAudioServiceRef = useRef<MobileAudioService | null>(null);
+  const voiceRecorderRef = useRef<any>(null); // VoiceRecorder instance
   const { ensureAudioContext, isReady: isAudioReady, hasInteraction } = useAudioInteraction();
   
 
@@ -82,6 +83,12 @@ export default function VoiceInterface({
     }
     
     return () => {
+      // Cleanup VoiceRecorder
+      if (voiceRecorderRef.current) {
+        voiceRecorderRef.current.cleanup();
+        voiceRecorderRef.current = null;
+      }
+      
       if (audioContextRef.current) {
         audioContextRef.current.close();
       }
@@ -217,8 +224,8 @@ export default function VoiceInterface({
         return;
       }
       
-      // Store recorder reference
-      (window as any).currentVoiceRecorder = recorder;
+      // Store recorder reference in component ref
+      voiceRecorderRef.current = recorder;
       
       // Start recording
       recorder.start();
@@ -238,16 +245,13 @@ export default function VoiceInterface({
 
   // Stop voice recording
   const stopListening = () => {
-    if (isRecording) {
-      const recorder = (window as any).currentVoiceRecorder;
-      if (recorder) {
-        recorder.stop();
-        // Cleanup will happen after stop
-        setTimeout(() => {
-          recorder.cleanup();
-          delete (window as any).currentVoiceRecorder;
-        }, 100);
-      }
+    if (isRecording && voiceRecorderRef.current) {
+      const recorder = voiceRecorderRef.current;
+      recorder.stop();
+      // Cleanup immediately, no setTimeout needed
+      recorder.cleanup();
+      voiceRecorderRef.current = null;
+      
       setIsRecording(false);
       setIsListening(false);
       setConversationState('processing');
@@ -480,70 +484,90 @@ export default function VoiceInterface({
         }
       })();
 
-      // Set up enhanced onEnded callback for MobileAudioService
-      mobileAudioServiceRef.current = new MobileAudioService({
-        volume: volume,
-        onPlay: () => setIsSpeaking(true),
-        onEnded: () => {
-          console.log('[AUDIO] Audio playback ended');
-          setIsSpeaking(false);
-          setConversationState('idle');
-          setIsLoading(false);
-          setLoadingMessage('');
-          
-          // Clean up audio resources
-          if (mobileAudioServiceRef.current) {
-            mobileAudioServiceRef.current.stop();
+      // Ensure MobileAudioService is initialized and update volume
+      if (!mobileAudioServiceRef.current) {
+        mobileAudioServiceRef.current = new MobileAudioService({
+          volume: volume,
+          onPlay: () => setIsSpeaking(true),
+          onEnded: () => setIsSpeaking(false),
+          onError: (error) => {
+            console.error('[AUDIO] Mobile audio service error:', error);
+            setError(`Audio playback error: ${error.message}`);
           }
-          
-          // Revoke object URL after a delay to ensure cleanup
-          setTimeout(() => {
-            URL.revokeObjectURL(audioUrl);
-          }, 100);
-          
-          // Stop lip-sync
-          fetch('/api/character', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'stopLipSync',
-            }),
-          }).catch(console.error);
-          
-          // Restore emotion expression after lip-sync if needed
-          if (currentEmotion && currentEmotion !== 'neutral') {
-            console.log('Restoring emotion after speech:', currentEmotion);
-            setTimeout(() => {
-              updateCharacterExpression(currentEmotion);
-            }, 200);
-          }
-          
-          // Auto-listen if enabled
-          if (autoListen && !isMuted) {
-            setTimeout(() => {
-              console.log('Auto-listening after response...');
-              startListening();
-            }, 1000); // 1 second delay before auto-listening
-          }
-        },
-        onError: (error) => {
-          console.error('[AUDIO] Mobile audio service error:', error);
-          setIsSpeaking(false);
-          setConversationState('idle');
-          setIsLoading(false);
-          setLoadingMessage('');
-          setError(formatError({ code: 'VOICE_PROCESSING_ERROR' }, currentLanguage));
-          URL.revokeObjectURL(audioUrl);
-          
-          // Stop lip-sync on error
-          fetch('/api/character', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'stopLipSync',
-            }),
-          }).catch(console.error);
+        });
+      } else {
+        // Update volume for existing instance
+        mobileAudioServiceRef.current.setVolume(volume);
+      }
+      
+      // Set up audio ended handler for this specific playback
+      const handleAudioEnd = () => {
+        console.log('[AUDIO] Audio playback ended');
+        setIsSpeaking(false);
+        setConversationState('idle');
+        setIsLoading(false);
+        setLoadingMessage('');
+        
+        // Clean up audio resources
+        if (mobileAudioServiceRef.current) {
+          mobileAudioServiceRef.current.stop();
         }
+        
+        // Revoke object URL after a delay to ensure cleanup
+        setTimeout(() => {
+          URL.revokeObjectURL(audioUrl);
+        }, 100);
+        
+        // Stop lip-sync
+        fetch('/api/character', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'stopLipSync',
+          }),
+        }).catch(console.error);
+        
+        // Restore emotion expression after lip-sync if needed
+        if (currentEmotion && currentEmotion !== 'neutral') {
+          console.log('Restoring emotion after speech:', currentEmotion);
+          setTimeout(() => {
+            updateCharacterExpression(currentEmotion);
+          }, 200);
+        }
+        
+        // Auto-listen if enabled
+        if (autoListen && !isMuted) {
+          setTimeout(() => {
+            console.log('Auto-listening after response...');
+            startListening();
+          }, 1000); // 1 second delay before auto-listening
+        }
+      };
+      
+      const handleAudioError = (error: Error) => {
+        console.error('[AUDIO] Mobile audio service error:', error);
+        setIsSpeaking(false);
+        setConversationState('idle');
+        setIsLoading(false);
+        setLoadingMessage('');
+        setError(formatError({ code: 'VOICE_PROCESSING_ERROR' }, currentLanguage));
+        URL.revokeObjectURL(audioUrl);
+        
+        // Stop lip-sync on error
+        fetch('/api/character', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'stopLipSync',
+          }),
+        }).catch(console.error);
+      };
+
+      // Update event handlers for this specific playback
+      mobileAudioServiceRef.current.updateEventHandlers({
+        onPlay: () => setIsSpeaking(true),
+        onEnded: handleAudioEnd,
+        onError: handleAudioError
       });
 
       // Set loading state to false before playing audio (UI becomes responsive)

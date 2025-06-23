@@ -904,8 +904,8 @@ This project is published under the [MIT License](LICENSE).
 
 ### Project Team
 
-- **Development Lead**: [Your Name](mailto:your.email@example.com)
-- **Engineer Cafe**: [cafe@example.com](mailto:cafe@example.com)
+- **Development Lead**: [Terisuke](mailto:company@cor-jp.com)
+- **Engineer Cafe**: [cafe@example.com](mailto:info@engineer-cafe.jp)
 
 ### Technical Support
 
@@ -937,6 +937,6 @@ This project is published under the [MIT License](LICENSE).
 
 **Built with ❤️ by Engineer Cafe Team**
 
-[🏠 Home](https://engineer-cafe.fukuoka.jp) • [📚 Documentation](docs/README.md) • [🚀 Demo](https://demo.engineer-cafe-navigator.vercel.app)
+[🏠 Home](https://engineer-cafe.fukuoka.jp) • [📚 Documentation](docs/README.md) • [🚀 Demo](https://engineer-cafe-navigator.vercel.app)
 
 </div>

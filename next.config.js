@@ -5,10 +5,6 @@ const nextConfig = {
       allowedOrigins: ['localhost:3000', 'vercel.app', '*.vercel.app']
     }
   },
-  // Allow cross-origin requests from local network IPs during development
-  devServer: {
-    allowedHosts: 'all'
-  },
   // WebSocket support for external integrations
   webpack: (config, { isServer }) => {
     config.externals.push({

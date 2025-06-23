@@ -37,6 +37,13 @@ export class MobileAudioService {
   }
 
   /**
+   * Update event handlers for this instance
+   */
+  public updateEventHandlers(handlers: Partial<Pick<MobileAudioOptions, 'onPlay' | 'onEnded' | 'onError' | 'onPause'>>): void {
+    this.options = { ...this.options, ...handlers };
+  }
+
+  /**
    * Load and play audio with automatic fallback
    */
   public async playAudio(audioData: string | ArrayBuffer): Promise<AudioPlaybackResult> {
@@ -97,9 +104,10 @@ export class MobileAudioService {
           await this.webAudioPlayer.loadAudio(audioData);
         }
       } else {
-        // Handle ArrayBuffer - convert to base64
+        // Handle ArrayBuffer - detect format and convert to appropriate data URL
+        const audioFormat = this.detectAudioFormat(audioData);
         const base64 = this.arrayBufferToBase64(audioData);
-        await this.webAudioPlayer.loadBase64Audio(`data:audio/wav;base64,${base64}`);
+        await this.webAudioPlayer.loadBase64Audio(`data:${audioFormat};base64,${base64}`);
       }
 
       // Play audio
@@ -130,8 +138,9 @@ export class MobileAudioService {
       if (typeof audioData === 'string') {
         audioUrl = audioData;
       } else {
-        // Convert ArrayBuffer to blob URL
-        const blob = new Blob([audioData], { type: 'audio/wav' });
+        // Convert ArrayBuffer to blob URL with proper MIME type detection
+        const audioFormat = this.detectAudioFormat(audioData);
+        const blob = new Blob([audioData], { type: audioFormat });
         audioUrl = URL.createObjectURL(blob);
       }
 
@@ -214,6 +223,54 @@ export class MobileAudioService {
       errorMessage.includes('not allowed') ||
       error.name === 'NotAllowedError'
     );
+  }
+
+  /**
+   * Detect audio format from ArrayBuffer by examining file headers
+   */
+  private detectAudioFormat(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    
+    // Check for common audio format signatures
+    if (bytes.length < 12) {
+      return 'audio/wav'; // Default fallback
+    }
+
+    // MP3: ID3 tag or MPEG sync word
+    if ((bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) || // ID3
+        (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0)) { // MPEG sync
+      return 'audio/mpeg';
+    }
+
+    // WAV: RIFF header + WAVE format
+    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && // RIFF
+        bytes[8] === 0x57 && bytes[9] === 0x41 && bytes[10] === 0x56 && bytes[11] === 0x45) { // WAVE
+      return 'audio/wav';
+    }
+
+    // MP4/AAC: ftyp box
+    if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) { // ftyp
+      return 'audio/mp4';
+    }
+
+    // OGG: OggS signature
+    if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) { // OggS
+      return 'audio/ogg';
+    }
+
+    // WebM: EBML signature
+    if (bytes[0] === 0x1A && bytes[1] === 0x45 && bytes[2] === 0xDF && bytes[3] === 0xA3) { // EBML
+      return 'audio/webm';
+    }
+
+    // FLAC: fLaC signature
+    if (bytes[0] === 0x66 && bytes[1] === 0x4C && bytes[2] === 0x61 && bytes[3] === 0x43) { // fLaC
+      return 'audio/flac';
+    }
+
+    // Default to WAV if format cannot be determined
+    console.warn('Could not detect audio format, defaulting to audio/wav');
+    return 'audio/wav';
   }
 
   /**

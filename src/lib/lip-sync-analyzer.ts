@@ -54,112 +54,106 @@ export class LipSyncAnalyzer {
    * Analyze audio blob and generate lip-sync data with intelligent caching and timeout protection
    */
   async analyzeLipSync(audioBlob: Blob, timeoutMs: number = 10000): Promise<LipSyncData> {
-    const startTime = performance.now();
-    
-    return new Promise(async (resolve, reject) => {
-      // Set up timeout
-      const timeoutId = setTimeout(() => {
+    // Inner async function to handle the actual analysis
+    const performAnalysis = async (): Promise<LipSyncData> => {
+      // Check cache first
+      const cachedResult = await lipSyncCache.instance.getCachedLipSync(audioBlob);
+      
+      if (cachedResult) {
+        return cachedResult;
+      }
+
+      // Initialize AudioContext if needed
+      await this.initializeAudioContext();
+      
+      if (!this.audioContext) {
+        throw new Error('AudioContext is not available');
+      }
+      
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      
+      const channelData = audioBuffer.getChannelData(0);
+      const sampleRate = audioBuffer.sampleRate;
+      const duration = audioBuffer.duration;
+      
+      // Optimize frame interval based on audio duration
+      const frameInterval = duration > 10 ? 0.1 : 0.05; // Use larger intervals for long audio
+      const frameCount = Math.floor(duration / frameInterval);
+      const frames: LipSyncFrame[] = [];
+
+      // Process frames in batches to prevent blocking
+      const batchSize = 10;
+      for (let batchStart = 0; batchStart < frameCount; batchStart += batchSize) {
+        const batchEnd = Math.min(batchStart + batchSize, frameCount);
+        
+        // Process batch
+        for (let i = batchStart; i < batchEnd; i++) {
+          const startSample = Math.floor(i * frameInterval * sampleRate);
+          const endSample = Math.floor((i + 1) * frameInterval * sampleRate);
+          
+          // Calculate RMS volume for this frame (optimized)
+          let sum = 0;
+          const sampleCount = Math.min(endSample - startSample, 1024); // Limit samples for performance
+          const step = Math.max(1, Math.floor((endSample - startSample) / sampleCount));
+          
+          for (let j = startSample; j < endSample && j < channelData.length; j += step) {
+            sum += channelData[j] * channelData[j];
+          }
+          const rms = Math.sqrt(sum / sampleCount);
+          
+          // Simplified mouth shape determination for performance
+          const mouthShape = this.determineMouthShapeSimplified(rms, channelData, startSample, endSample);
+          
+          frames.push({
+            time: i * frameInterval,
+            volume: Math.min(rms * 10, 1),
+            mouthOpen: Math.min(rms * 15, 1),
+            mouthShape
+          });
+        }
+        
+        // Yield control to prevent blocking (only for large batches)
+        if (frameCount > 100) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+
+      const lipSyncData: LipSyncData = {
+        frames,
+        duration
+      };
+
+      // Cache the results for future use
+      await lipSyncCache.instance.cacheLipSync(audioBlob, lipSyncData);
+
+      return lipSyncData;
+    };
+
+    // Use Promise.race for timeout handling without async Promise executor
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
         reject(new Error(`Lip-sync analysis timed out after ${timeoutMs}ms`));
       }, timeoutMs);
-
-      try {
-        // Check cache first
-        const cachedResult = await lipSyncCache.instance.getCachedLipSync(audioBlob);
-        
-        if (cachedResult) {
-          clearTimeout(timeoutId);
-          resolve(cachedResult);
-          return;
-        }
-
-        // Analyze audio
-        const analysisStartTime = performance.now();
-        
-        // Initialize AudioContext if needed
-        await this.initializeAudioContext();
-        
-        if (!this.audioContext) {
-          throw new Error('AudioContext is not available');
-        }
-        
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-        
-        const channelData = audioBuffer.getChannelData(0);
-        const sampleRate = audioBuffer.sampleRate;
-        const duration = audioBuffer.duration;
-        
-        // Optimize frame interval based on audio duration
-        const frameInterval = duration > 10 ? 0.1 : 0.05; // Use larger intervals for long audio
-        const frameCount = Math.floor(duration / frameInterval);
-        const frames: LipSyncFrame[] = [];
-
-
-        // Process frames in batches to prevent blocking
-        const batchSize = 10;
-        for (let batchStart = 0; batchStart < frameCount; batchStart += batchSize) {
-          const batchEnd = Math.min(batchStart + batchSize, frameCount);
-          
-          // Process batch
-          for (let i = batchStart; i < batchEnd; i++) {
-            const startSample = Math.floor(i * frameInterval * sampleRate);
-            const endSample = Math.floor((i + 1) * frameInterval * sampleRate);
-            
-            // Calculate RMS volume for this frame (optimized)
-            let sum = 0;
-            const sampleCount = Math.min(endSample - startSample, 1024); // Limit samples for performance
-            const step = Math.max(1, Math.floor((endSample - startSample) / sampleCount));
-            
-            for (let j = startSample; j < endSample && j < channelData.length; j += step) {
-              sum += channelData[j] * channelData[j];
-            }
-            const rms = Math.sqrt(sum / sampleCount);
-            
-            // Simplified mouth shape determination for performance
-            const mouthShape = this.determineMouthShapeSimplified(rms, channelData, startSample, endSample);
-            
-            frames.push({
-              time: i * frameInterval,
-              volume: Math.min(rms * 10, 1),
-              mouthOpen: Math.min(rms * 15, 1),
-              mouthShape
-            });
-          }
-          
-          // Yield control to prevent blocking (only for large batches)
-          if (frameCount > 100) {
-            await new Promise(resolve => setTimeout(resolve, 0));
-          }
-        }
-
-        const lipSyncData: LipSyncData = {
-          frames,
-          duration
-        };
-
-        // Cache the results for future use
-        await lipSyncCache.instance.cacheLipSync(audioBlob, lipSyncData);
-
-        clearTimeout(timeoutId);
-        resolve(lipSyncData);
-      } catch (error) {
-        clearTimeout(timeoutId);
-        console.error('Error analyzing lip-sync:', error);
-        reject(error);
-      }
     });
+
+    try {
+      return await Promise.race([performAnalysis(), timeoutPromise]);
+    } catch (error) {
+      console.error('Error analyzing lip-sync:', error);
+      throw error;
+    }
   }
 
   /**
    * Real-time lip-sync analysis from audio stream
    */
-  async analyzeRealTimeLipSync(audioStream: MediaStream, callback: (frame: LipSyncFrame) => void): Promise<() => void> {
+  analyzeRealTimeLipSync(audioStream: MediaStream, callback: (frame: LipSyncFrame) => void): (() => void) | null {
     try {
-      // Initialize AudioContext if needed
-      await this.initializeAudioContext();
-      
+      // AudioContext must be initialized before calling this method
       if (!this.audioContext || !this.analyserNode) {
-        throw new Error('AudioContext or AnalyserNode is not available');
+        console.error('[LipSyncAnalyzer] AudioContext not initialized. Call initializeAudioContext() first.');
+        return null;
       }
 
       const source = this.audioContext.createMediaStreamSource(audioStream);
@@ -205,8 +199,24 @@ export class LipSyncAnalyzer {
       };
     } catch (error) {
       console.error('[LipSyncAnalyzer] Real-time analysis failed:', error);
-      throw error;
+      return null;
     }
+  }
+
+  /**
+   * Async version of real-time lip-sync analysis (for backward compatibility)
+   * @deprecated Use analyzeRealTimeLipSync instead for better performance
+   */
+  async analyzeRealTimeLipSyncAsync(audioStream: MediaStream, callback: (frame: LipSyncFrame) => void): Promise<() => void> {
+    // Initialize AudioContext if needed
+    await this.initializeAudioContext();
+    
+    const cleanup = this.analyzeRealTimeLipSync(audioStream, callback);
+    if (!cleanup) {
+      throw new Error('Failed to start real-time lip-sync analysis');
+    }
+    
+    return cleanup;
   }
 
   private determineMouthShape(

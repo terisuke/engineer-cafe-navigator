@@ -842,8 +842,8 @@ pnpm run test:external-apis # 外部API連携テスト
 
 ### プロジェクトチーム
 
-- **開発リーダー**: [Your Name](mailto:your.email@example.com)
-- **エンジニアカフェ**: [cafe@example.com](mailto:cafe@example.com)
+- **開発リーダー**: [Terisuke](mailto:company@cor-jp.com)
+- **エンジニアカフェ**: [cafe@example.com](mailto:info@engineer-cafe.jp)
 
 ### 技術サポート
 
@@ -873,6 +873,6 @@ pnpm run test:external-apis # 外部API連携テスト
 
 **Built with ❤️ by Engineer Cafe Team**
 
-[🏠 ホーム](https://engineer-cafe.fukuoka.jp) • [📚 ドキュメント](docs/README.md) • [🚀 デモ](https://demo.engineer-cafe-navigator.vercel.app)
+[🏠 ホーム](https://engineer-cafe.fukuoka.jp) • [📚 ドキュメント](docs/README.md) • [🚀 デモ](https://engineer-cafe-navigator.vercel.app)
 
 </div>
