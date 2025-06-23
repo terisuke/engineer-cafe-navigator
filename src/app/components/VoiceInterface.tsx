@@ -2,6 +2,8 @@
 
 import { AudioQueue } from '@/lib/audio-queue';
 import { formatError } from '@/lib/error-messages';
+import { MobileAudioService } from '@/lib/audio/mobile-audio-service';
+import { useAudioInteraction } from '@/lib/audio/audio-interaction-manager';
 import { AlertCircle, Loader2, Mic, MicOff, Settings, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -46,6 +48,8 @@ export default function VoiceInterface({
   const audioContextRef = useRef<AudioContext | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioQueueRef = useRef<AudioQueue | null>(null);
+  const mobileAudioServiceRef = useRef<MobileAudioService | null>(null);
+  const { ensureAudioContext, isReady: isAudioReady, hasInteraction } = useAudioInteraction();
   
 
   // Audio unlock function
@@ -63,51 +67,32 @@ export default function VoiceInterface({
     }
   };
 
-  // Initialize audio context with user gesture handling
+  // Initialize mobile audio service
   useEffect(() => {
-    const initAudioContext = () => {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      
-      // Resume audio context if it's suspended
-      if (audioContextRef.current?.state === 'suspended') {
-        audioContextRef.current.resume();
-      }
-    };
-    
-    // Initialize on mount
-    initAudioContext();
-
-    // Also initialize on first user interaction with improved detection
-    const handleUserInteraction = async (event: Event) => {
-      console.log('[AUDIO] First user interaction detected:', event.type);
-      initAudioContext();
-      
-      // Comprehensive iOS audio unlock
-      await unlockAudio();
-      
-      // Remove listener after first interaction
-      document.removeEventListener('click', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
-      document.removeEventListener('keydown', handleUserInteraction);
-    };
-    
-    document.addEventListener('click', handleUserInteraction);
-    document.addEventListener('touchstart', handleUserInteraction);
-    document.addEventListener('keydown', handleUserInteraction);
+    if (!mobileAudioServiceRef.current) {
+      mobileAudioServiceRef.current = new MobileAudioService({
+        volume: volume,
+        onPlay: () => setIsSpeaking(true),
+        onEnded: () => setIsSpeaking(false),
+        onError: (error) => {
+          console.error('[AUDIO] Mobile audio service error:', error);
+          setError(`Audio playback error: ${error.message}`);
+        }
+      });
+    }
     
     return () => {
-      document.removeEventListener('click', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
       if (audioContextRef.current) {
         audioContextRef.current.close();
       }
       if (audioQueueRef.current) {
         audioQueueRef.current.clear();
       }
+      if (mobileAudioServiceRef.current) {
+        mobileAudioServiceRef.current.dispose();
+      }
     };
-  }, []);
+  }, [volume]);
 
   // Update language when prop changes
   useEffect(() => {
@@ -398,19 +383,23 @@ export default function VoiceInterface({
       const audioBlob = new Blob([audioData], { type: 'audio/mp3' });
       const audioUrl = URL.createObjectURL(audioBlob);
       
-      console.log('[AUDIO] Creating audio element...', { volume, audioUrlLength: audioUrl.length });
-      const audio = new Audio(audioUrl);
-      audio.volume = volume;
-      currentAudioRef.current = audio;
+      console.log('[AUDIO] Starting mobile audio playback...', { volume, audioUrlLength: audioUrl.length });
       
-      // Add more event listeners for debugging
-      audio.addEventListener('loadstart', () => console.log('[AUDIO] Loading started'));
-      audio.addEventListener('loadeddata', () => console.log('[AUDIO] Data loaded'));
-      audio.addEventListener('canplay', () => console.log('[AUDIO] Can play'));
-      audio.addEventListener('playing', () => console.log('[AUDIO] Playing'));
-      audio.addEventListener('pause', () => console.log('[AUDIO] Paused'));
-      audio.addEventListener('waiting', () => console.log('[AUDIO] Waiting for data'));
-      audio.addEventListener('stalled', () => console.log('[AUDIO] Stalled'));
+      // Use mobile audio service for better compatibility
+      if (!mobileAudioServiceRef.current) {
+        mobileAudioServiceRef.current = new MobileAudioService({
+          volume: volume,
+          onPlay: () => setIsSpeaking(true),
+          onEnded: () => setIsSpeaking(false),
+          onError: (error) => {
+            console.error('[AUDIO] Mobile audio service error:', error);
+            setError(`Audio playback error: ${error.message}`);
+          }
+        });
+      }
+      
+      // Update volume
+      mobileAudioServiceRef.current.setVolume(volume);
 
       // Import performance monitor functions
       const { measurePerformance } = await import('@/lib/performance-monitor');
@@ -491,130 +480,122 @@ export default function VoiceInterface({
         }
       })();
 
-      audio.onended = () => {
-        console.log('[AUDIO] Audio playback ended');
-        setIsSpeaking(false);
-        setConversationState('idle');
-        setIsLoading(false);
-        setLoadingMessage('');
-        
-        // Clean up audio resources
-        if (currentAudioRef.current) {
-          currentAudioRef.current.src = '';
-          currentAudioRef.current = null;
-        }
-        
-        // Revoke object URL after a delay to ensure cleanup
-        setTimeout(() => {
+      // Set up enhanced onEnded callback for MobileAudioService
+      mobileAudioServiceRef.current = new MobileAudioService({
+        volume: volume,
+        onPlay: () => setIsSpeaking(true),
+        onEnded: () => {
+          console.log('[AUDIO] Audio playback ended');
+          setIsSpeaking(false);
+          setConversationState('idle');
+          setIsLoading(false);
+          setLoadingMessage('');
+          
+          // Clean up audio resources
+          if (mobileAudioServiceRef.current) {
+            mobileAudioServiceRef.current.stop();
+          }
+          
+          // Revoke object URL after a delay to ensure cleanup
+          setTimeout(() => {
+            URL.revokeObjectURL(audioUrl);
+          }, 100);
+          
+          // Stop lip-sync
+          fetch('/api/character', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'stopLipSync',
+            }),
+          }).catch(console.error);
+          
+          // Restore emotion expression after lip-sync if needed
+          if (currentEmotion && currentEmotion !== 'neutral') {
+            console.log('Restoring emotion after speech:', currentEmotion);
+            setTimeout(() => {
+              updateCharacterExpression(currentEmotion);
+            }, 200);
+          }
+          
+          // Auto-listen if enabled
+          if (autoListen && !isMuted) {
+            setTimeout(() => {
+              console.log('Auto-listening after response...');
+              startListening();
+            }, 1000); // 1 second delay before auto-listening
+          }
+        },
+        onError: (error) => {
+          console.error('[AUDIO] Mobile audio service error:', error);
+          setIsSpeaking(false);
+          setConversationState('idle');
+          setIsLoading(false);
+          setLoadingMessage('');
+          setError(formatError({ code: 'VOICE_PROCESSING_ERROR' }, currentLanguage));
           URL.revokeObjectURL(audioUrl);
-        }, 100);
-        
-        // Stop lip-sync
-        fetch('/api/character', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'stopLipSync',
-          }),
-        }).catch(console.error);
-        
-        // Restore emotion expression after lip-sync if needed
-        if (currentEmotion && currentEmotion !== 'neutral') {
-          console.log('Restoring emotion after speech:', currentEmotion);
-          setTimeout(() => {
-            updateCharacterExpression(currentEmotion);
-          }, 200);
+          
+          // Stop lip-sync on error
+          fetch('/api/character', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'stopLipSync',
+            }),
+          }).catch(console.error);
         }
-        
-        // Auto-listen if enabled
-        if (autoListen && !isMuted) {
-          setTimeout(() => {
-            console.log('Auto-listening after response...');
-            startListening();
-          }, 1000); // 1 second delay before auto-listening
-        }
-      };
+      });
 
-      audio.onerror = () => {
-        setIsSpeaking(false);
-        setConversationState('idle');
-        setIsLoading(false);
-        setLoadingMessage('');
-        setError(formatError({ code: 'VOICE_PROCESSING_ERROR' }, currentLanguage));
-        URL.revokeObjectURL(audioUrl);
-        currentAudioRef.current = null;
-        
-        // Stop lip-sync on error
-        fetch('/api/character', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'stopLipSync',
-          }),
-        }).catch(console.error);
-      };
-
-      // Ensure audio context is running before playing
-      if (audioContextRef.current?.state === 'suspended') {
-        console.log('AudioContext suspended, resuming...');
-        await audioContextRef.current.resume();
-      }
-      
       // Set loading state to false before playing audio (UI becomes responsive)
       setIsLoading(false);
       setLoadingMessage('');
       
-      // Play audio with retry on autoplay failure
-      console.log('[AUDIO] Attempting to play audio...', { audioUnlocked });
-      
-      // Check if audio was unlocked earlier
-      if (!audioUnlocked) {
-        console.log('[AUDIO] Audio not unlocked yet, will require user interaction');
-      }
-      
       try {
-        await audio.play();
-        console.log('[AUDIO] Audio playback started successfully');
+        // Use mobile audio service for better compatibility
+        const result = await mobileAudioServiceRef.current!.playAudio(audioUrl);
         
-        // Skip lip-sync processing entirely on iOS
-        if (!skipLipSync) {
-          // Start lip-sync processing in background (non-blocking)
-          lipSyncPromise.catch(error => {
-            console.warn('Lip-sync processing error (non-critical):', error);
-          });
+        if (result.success) {
+          console.log(`[AUDIO] Audio playback started successfully using ${result.method}`);
+          
+          // Skip lip-sync processing entirely on iOS
+          if (!skipLipSync) {
+            // Start lip-sync processing in background (non-blocking)
+            lipSyncPromise.catch(error => {
+              console.warn('Lip-sync processing error (non-critical):', error);
+            });
+          }
+        } else {
+          throw result.error || new Error('Audio playback failed');
         }
       } catch (playError: any) {
         console.error('Audio playback failed:', playError);
         
-        // If autoplay was blocked, show a message and retry on next user interaction
-        if (playError.name === 'NotAllowedError') {
-          console.log('[AUDIO] Autoplay blocked, waiting for user interaction...');
-          
-          // Store the audio for later playback
-          const storedAudio = audio;
+        // If interaction is required, show a message and retry on next user interaction
+        if (playError.message?.includes('User interaction required') || playError.name === 'NotAllowedError') {
+          console.log('[AUDIO] User interaction required, waiting for user interaction...');
           
           // Create a one-time click handler to retry playback
-          const retryPlayback = async (event: Event) => {
+          const retryPlayback = async () => {
             console.log('[AUDIO] User interaction detected, retrying playback...');
             try {
-              // Resume AudioContext if needed
-              if (audioContextRef.current?.state === 'suspended') {
-                await audioContextRef.current.resume();
-                console.log('[AUDIO] AudioContext resumed');
-              }
+              // Ensure audio context and retry playback
+              await ensureAudioContext();
               
-              // Try to play the stored audio
-              await storedAudio.play();
-              console.log('[AUDIO] Audio playback started after user interaction');
-              
-              // Clear the error message
-              setError(null);
-              
-              // Skip lip-sync processing entirely on iOS
-              if (!skipLipSync) {
-                lipSyncPromise.catch(error => {
-                  console.warn('Lip-sync processing error (non-critical):', error);
-                });
+              const retryResult = await mobileAudioServiceRef.current!.playAudio(audioUrl);
+              if (retryResult.success) {
+                console.log(`[AUDIO] Audio playback started after user interaction using ${retryResult.method}`);
+                
+                // Clear the error message
+                setError(null);
+                
+                // Skip lip-sync processing entirely on iOS
+                if (!skipLipSync) {
+                  lipSyncPromise.catch(error => {
+                    console.warn('Lip-sync processing error (non-critical):', error);
+                  });
+                }
+              } else {
+                throw retryResult.error || new Error('Retry playback failed');
               }
               
             } catch (retryError) {

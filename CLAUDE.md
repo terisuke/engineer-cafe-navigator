@@ -50,7 +50,7 @@ pnpm cron:update-slides     # Manually trigger slide update
   - Google Gemini 2.5 Flash Preview (for responses)
   - Google text-embedding-004 (768 dimensions, padded to 1536 for compatibility)
   - OpenAI text-embedding-3-small (1536 dimensions as fallback)
-- **Voice**: Google Cloud Speech-to-Text/Text-to-Speech
+- **Voice**: Google Cloud Speech-to-Text/Text-to-Speech with Web Audio API for mobile compatibility
 - **3D Graphics**: Three.js 0.176.0 with @pixiv/three-vrm 3.4.1
 - **Database**: PostgreSQL with pgvector extension
 - **Backend Services**: Supabase 2.49.8
@@ -258,6 +258,73 @@ The knowledge base contains 84+ entries organized by:
 - **WebSocket Support**: For external system integration
 - **Streamlined UI**: Fullscreen controls removed from character display for cleaner interface
 - **No Test Framework**: Currently configured for production deployment
+
+### Mobile-Compatible Audio System
+
+The application features a robust audio playback system designed specifically for mobile device compatibility, addressing autoplay policy restrictions on tablets and smartphones:
+
+#### **Core Audio Components**
+
+1. **WebAudioPlayer** (`/src/lib/audio/web-audio-player.ts`)
+   - Web Audio API-based audio player for superior mobile compatibility
+   - Automatic AudioContext initialization and management
+   - Support for both URL and base64 audio data
+   - Volume control and playback state management
+   - Safari/WebKit compatibility with fallback mechanisms
+
+2. **AudioInteractionManager** (`/src/lib/audio/audio-interaction-manager.ts`)
+   - Handles user interaction requirements for audio playback
+   - Automatic AudioContext initialization on first user gesture
+   - Event listener management for touch/click/keyboard interactions
+   - Pending callback system for deferred audio operations
+
+3. **MobileAudioService** (`/src/lib/audio/mobile-audio-service.ts`)
+   - Unified audio service with automatic fallback mechanisms
+   - Web Audio API primary, HTMLAudioElement fallback
+   - Retry logic with exponential backoff
+   - Device-specific optimization (iOS, Android detection)
+
+#### **Mobile Compatibility Features**
+
+- **Autoplay Policy Compliance**: Respects browser autoplay restrictions
+- **User Interaction Detection**: Automatic audio context unlocking on first user gesture
+- **iPad/iOS Optimization**: Special handling for Safari's strict audio policies
+- **Fallback Mechanisms**: Graceful degradation from Web Audio API to HTML Audio
+- **Error Recovery**: Intelligent retry with user interaction prompts
+
+#### **Supported Platforms**
+
+- **Desktop Browsers**: Full Web Audio API support with enhanced features
+- **iPad/iOS Safari**: Web Audio API with interaction-based initialization
+- **Android Tablets**: Full compatibility with both audio systems
+- **Mobile Browsers**: Automatic detection and optimization per device type
+
+#### **Technical Implementation**
+
+```typescript
+// Example usage of the mobile audio system
+const audioService = new MobileAudioService({
+  volume: 0.8,
+  onPlay: () => setIsPlaying(true),
+  onEnded: () => setIsPlaying(false),
+  onError: (error) => handleAudioError(error)
+});
+
+const result = await audioService.playAudio(audioData);
+if (result.success) {
+  console.log(`Playing via ${result.method}`);
+} else if (result.requiresInteraction) {
+  // Show user interaction prompt
+  showTapToPlayMessage();
+}
+```
+
+#### **Error Handling & User Experience**
+
+- **Graceful Error Messages**: Localized prompts for user interaction (Japanese/English)
+- **Visual Feedback**: Clear indicators when user tap is required for audio
+- **Automatic Recovery**: Seamless continuation after user interaction
+- **Performance Monitoring**: Built-in metrics for audio playback success rates
 
 ### Lip-sync System
 

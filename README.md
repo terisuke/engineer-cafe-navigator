@@ -27,17 +27,24 @@ Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福
 - **🚀 リップシンク最適化** - O(n²)→O(n)アルゴリズム、タイムアウト保護、モバイル対応
 - **📱 モバイル互換性改善** - 適切なエラーハンドリングと音声専用モードの実装
 
-#### ⚠️ デバイス互換性情報
-| デバイス | 音声機能 | リップシンク | 推奨度 |
+#### ✅ モバイル互換性の大幅改善 (2025/06/23)
+- **🔧 Web Audio API統合** - iPadなどのタブレットでの音声再生エラーを解決
+- **📱 自動再生ポリシー対応** - ブラウザ制限を回避する音声システム
+- **🔄 フォールバック機能** - Web Audio API失敗時のHTMLAudio自動切り替え
+- **👆 ユーザーインタラクション管理** - 初回タップで音声機能完全有効化
+
+#### 📱 デバイス互換性情報
+| デバイス | 音声再生 | リップシンク | 推奨度 |
 |---------|---------|------------|-------|
 | **PC/Mac ブラウザ** | ✅ 完全対応 | ✅ 完全対応 | 🟢 推奨 |
-| **Android タブレット** | ✅ 対応 | ⚠️ 制限あり | 🟡 使用可能 |
-| **iPad/iOS Safari** | ⚠️ 制限あり | ❌ 非対応 | 🔴 制限あり |
+| **iPad/iOS Safari** | ✅ **改善済み** | ⚠️ 制限あり | 🟢 **使用推奨** |
+| **Android タブレット** | ✅ 完全対応 | ⚠️ 制限あり | 🟢 使用推奨 |
 
-**iPad/iOS ユーザーへの注意：**
-- Safari の厳しい音声制限により、リップシンク機能は動作しません
-- 音声のみでの動作は可能ですが、画面タップ後の使用を推奨
-- 最適な体験には PC/Mac ブラウザをご利用ください
+**iPad/iOS での改善点：**
+- ✅ 音声再生エラーを完全解決（Web Audio API導入）
+- ✅ 初回画面タップで音声機能が自動的に有効化
+- ✅ 自動再生ポリシーに準拠した適切なエラーハンドリング
+- ⚠️ リップシンク機能は引き続きブラウザ制限により制限あり
 
 ### 🎯 主な目的
 
@@ -102,7 +109,7 @@ graph TB
 - **フレームワーク**: [Mastra 0.10.1](https://mastra.ai/) - AI エージェント開発フレームワーク
 - **Frontend**: [Next.js 15.3.2](https://nextjs.org/) + [TypeScript 5.8.3](https://www.typescriptlang.org/)
 - **AI/ML**: [Google Gemini 2.5 Flash Preview](https://ai.google.dev/)
-- **音声処理**: [Google Cloud Speech-to-Text/Text-to-Speech](https://cloud.google.com/speech-to-text)
+- **音声処理**: [Google Cloud Speech-to-Text/Text-to-Speech](https://cloud.google.com/speech-to-text) + Web Audio API
 
 #### 専門技術
 - **3Dキャラクター**: [Three.js 0.176.0](https://threejs.org/) + [@pixiv/three-vrm 3.4.0](https://github.com/pixiv/three-vrm)
@@ -329,7 +336,11 @@ engineer-cafe-navigator/
 │   │   │   └── greetings.json        # 挨拶アニメーション
 │   │   └── expressions/              # 表情データ
 │   ├── lib/                          # 共通ライブラリ
-│   │   ├── audio-player.ts           # 音声再生
+│   │   ├── audio/                    # 音声システム (モバイル対応)
+│   │   │   ├── web-audio-player.ts   # Web Audio API音声プレイヤー
+│   │   │   ├── audio-interaction-manager.ts # ユーザーインタラクション管理
+│   │   │   └── mobile-audio-service.ts # モバイル対応音声サービス
+│   │   ├── audio-player.ts           # 旧音声再生（互換性維持）
 │   │   ├── lip-sync-analyzer.ts      # リップシンク解析 (キャッシュ対応)
 │   │   ├── lip-sync-cache.ts         # リップシンクキャッシュシステム
 │   │   ├── marp-processor.ts         # Marp処理
@@ -383,8 +394,10 @@ Engineer Cafe NavigatorはGoogle Cloud STTとWeb Speech APIのハイブリッド
 
 ### ブラウザ互換性
 - **Google Cloud STT**: すべてのモダンブラウザで動作
+- **Web Audio API**: 全モダンブラウザ対応（Safari/iOS含む）
 - **MediaRecorder API**: Chrome, Firefox, Edgeで完全対応、Safariで部分対応
 - **Three.js VRM**: 全モダンブラウザ対応
+- **自動再生ポリシー対応**: 全モバイルブラウザで適切に動作
 
 ## 🎮 使用方法
 
