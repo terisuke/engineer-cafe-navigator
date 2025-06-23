@@ -187,7 +187,7 @@ export class RealtimeAgent extends Agent {
     }
   }
 
-  async processVoiceInput(audioBuffer: ArrayBuffer): Promise<{
+  async processVoiceInput(audioBuffer: ArrayBuffer, language?: SupportedLanguage): Promise<{
     transcript: string;
     response: string;
     rawResponse?: string;
@@ -214,7 +214,14 @@ export class RealtimeAgent extends Agent {
       const uint8Array = new Uint8Array(audioBuffer);
       const audioBase64 = Buffer.from(uint8Array).toString('base64');
       
-      const currentLang = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      // Use the provided language or fallback to stored language or default 'ja'
+      const currentLang = language || await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      
+      // Update stored language if provided
+      if (language) {
+        await this.supabaseMemory.store('language', language);
+      }
+      
       const result = await this.voiceService.speechToText(audioBase64, currentLang);
       performanceSteps['Speech-to-Text'] = endPerformance('Speech-to-Text');
       
@@ -263,7 +270,7 @@ export class RealtimeAgent extends Agent {
       
       // Get conversation context for additional emotion detection
       const conversationHistory = await this.getRecentConversationHistory();
-      const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+      const storedLanguage = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
       
       // Create emotion data from parsed tags or fallback to text analysis
       let emotion: EmotionData;

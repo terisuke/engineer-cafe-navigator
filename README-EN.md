@@ -14,7 +14,7 @@
 
 Engineer Cafe Navigator is a **multilingual voice AI agent system** that automates customer service for Fukuoka City Engineer Cafe. Built with the Mastra framework, it aims to reduce staff workload and improve customer satisfaction.
 
-### 🆕 Latest Updates (2025/06/19)
+### 🆕 Latest Updates (2025/06/23)
 
 #### ✅ Completed Features
 - **🎯 Production Monitoring** - Real-time performance monitoring and alert system
@@ -31,6 +31,25 @@ Engineer Cafe Navigator is a **multilingual voice AI agent system** that automat
 - **Emotion Recognition & VRM Expression Control** - Automatic facial expression changes via text analysis
 - **🚀 Lip-sync Cache System** - Intelligent audio analysis caching for 99% speed improvement (4-8s → 10-50ms)
 - **🧠 SimplifiedMemorySystem** - Unified memory architecture with 3-minute conversation context retention
+
+#### ✅ Major Mobile Compatibility Improvements (2025/06/23)
+- **🔧 Web Audio API Integration** - Fixed audio playback errors on iPad and other tablets
+- **📱 Autoplay Policy Compliance** - Audio system that bypasses browser restrictions
+- **🔄 Fallback Mechanisms** - Automatic fallback from Web Audio API to HTML Audio when needed
+- **👆 User Interaction Management** - Full audio functionality activation with first screen tap
+
+#### 📱 Device Compatibility Status
+| Device | Audio Playback | Lip-sync | Recommendation |
+|--------|----------------|----------|----------------|
+| **PC/Mac Browsers** | ✅ Full Support | ✅ Full Support | 🟢 Recommended |
+| **iPad/iOS Safari** | ✅ **Fixed** | ⚠️ Limited | 🟢 **Now Recommended** |
+| **Android Tablets** | ✅ Full Support | ⚠️ Limited | 🟢 Recommended |
+
+**iPad/iOS Improvements:**
+- ✅ Audio playback errors completely resolved (Web Audio API implementation)
+- ✅ Audio functionality automatically enabled with first screen tap
+- ✅ Proper error handling compliant with autoplay policies
+- ⚠️ Lip-sync functionality still limited due to browser restrictions
 
 ### 🎯 Main Objectives
 
@@ -95,7 +114,7 @@ graph TB
 - **Framework**: [Mastra 0.10.5](https://mastra.ai/) - AI Agent Development Framework
 - **Frontend**: [Next.js 15.3.2](https://nextjs.org/) + [TypeScript 5.8.3](https://www.typescriptlang.org/)
 - **AI/ML**: [Google Gemini 2.5 Flash Preview](https://ai.google.dev/)
-- **Voice Processing**: [Google Cloud Speech-to-Text/Text-to-Speech](https://cloud.google.com/speech-to-text)
+- **Voice Processing**: [Google Cloud Speech-to-Text/Text-to-Speech](https://cloud.google.com/speech-to-text) + Web Audio API
 
 #### Specialized Technologies
 - **3D Character**: [Three.js 0.176.0](https://threejs.org/) + [@pixiv/three-vrm 3.4.0](https://github.com/pixiv/three-vrm)
@@ -885,8 +904,8 @@ This project is published under the [MIT License](LICENSE).
 
 ### Project Team
 
-- **Development Lead**: [Your Name](mailto:your.email@example.com)
-- **Engineer Cafe**: [cafe@example.com](mailto:cafe@example.com)
+- **Development Lead**: [Terisuke](mailto:company@cor-jp.com)
+- **Engineer Cafe**: [cafe@example.com](mailto:info@engineer-cafe.jp)
 
 ### Technical Support
 
@@ -918,6 +937,6 @@ This project is published under the [MIT License](LICENSE).
 
 **Built with ❤️ by Engineer Cafe Team**
 
-[🏠 Home](https://engineer-cafe.fukuoka.jp) • [📚 Documentation](docs/README.md) • [🚀 Demo](https://demo.engineer-cafe-navigator.vercel.app)
+[🏠 Home](https://engineer-cafe.fukuoka.jp) • [📚 Documentation](docs/README.md) • [🚀 Demo](https://engineer-cafe-navigator.vercel.app)
 
 </div>

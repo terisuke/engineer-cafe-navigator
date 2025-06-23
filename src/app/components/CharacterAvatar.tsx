@@ -328,11 +328,22 @@ useEffect(() => {
     camera.lookAt(0 + cameraPositionOffset.x, 1, 0);
     cameraRef.current = camera;
 
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // Renderer with performance optimizations
+    // iOS detection removed - focusing on desktop/PC experience
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true, // Enable antialiasing for desktop
+      alpha: true,
+      powerPreference: "low-power" // Use low-power GPU on mobile devices
+    });
     renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    
+    // Use native pixel ratio for desktop
+    const pixelRatio = window.devicePixelRatio;
+    renderer.setPixelRatio(pixelRatio);
+    
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    
+    // Enable shadows for desktop
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     containerRef.current.appendChild(renderer.domElement);
@@ -394,7 +405,6 @@ useEffect(() => {
   };
 
   const loadVRMAnimation = async (animationUrl: string, vrm: VRM, loop: boolean = true, isIdleAnimation: boolean = false) => {
-    console.log('Loading VRM animation:', animationUrl);
     currentAnimationUrlRef.current = animationUrl;
     const loader = new GLTFLoader();
     loader.crossOrigin = 'anonymous';
@@ -406,21 +416,15 @@ useEffect(() => {
 
     try {
       const gltf = await loader.loadAsync(animationUrl);
-      console.log('GLTF loaded:', gltf);
-      console.log('GLTF userData:', gltf.userData);
       
       // Try different ways to access the animation
       const vrmAnimation = gltf.userData.vrmAnimations?.[0] || gltf.userData.vrmAnimation;
-      console.log('VRM Animation found:', vrmAnimation);
       
       if (vrmAnimation) {
         const clip = createVRMAnimationClip(vrmAnimation, vrm as any);
-        console.log('Animation clip created:', clip);
-        console.log('Animation duration:', clip.duration);
         
         if (!mixerRef.current) {
           mixerRef.current = new THREE.AnimationMixer(vrm.scene);
-          console.log('Mixer created');
         }
         
         // Stop current animation if exists
@@ -458,15 +462,12 @@ useEffect(() => {
           );
         }
         
-        console.log('Animation playing');
         
         return { success: true, duration: clip.duration };
       } else {
-        console.warn('No VRM animation found in userData');
         
         // Try using the gltf animations directly
         if (gltf.animations && gltf.animations.length > 0) {
-          console.log('Found standard GLTF animations:', gltf.animations);
           
           if (!mixerRef.current) {
             mixerRef.current = new THREE.AnimationMixer(vrm.scene);
@@ -598,10 +599,11 @@ useEffect(() => {
       );
 
       // Initialize lip-sync and expression controllers
-      console.log('Initializing BlendShape controllers...');
       blendShapeControllerRef.current = new VRMBlendShapeController(vrm);
-      lipSyncAnalyzerRef.current = new LipSyncAnalyzer();
       expressionControllerRef.current = new ExpressionController();
+      
+      // Initialize LipSyncAnalyzer without AudioContext (will be initialized on first use)
+      lipSyncAnalyzerRef.current = new LipSyncAnalyzer();
       
       // Log available expressions
       const availableExpressions = blendShapeControllerRef.current.getAvailableExpressions();
@@ -622,13 +624,10 @@ useEffect(() => {
       await fetchAvailableFeatures();
       
       // Load default idle animation
-      console.log('Loading idle animation, current modelPositionOffset:', modelPositionOffset);
       await loadVRMAnimation('/animations/idle_loop.vrma', vrm, true, true);
-      console.log('After idle animation load, model position:', vrm.scene.position);
 
       // Create viseme control function
       const setViseme = (viseme: string, intensity: number) => {
-        console.log(`[CharacterAvatar] Setting viseme: ${viseme}, intensity: ${intensity}`);
         if (blendShapeControllerRef.current) {
           // Map viseme to VRM expression name
           const visemeMap: Record<string, string> = {
@@ -641,7 +640,6 @@ useEffect(() => {
           };
           
           const vrmExpression = visemeMap[viseme] || 'neutral';
-          console.log(`[CharacterAvatar] Mapped viseme ${viseme} to VRM expression ${vrmExpression}`);
           blendShapeControllerRef.current.setViseme(vrmExpression, intensity);
         } else {
           console.warn('[CharacterAvatar] BlendShape controller not available');
@@ -650,10 +648,6 @@ useEffect(() => {
 
       // Create expression control function
       const setExpression = (expression: string, weight: number) => {
-        console.log(`[CharacterAvatar] === setExpression called ===`);
-        console.log(`[CharacterAvatar] Expression: ${expression}, Weight: ${weight}`);
-        console.log(`[CharacterAvatar] BlendShape controller available:`, !!blendShapeControllerRef.current);
-        console.log(`[CharacterAvatar] VRM object:`, !!vrm);
         
         // Clear existing timeout if any
         if (expressionTimeoutRef.current) {
@@ -1001,6 +995,10 @@ useEffect(() => {
     animationFrameRef.current = requestAnimationFrame(animate);
 
     const deltaTime = clockRef.current?.getDelta() || 0;
+    
+    // Skip frame for performance on mobile devices
+    // iOS detection removed - focusing on desktop/PC experience
+    // Removed iOS frame skipping - desktop can handle full frame rate
 
     // Update animation mixer
     if (mixerRef.current && deltaTime > 0) {
@@ -1028,6 +1026,8 @@ useEffect(() => {
 
     rendererRef.current.render(sceneRef.current, cameraRef.current);
   };
+  
+  let frameCount = 0;
 
   const cleanup = () => {
     if (animationFrameRef.current) {

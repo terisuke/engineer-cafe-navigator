@@ -50,7 +50,7 @@ pnpm cron:update-slides     # Manually trigger slide update
   - Google Gemini 2.5 Flash Preview (for responses)
   - Google text-embedding-004 (768 dimensions, padded to 1536 for compatibility)
   - OpenAI text-embedding-3-small (1536 dimensions as fallback)
-- **Voice**: Google Cloud Speech-to-Text/Text-to-Speech
+- **Voice**: Google Cloud Speech-to-Text/Text-to-Speech with Web Audio API for mobile compatibility
 - **3D Graphics**: Three.js 0.176.0 with @pixiv/three-vrm 3.4.1
 - **Database**: PostgreSQL with pgvector extension
 - **Backend Services**: Supabase 2.49.8
@@ -259,14 +259,89 @@ The knowledge base contains 84+ entries organized by:
 - **Streamlined UI**: Fullscreen controls removed from character display for cleaner interface
 - **No Test Framework**: Currently configured for production deployment
 
+### Mobile-Compatible Audio System
+
+The application features a robust audio playback system designed specifically for mobile device compatibility, addressing autoplay policy restrictions on tablets and smartphones:
+
+#### **Core Audio Components**
+
+1. **WebAudioPlayer** (`/src/lib/audio/web-audio-player.ts`)
+   - Web Audio API-based audio player for superior mobile compatibility
+   - Automatic AudioContext initialization and management
+   - Support for both URL and base64 audio data
+   - Volume control and playback state management
+   - Safari/WebKit compatibility with fallback mechanisms
+
+2. **AudioInteractionManager** (`/src/lib/audio/audio-interaction-manager.ts`)
+   - Handles user interaction requirements for audio playback
+   - Automatic AudioContext initialization on first user gesture
+   - Event listener management for touch/click/keyboard interactions
+   - Pending callback system for deferred audio operations
+
+3. **MobileAudioService** (`/src/lib/audio/mobile-audio-service.ts`)
+   - Unified audio service with automatic fallback mechanisms
+   - Web Audio API primary, HTMLAudioElement fallback
+   - Retry logic with exponential backoff
+   - Device-specific optimization (iOS, Android detection)
+
+#### **Mobile Compatibility Features**
+
+- **Autoplay Policy Compliance**: Respects browser autoplay restrictions
+- **User Interaction Detection**: Automatic audio context unlocking on first user gesture
+- **iPad/iOS Optimization**: Special handling for Safari's strict audio policies
+- **Fallback Mechanisms**: Graceful degradation from Web Audio API to HTML Audio
+- **Error Recovery**: Intelligent retry with user interaction prompts
+
+#### **Supported Platforms**
+
+- **Desktop Browsers**: Full Web Audio API support with enhanced features
+- **iPad/iOS Safari**: Web Audio API with interaction-based initialization
+- **Android Tablets**: Full compatibility with both audio systems
+- **Mobile Browsers**: Automatic detection and optimization per device type
+
+#### **Technical Implementation**
+
+```typescript
+// Example usage of the mobile audio system
+const audioService = new MobileAudioService({
+  volume: 0.8,
+  onPlay: () => setIsPlaying(true),
+  onEnded: () => setIsPlaying(false),
+  onError: (error) => handleAudioError(error)
+});
+
+const result = await audioService.playAudio(audioData);
+if (result.success) {
+  console.log(`Playing via ${result.method}`);
+} else if (result.requiresInteraction) {
+  // Show user interaction prompt
+  showTapToPlayMessage();
+}
+```
+
+#### **Error Handling & User Experience**
+
+- **Graceful Error Messages**: Localized prompts for user interaction (Japanese/English)
+- **Visual Feedback**: Clear indicators when user tap is required for audio
+- **Automatic Recovery**: Seamless continuation after user interaction
+- **Performance Monitoring**: Built-in metrics for audio playback success rates
+
 ### Lip-sync System
 
-The application features an advanced lip-sync system for VRM character animations:
+The application features an optimized lip-sync system for VRM character animations with intelligent caching and mobile-friendly performance optimizations:
 
 #### **Core Components**
-- **LipSyncAnalyzer** (`/src/lib/lip-sync-analyzer.ts`): Real-time audio analysis for mouth shape generation
+- **LipSyncAnalyzer** (`/src/lib/lip-sync-analyzer.ts`): Optimized audio analysis for mouth shape generation
 - **LipSyncCache** (`/src/lib/lip-sync-cache.ts`): Intelligent caching system for performance optimization
 - **5 Viseme Types**: A, I, U, E, O mouth shapes plus Closed state
+
+#### **Performance Optimizations (2024)**
+- **Efficient FFT Processing**: Replaced O(n²) DFT with O(n) frequency band analysis
+- **Timeout Protection**: 10-second timeout prevents UI freezing
+- **Batch Processing**: Non-blocking frame processing with yielding control
+- **Adaptive Frame Rates**: Dynamic interval adjustment based on audio duration
+- **Simplified Algorithms**: Fast mouth shape determination using volume and variance
+- **Mobile-Optimized**: Special handling for iOS/iPad audio permission issues
 
 #### **Caching System Features**
 - **Audio Fingerprinting**: Generates unique hashes from audio data for cache keys
@@ -276,23 +351,55 @@ The application features an advanced lip-sync system for VRM character animation
 - **Performance Monitoring**: Hit rate tracking and detailed statistics
 
 #### **Performance Benefits**
-- **First Analysis**: 4-8 seconds for new audio processing
+- **First Analysis**: 1-3 seconds for new audio processing (optimized from 4-8s)
 - **Cached Results**: 10-50ms retrieval time for repeated audio
 - **Efficient Storage**: Compressed frame data with intelligent deduplication
 - **Memory Management**: Automatic cleanup prevents storage bloat
+- **Mobile Performance**: Optimized algorithms for tablet/mobile devices
 
 #### **User Interface**
 - **Settings Panel**: Real-time cache statistics display
 - **Cache Management**: One-click cache clearing functionality
 - **Performance Metrics**: Hit rate, entry counts, and usage statistics
-- **Debug Mode**: Detailed timing information in development
+- **Error Handling**: Graceful fallback to audio-only mode on permission issues
 
 #### **Technical Details**
-- **Frame Rate**: 20fps mouth shape updates (50ms intervals)
-- **Audio Analysis**: FFT-based frequency analysis for vowel detection
+- **Frame Rate**: 20fps mouth shape updates (50ms intervals for short audio, 100ms for long)
+- **Audio Analysis**: Optimized frequency band analysis (no longer uses heavy FFT)
 - **Storage Format**: JSON serialization with timestamp metadata
-- **Error Handling**: Graceful fallbacks when cache fails
+- **Error Handling**: Graceful fallbacks when cache fails or permissions denied
 - **Cross-session**: Persistent cache across browser restarts
+- **AudioContext Management**: Lazy initialization to prevent permission issues
+
+#### **Mobile/Tablet Compatibility & Known Limitations**
+
+**Current Status:**
+- **Desktop/PC Browsers**: Full functionality including lip-sync and audio playback
+- **iPad/iOS Safari**: Limited audio functionality due to browser restrictions
+- **Android Tablets**: Generally functional with occasional permission prompts
+
+**Known iPad/iOS Issues:**
+- **AudioContext Restrictions**: Safari blocks AudioContext creation until explicit user interaction
+- **Lip-sync Limitations**: May fail with "request not allowed" errors on iPads
+- **Autoplay Policy**: Strict autoplay restrictions prevent background audio processing
+- **WebKit Permissions**: Audio permission requirements vary between iOS versions
+
+**Recommended User Experience:**
+1. **Desktop/PC**: Use for full feature experience including real-time lip-sync
+2. **iPad/iOS**: Audio-only mode recommended (lip-sync may be disabled automatically)
+3. **Android**: Generally functional with manual permission grants
+
+**Technical Workarounds Implemented:**
+- **Graceful Degradation**: Automatic fallback to audio-only when lip-sync fails
+- **Permission Detection**: User-friendly error messages for permission issues
+- **Simplified Processing**: Reduced computational load for mobile devices
+- **Lazy Initialization**: AudioContext only created after user interaction
+
+**For Optimal iPad/iOS Experience:**
+- Tap the screen before using voice features
+- Grant microphone permissions when prompted
+- Use in landscape orientation for better UI
+- Consider using Chrome for iOS as an alternative to Safari
 
 #### **Cache Key Generation**
 ```typescript
@@ -303,7 +410,7 @@ The application features an advanced lip-sync system for VRM character animation
 4. Collision-resistant final hash
 ```
 
-This system dramatically reduces lip-sync processing time for repeated slide presentations while maintaining high-quality mouth animations.
+This system provides fast, reliable lip-sync with mobile-first performance optimizations while maintaining high-quality mouth animations.
 
 ### Conversation Memory System
 

@@ -14,18 +14,37 @@
 
 Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福岡市エンジニアカフェの新規顧客対応を自動化する**多言語対応音声AIエージェントシステム**です。Mastraフレームワークを活用し、スタッフの負担軽減と顧客満足度向上を目指します。
 
-### 🆕 最新アップデート (2025/06/15)
+### 🆕 最新アップデート (2025/06/23)
 
 #### ✅ 実装完了
 - **OpenAI エンベディング統合** - RAG検索システムをOpenAI text-embedding-3-small (1536次元)に統一
 - **多言語RAG検索** - 英語で質問しても日本語コンテンツから回答、逆も可能
 - **知識ベース管理UI** - `/admin/knowledge`でのデータ管理、メタデータテンプレート対応
 - **地下スペース情報の完全対応** - 4種類の地下施設（MTG、集中、アンダー、Makers）の音声検索対応
-- **クロスランゲージ検索** - 質問言語に関係なく最適な情報を両言語から取得
 - **Service Account認証** - APIキー不要でより安全な認証方式
 - **Supabaseメモリアダプタ統合** - 永続的な会話履歴とセッション管理
 - **感情認識・VRM表情制御** - テキスト解析による自動表情変化
-- **🚀 リップシンクキャッシュシステム** - 音声解析結果の智能キャッシュで99%高速化（4-8秒→10-50ms）
+- **🚀 リップシンク最適化** - O(n²)→O(n)アルゴリズム、タイムアウト保護、モバイル対応
+- **📱 モバイル互換性改善** - 適切なエラーハンドリングと音声専用モードの実装
+
+#### ✅ モバイル互換性の大幅改善 (2025/06/23)
+- **🔧 Web Audio API統合** - iPadなどのタブレットでの音声再生エラーを解決
+- **📱 自動再生ポリシー対応** - ブラウザ制限を回避する音声システム
+- **🔄 フォールバック機能** - Web Audio API失敗時のHTMLAudio自動切り替え
+- **👆 ユーザーインタラクション管理** - 初回タップで音声機能完全有効化
+
+#### 📱 デバイス互換性情報
+| デバイス | 音声再生 | リップシンク | 推奨度 |
+|---------|---------|------------|-------|
+| **PC/Mac ブラウザ** | ✅ 完全対応 | ✅ 完全対応 | 🟢 推奨 |
+| **iPad/iOS Safari** | ✅ **改善済み** | ⚠️ 制限あり | 🟢 **使用推奨** |
+| **Android タブレット** | ✅ 完全対応 | ⚠️ 制限あり | 🟢 使用推奨 |
+
+**iPad/iOS での改善点：**
+- ✅ 音声再生エラーを完全解決（Web Audio API導入）
+- ✅ 初回画面タップで音声機能が自動的に有効化
+- ✅ 自動再生ポリシーに準拠した適切なエラーハンドリング
+- ⚠️ リップシンク機能は引き続きブラウザ制限により制限あり
 
 ### 🎯 主な目的
 
@@ -90,7 +109,7 @@ graph TB
 - **フレームワーク**: [Mastra 0.10.1](https://mastra.ai/) - AI エージェント開発フレームワーク
 - **Frontend**: [Next.js 15.3.2](https://nextjs.org/) + [TypeScript 5.8.3](https://www.typescriptlang.org/)
 - **AI/ML**: [Google Gemini 2.5 Flash Preview](https://ai.google.dev/)
-- **音声処理**: [Google Cloud Speech-to-Text/Text-to-Speech](https://cloud.google.com/speech-to-text)
+- **音声処理**: [Google Cloud Speech-to-Text/Text-to-Speech](https://cloud.google.com/speech-to-text) + Web Audio API
 
 #### 専門技術
 - **3Dキャラクター**: [Three.js 0.176.0](https://threejs.org/) + [@pixiv/three-vrm 3.4.0](https://github.com/pixiv/three-vrm)
@@ -317,7 +336,11 @@ engineer-cafe-navigator/
 │   │   │   └── greetings.json        # 挨拶アニメーション
 │   │   └── expressions/              # 表情データ
 │   ├── lib/                          # 共通ライブラリ
-│   │   ├── audio-player.ts           # 音声再生
+│   │   ├── audio/                    # 音声システム (モバイル対応)
+│   │   │   ├── web-audio-player.ts   # Web Audio API音声プレイヤー
+│   │   │   ├── audio-interaction-manager.ts # ユーザーインタラクション管理
+│   │   │   └── mobile-audio-service.ts # モバイル対応音声サービス
+│   │   ├── audio-player.ts           # 旧音声再生（互換性維持）
 │   │   ├── lip-sync-analyzer.ts      # リップシンク解析 (キャッシュ対応)
 │   │   ├── lip-sync-cache.ts         # リップシンクキャッシュシステム
 │   │   ├── marp-processor.ts         # Marp処理
@@ -371,8 +394,10 @@ Engineer Cafe NavigatorはGoogle Cloud STTとWeb Speech APIのハイブリッド
 
 ### ブラウザ互換性
 - **Google Cloud STT**: すべてのモダンブラウザで動作
+- **Web Audio API**: 全モダンブラウザ対応（Safari/iOS含む）
 - **MediaRecorder API**: Chrome, Firefox, Edgeで完全対応、Safariで部分対応
 - **Three.js VRM**: 全モダンブラウザ対応
+- **自動再生ポリシー対応**: 全モバイルブラウザで適切に動作
 
 ## 🎮 使用方法
 
@@ -817,8 +842,8 @@ pnpm run test:external-apis # 外部API連携テスト
 
 ### プロジェクトチーム
 
-- **開発リーダー**: [Your Name](mailto:your.email@example.com)
-- **エンジニアカフェ**: [cafe@example.com](mailto:cafe@example.com)
+- **開発リーダー**: [Terisuke](mailto:company@cor-jp.com)
+- **エンジニアカフェ**: [cafe@example.com](mailto:info@engineer-cafe.jp)
 
 ### 技術サポート
 
@@ -848,6 +873,6 @@ pnpm run test:external-apis # 外部API連携テスト
 
 **Built with ❤️ by Engineer Cafe Team**
 
-[🏠 ホーム](https://engineer-cafe.fukuoka.jp) • [📚 ドキュメント](docs/README.md) • [🚀 デモ](https://demo.engineer-cafe-navigator.vercel.app)
+[🏠 ホーム](https://engineer-cafe.fukuoka.jp) • [📚 ドキュメント](docs/README.md) • [🚀 デモ](https://engineer-cafe-navigator.vercel.app)
 
 </div>

@@ -16,6 +16,18 @@ export class VoiceRecorder {
         return;
       }
 
+      // Check if we're on HTTPS (required for getUserMedia on iOS)
+      if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        this.onError(new Error('Microphone access requires HTTPS connection. Please use HTTPS or localhost.'));
+        return;
+      }
+
+      // Check if mediaDevices is available
+      if (!navigator.mediaDevices) {
+        this.onError(new Error('navigator.mediaDevices is not available. Please ensure you are using a modern browser.'));
+        return;
+      }
+
       // Normalize getUserMedia across browsers
       let getUserMediaFunc: ((c: MediaStreamConstraints) => Promise<MediaStream>) | null = null;
 
@@ -29,23 +41,63 @@ export class VoiceRecorder {
       }
 
       if (!getUserMediaFunc) {
-        this.onError(new Error('getUserMedia API is not available'));
+        this.onError(new Error('getUserMedia API is not available. Please check browser permissions.'));
         return;
       }
 
-      this.stream = await getUserMediaFunc({
-        audio: {
-          channelCount: 1,
-          sampleRate: 16000,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
+      // iOS-specific audio constraints
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      
+      const audioConstraints = isIOS ? {
+        // Simplified constraints for iOS
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      } : {
+        // Full constraints for other platforms
+        channelCount: 1,
+        sampleRate: 16000,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      };
 
-      this.mediaRecorder = new MediaRecorder(this.stream, {
-        mimeType: this.getSupportedMimeType(),
-      });
+      try {
+        this.stream = await getUserMediaFunc({ audio: audioConstraints });
+      } catch (error: any) {
+        // Handle specific error cases
+        if (error.name === 'NotAllowedError') {
+          this.onError(new Error('Microphone permission denied. Please allow microphone access and try again.'));
+        } else if (error.name === 'NotFoundError') {
+          this.onError(new Error('No microphone found. Please connect a microphone and try again.'));
+        } else if (error.name === 'NotReadableError') {
+          this.onError(new Error('Microphone is in use by another application. Please close other apps using the microphone.'));
+        } else {
+          this.onError(new Error(`Failed to access microphone: ${error.message || error.name}`));
+        }
+        return;
+      }
+
+      // Check if MediaRecorder is available
+      if (typeof MediaRecorder === 'undefined') {
+        this.onError(new Error('MediaRecorder API is not available. Please use a browser that supports audio recording.'));
+        this.stream.getTracks().forEach(track => track.stop());
+        this.stream = null;
+        return;
+      }
+
+      const mimeType = this.getSupportedMimeType();
+      const recorderOptions: MediaRecorderOptions = mimeType ? { mimeType } : {};
+      
+      try {
+        this.mediaRecorder = new MediaRecorder(this.stream, recorderOptions);
+      } catch (recorderError: any) {
+        console.error('MediaRecorder creation failed:', recorderError);
+        this.onError(new Error(`Failed to create MediaRecorder: ${recorderError.message || 'Unknown error'}`));
+        this.stream.getTracks().forEach(track => track.stop());
+        this.stream = null;
+        return;
+      }
 
       this.mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -166,7 +218,16 @@ export class VoiceRecorder {
   }
 
   private getSupportedMimeType(): string {
-    const mimeTypes = [
+    // Check if we're on iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    
+    // iOS Safari prefers mp4/aac
+    const mimeTypes = isIOS ? [
+      'audio/mp4',
+      'audio/aac',
+      'audio/mpeg',
+      'audio/webm',
+    ] : [
       'audio/webm;codecs=opus',
       'audio/webm',
       'audio/mp4',
@@ -176,12 +237,14 @@ export class VoiceRecorder {
 
     for (const mimeType of mimeTypes) {
       if (MediaRecorder.isTypeSupported(mimeType)) {
+        console.log(`Selected mime type: ${mimeType}`);
         return mimeType;
       }
     }
 
-    // Fallback
-    return 'audio/webm';
+    // Fallback - let the browser choose
+    console.warn('No supported mime type found, using default');
+    return '';
   }
 
   // Static utility methods

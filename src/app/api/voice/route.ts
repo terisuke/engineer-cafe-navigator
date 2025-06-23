@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
 
         // Convert base64 audio to ArrayBuffer and let agent handle STT internally
         const audioBuffer = Buffer.from(audioData, 'base64').buffer;
-        const result = await realtimeAgent.processVoiceInput(audioBuffer);
+        const result = await realtimeAgent.processVoiceInput(audioBuffer, language || 'ja');
         // result.audioResponseはArrayBufferなので、Buffer.fromで扱うためUint8Arrayに変換する
         const audioResponseBase64 = Buffer.from(new Uint8Array(result.audioResponse)).toString('base64');
         return NextResponse.json({
