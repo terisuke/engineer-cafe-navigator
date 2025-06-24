@@ -68,55 +68,50 @@ export class AudioStateManager {
   }
   
   private async playAudio(audioData: string): Promise<void> {
-    try {
-      // Stop current audio if playing
-      if (this.currentAudioService) {
-        this.activeAudioServices.delete(this.currentAudioService);
+    // Stop current audio if playing
+    if (this.currentAudioService) {
+      this.activeAudioServices.delete(this.currentAudioService);
+      this.currentAudioService = null;
+    }
+    
+    // Create new audio service
+    const audioService = new MobileAudioService({
+      volume: this.globalMuted ? 0 : this.globalVolume,
+      onEnded: () => {
+        this.activeAudioServices.delete(audioService);
         this.currentAudioService = null;
+      },
+      onError: (error) => {
+        this.activeAudioServices.delete(audioService);
+        this.currentAudioService = null;
+        throw error;
       }
-      
-      // Create new audio service
-      const audioService = new MobileAudioService({
-        volume: this.globalMuted ? 0 : this.globalVolume,
+    });
+    
+    this.currentAudioService = audioService;
+    this.registerAudioService(audioService);
+    
+    // Play the audio
+    const result = await audioService.playAudio(audioData);
+    if (!result.success) {
+      throw result.error || new AudioError(AudioErrorType.PLAYBACK_FAILED, 'Audio playback failed');
+    }
+    
+    // Wait for audio to complete
+    return new Promise((resolve, reject) => {
+      audioService.updateEventHandlers({
         onEnded: () => {
           this.activeAudioServices.delete(audioService);
           this.currentAudioService = null;
+          resolve();
         },
         onError: (error) => {
           this.activeAudioServices.delete(audioService);
           this.currentAudioService = null;
-          throw error;
+          reject(error);
         }
       });
-      
-      this.currentAudioService = audioService;
-      this.registerAudioService(audioService);
-      
-      // Play the audio
-      const result = await audioService.playAudio(audioData);
-      if (!result.success) {
-        throw result.error || new AudioError(AudioErrorType.PLAYBACK_FAILED, 'Audio playback failed');
-      }
-      
-      // Wait for audio to complete
-      return new Promise((resolve, reject) => {
-        audioService.updateEventHandlers({
-          onEnded: () => {
-            this.activeAudioServices.delete(audioService);
-            this.currentAudioService = null;
-            resolve();
-          },
-          onError: (error) => {
-            this.activeAudioServices.delete(audioService);
-            this.currentAudioService = null;
-            reject(error);
-          }
-        });
-      });
-      
-    } catch (error) {
-      throw error;
-    }
+    });
   }
   
   stopAll(): void {

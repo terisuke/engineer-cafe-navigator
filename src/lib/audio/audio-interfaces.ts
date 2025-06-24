@@ -75,7 +75,7 @@ export class AudioError extends Error {
    * Create AudioError from generic error
    */
   static fromError(error: Error, type: AudioErrorType = AudioErrorType.PLAYBACK_FAILED): AudioError {
-    const requiresInteraction = this.isInteractionRequired(error);
+    const requiresInteraction = AudioError.isInteractionRequired(error);
     return new AudioError(type, error.message, error, requiresInteraction);
   }
 }

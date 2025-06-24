@@ -126,6 +126,12 @@ export default function MarpViewer({
     // Analytics event tracked
   };
 
+  // Helper to reset narration flags without causing redundant re-renders
+  const resetNarrationFlags = () => {
+    setIsNarrating(false);
+    setIsNarrationInProgress(false);
+  };
+
   // Error recovery with retry logic
   const narrateWithRetry = async (retries = 3) => {
     for (let i = 0; i < retries; i++) {
@@ -152,11 +158,12 @@ export default function MarpViewer({
           
           if (shouldContinue && isPlaying && currentSlide < totalSlides) {
             setTimeout(() => {
-              const newSlide = currentSlide + 1;
-              setIsNarrating(false);
-              setIsNarrationInProgress(false);
-              setCurrentSlide(newSlide);
-              onSlideChange?.(newSlide);
+              resetNarrationFlags();
+              setCurrentSlide(prev => {
+                const nextSlide = prev + 1;
+                onSlideChange?.(nextSlide);
+                return nextSlide;
+              });
             }, 1000);
           }
         } else {
@@ -599,19 +606,15 @@ export default function MarpViewer({
           await playAudioWithLipSync(result.audioResponse);
           
           // Audio playback completed
-          setIsNarrating(false);
-          setIsNarrationInProgress(false);
+          resetNarrationFlags();
           
           // Advance to next slide only after audio completion
           if (isPlaying && currentSlide < totalSlides) {
-            // Moving to next slide
-            const nextSlide = currentSlide + 1;
-            
-            // Reset narration flags for next slide
-            setIsNarrating(false);
-            setIsNarrationInProgress(false);
-            setCurrentSlide(nextSlide);
-            onSlideChange?.(nextSlide);
+            setCurrentSlide(prev => {
+              const nextSlide = prev + 1;
+              onSlideChange?.(nextSlide);
+              return nextSlide;
+            });
           } else if (currentSlide >= totalSlides) {
             // Presentation completed
             setIsPlaying(false);
@@ -622,8 +625,7 @@ export default function MarpViewer({
         } catch (error: any) {
           // Error during audio playback
           
-          setIsNarrating(false);
-          setIsNarrationInProgress(false);
+          resetNarrationFlags();
           
           // Check if it's a user interaction required error
           if (error?.type === 'user_interaction_required' || 
@@ -638,13 +640,13 @@ export default function MarpViewer({
           
           // Continue to next slide even if audio fails (for other errors)
           if (isPlaying && currentSlide < totalSlides) {
-            // Audio failed, moving to next slide
             setTimeout(() => {
-              const nextSlide = currentSlide + 1;
-              setIsNarrating(false);
-              setIsNarrationInProgress(false);
-              setCurrentSlide(nextSlide);
-              onSlideChange?.(nextSlide);
+              resetNarrationFlags();
+              setCurrentSlide(prev => {
+                const nextSlide = prev + 1;
+                onSlideChange?.(nextSlide);
+                return nextSlide;
+              });
             }, 1000);
           }
         }
@@ -655,8 +657,7 @@ export default function MarpViewer({
           updateCharacterAction(result.characterAction);
         }
       } else {
-        setIsNarrating(false);
-        setIsNarrationInProgress(false);
+        resetNarrationFlags();
       }
     } catch (error) {
       // Check if the error is due to abort
@@ -665,8 +666,7 @@ export default function MarpViewer({
       } else {
         console.error('[MarpViewer] Error narrating slide:', error);
       }
-      setIsNarrating(false);
-      setIsNarrationInProgress(false);
+      resetNarrationFlags();
     }
   };
 
@@ -746,8 +746,7 @@ export default function MarpViewer({
       clearTimeout(autoPlayTimerRef.current);
       autoPlayTimerRef.current = null;
     }
-    setIsNarrating(false);
-    setIsNarrationInProgress(false);
+    resetNarrationFlags();
     audioStateManager.stopAll();
     
     // Reset viseme to closed mouth when stopping

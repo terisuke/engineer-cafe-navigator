@@ -137,44 +137,39 @@ export class AudioQueue {
    * Play a single audio item using Web Audio API
    */
   private async playAudio(item: AudioQueueItem): Promise<void> {
-    try {
-      // Create audio service with current volume
-      const audioService = new MobileAudioService({
-        volume: this.volume,
+    // Create audio service with current volume
+    const audioService = new MobileAudioService({
+      volume: this.volume,
+      onEnded: () => {
+        this.currentAudioService = null;
+      },
+      onError: (error) => {
+        this.currentAudioService = null;
+        throw error;
+      }
+    });
+    
+    this.currentAudioService = audioService;
+    
+    // Play the audio using Web Audio API
+    const result = await audioService.playAudio(item.audioData);
+    if (!result.success) {
+      throw result.error || new AudioError(AudioErrorType.PLAYBACK_FAILED, 'Audio playback failed');
+    }
+    
+    // Wait for audio to complete
+    return new Promise((resolve, reject) => {
+      audioService.updateEventHandlers({
         onEnded: () => {
           this.currentAudioService = null;
+          resolve();
         },
         onError: (error) => {
           this.currentAudioService = null;
-          throw error;
+          reject(error);
         }
       });
-      
-      this.currentAudioService = audioService;
-      
-      // Play the audio using Web Audio API
-      const result = await audioService.playAudio(item.audioData);
-      if (!result.success) {
-        throw result.error || new AudioError(AudioErrorType.PLAYBACK_FAILED, 'Audio playback failed');
-      }
-      
-      // Wait for audio to complete
-      return new Promise((resolve, reject) => {
-        audioService.updateEventHandlers({
-          onEnded: () => {
-            this.currentAudioService = null;
-            resolve();
-          },
-          onError: (error) => {
-            this.currentAudioService = null;
-            reject(error);
-          }
-        });
-      });
-      
-    } catch (error) {
-      throw error;
-    }
+    });
   }
 
   /**

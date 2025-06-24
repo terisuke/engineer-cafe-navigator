@@ -39,6 +39,16 @@ export class RealtimeAgent extends Agent {
   /** Agent configuration */
   private config: any;
 
+  /**
+   * Normalize input for common speech recognition errors
+   */
+  private normalizeInput(input: string): string {
+    return input
+      .replace(/engineer confess/gi, 'engineer cafe')
+      .replace(/engineer conference/gi, 'engineer cafe')
+      .replace(/engineer campus/gi, 'engineer cafe');
+  }
+
   constructor(config: any, voiceService?: any) {
     super({
       name: 'RealtimeAgent',
@@ -471,10 +481,7 @@ export class RealtimeAgent extends Agent {
         }
         
         // Normalize input for common speech recognition errors
-        const normalizedInput = input
-          .replace(/engineer confess/gi, 'engineer cafe')
-          .replace(/engineer conference/gi, 'engineer cafe')
-          .replace(/engineer campus/gi, 'engineer cafe');
+        const normalizedInput = this.normalizeInput(input);
         
         if (process.env.NODE_ENV !== 'production') {
           console.log('[RealtimeAgent] Calling QA agent with input:', normalizedInput, 'language:', language);
@@ -539,10 +546,7 @@ export class RealtimeAgent extends Agent {
     }
     
     // Normalize input for speech recognition errors before memory operations
-    const normalizedInput = input
-      .replace(/engineer confess/gi, 'engineer cafe')
-      .replace(/engineer conference/gi, 'engineer cafe')
-      .replace(/engineer campus/gi, 'engineer cafe');
+    const normalizedInput = this.normalizeInput(input);
     
     // Get comprehensive context using SimplifiedMemorySystem
     const memoryContext = await this.simplifiedMemory.getContext(normalizedInput, {
