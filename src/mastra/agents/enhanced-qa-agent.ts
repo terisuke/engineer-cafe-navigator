@@ -954,7 +954,7 @@ ${context}
     ) && lowerQuestion.length < 20;
     
     // If there's a previous specific request and this is a follow-up, inherit the request type
-    const inheritsPreviousRequest = previousRequest && isShortFollowUp;
+    const inheritsPreviousRequest = !!(previousRequest && isShortFollowUp);
     
     // Additional check: avoid general questions even with these keywords
     const generalPatterns = [
