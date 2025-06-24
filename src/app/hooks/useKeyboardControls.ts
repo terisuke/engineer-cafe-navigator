@@ -3,7 +3,6 @@
 import { useEffect, useCallback } from 'react';
 
 interface KeyboardControlsOptions {
-  onNext?: () => void;
   onPrevious?: () => void;
   onReset?: () => void;
   onTogglePlay?: () => void;
@@ -16,7 +15,6 @@ interface KeyboardControlsOptions {
 }
 
 export function useKeyboardControls({
-  onNext,
   onPrevious,
   onReset,
   onTogglePlay,
@@ -40,12 +38,12 @@ export function useKeyboardControls({
     const preventDefault = () => event.preventDefault();
 
     switch (event.key.toLowerCase()) {
-      // Navigation
-      case 'arrowright':
-      case ' ': // Space bar
-        preventDefault();
-        onNext?.();
-        break;
+      // Navigation (next removed - auto-advance only)
+      // case 'arrowright':
+      // case ' ': // Space bar
+      //   preventDefault();
+      //   onNext?.();
+      //   break;
       
       case 'arrowleft':
         preventDefault();
@@ -112,7 +110,6 @@ export function useKeyboardControls({
     }
   }, [
     enabled,
-    onNext,
     onPrevious,
     onReset,
     onTogglePlay,
@@ -132,7 +129,6 @@ export function useKeyboardControls({
 
   return {
     shortcuts: [
-      { key: '→ / Space', description: 'Next slide' },
       { key: '←', description: 'Previous slide' },
       { key: 'R / Home', description: 'Reset to first slide' },
       { key: 'P', description: 'Play/Pause' },

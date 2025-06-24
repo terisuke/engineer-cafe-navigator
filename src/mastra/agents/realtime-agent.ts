@@ -4,19 +4,39 @@ import { endPerformance, logPerformanceSummary, startPerformance } from '@/lib/p
 import { ConversationManager, SupabaseMemoryAdapter } from '@/lib/supabase-memory';
 import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
 import { TextChunker } from '@/lib/text-chunker';
+import { ClarificationUtils } from '@/lib/clarification-utils';
 import { getEngineerCafeNavigator } from '@/mastra';
 import { Agent } from '@mastra/core/agent';
 import { SupportedLanguage } from '../types/config';
 import { EnhancedQAAgent } from './enhanced-qa-agent';
 
+/**
+ * RealtimeAgent handles real-time voice interactions with contextual memory
+ * Supports speech recognition, AI response generation, and text-to-speech
+ */
 export class RealtimeAgent extends Agent {
+  /** Current conversation state for flow control */
   private conversationState: 'idle' | 'listening' | 'processing' | 'speaking' = 'idle';
+  
+  /** Enable/disable interruption handling */
   private interruptionEnabled: boolean = true;
+  
+  /** Voice service for STT/TTS operations */
   private voiceService: any;
+  
+  /** Legacy memory adapter (deprecated) */
   private supabaseMemory: SupabaseMemoryAdapter;
+  
+  /** New simplified memory system with 3-minute TTL */
   private simplifiedMemory: SimplifiedMemorySystem;
+  
+  /** Current active session ID */
   private currentSessionId: string | null = null;
+  
+  /** Tool registry for this agent */
   private _tools: Map<string, any> = new Map();
+  
+  /** Agent configuration */
   private config: any;
 
   constructor(config: any, voiceService?: any) {
@@ -35,13 +55,13 @@ export class RealtimeAgent extends Agent {
         You must include emotion tags in your responses to control the VRM character's facial expressions.
         Use emotion tags at the beginning of sentences or phrases to indicate the character's emotion.
         
-        Available emotion tags (aituber-kit standard):
+        Available emotion tags (VRM compatible):
         [neutral] - for calm, normal, explaining responses
         [happy] - for joyful, excited, cheerful, greeting responses
         [sad] - for disappointed, melancholy, apologetic responses  
         [angry] - for frustrated, annoyed responses
         [relaxed] - for thinking, pondering, listening responses
-        [surprised] - for shocked, amazed responses
+        Note: Use [curious] instead of [surprised] for questioning or amazed responses
         
         You can also specify intensity: [happy:0.8] (0.0-1.0)
         
@@ -187,6 +207,14 @@ export class RealtimeAgent extends Agent {
     }
   }
 
+  /**
+   * Process voice input with full pipeline: STT → AI Response → TTS
+   * Includes quality checks and clarification handling
+   * 
+   * @param audioBuffer Raw audio data
+   * @param language Target language (ja/en)
+   * @returns Complete response with audio and emotion data
+   */
   async processVoiceInput(audioBuffer: ArrayBuffer, language?: SupportedLanguage): Promise<{
     transcript: string;
     response: string;
@@ -234,22 +262,53 @@ export class RealtimeAgent extends Agent {
         });
       }
       
-      // Check confidence threshold (ignore very low-confidence STT results)
-      if (!result.success || !result.transcript || !result.transcript.trim()) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('[RealtimeAgent] STT failed validation:', {
-            success: result.success,
-            hasTranscript: !!result.transcript,
-            transcriptTrimmed: result.transcript ? result.transcript.trim() : null
-          });
+      // Enhanced quality check for speech recognition
+      const qualityCheck = this.checkSpeechQuality(result);
+      
+      if (!qualityCheck.isValid) {
+        console.log('[RealtimeAgent] STT quality check failed:', {
+          reason: qualityCheck.reason,
+          confidence: qualityCheck.confidence,
+          transcript: result.transcript,
+          transcriptLength: result.transcript?.length || 0
+        });
+        
+        // Generate clarification request based on the issue
+        const clarificationResponse = await this.generateClarificationRequest(qualityCheck, currentLang);
+        
+        // Convert clarification to speech
+        let clarificationAudio: ArrayBuffer;
+        try {
+          const ttsResult = await this.voiceService.textToSpeech(clarificationResponse, currentLang);
+          if (ttsResult.success && ttsResult.audioBuffer && ttsResult.audioBuffer instanceof ArrayBuffer) {
+            clarificationAudio = ttsResult.audioBuffer;
+          } else if (ttsResult.success && ttsResult.audioBase64) {
+            // Convert base64 to ArrayBuffer if available
+            const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
+            clarificationAudio = audioData.buffer;
+          } else {
+            console.warn('[RealtimeAgent] TTS for clarification succeeded but no valid audio data:', ttsResult);
+            clarificationAudio = new ArrayBuffer(0);
+          }
+        } catch (error) {
+          console.error('[RealtimeAgent] TTS failed for clarification:', error);
+          clarificationAudio = new ArrayBuffer(0);
         }
+        
         this.conversationState = 'idle';
         return {
-          transcript: '',
-          response: '',
-          audioResponse: new ArrayBuffer(0),
-          shouldUpdateCharacter: false,
-          error: result.error || 'Speech recognition confidence too low',
+          transcript: result.transcript || '',
+          response: clarificationResponse,
+          audioResponse: clarificationAudio,
+          shouldUpdateCharacter: true,
+          characterAction: 'thinking',
+          emotion: {
+            emotion: 'curious',
+            intensity: 0.8,
+            confidence: 0.9,
+            duration: 3000
+          },
+          primaryEmotion: 'curious',
         };
       }
       
@@ -270,7 +329,6 @@ export class RealtimeAgent extends Agent {
       
       // Get conversation context for additional emotion detection
       const conversationHistory = await this.getRecentConversationHistory();
-      const storedLanguage = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
       
       // Create emotion data from parsed tags or fallback to text analysis
       let emotion: EmotionData;
@@ -317,7 +375,30 @@ export class RealtimeAgent extends Agent {
       
       // Convert CLEAN response to speech (without emotion tags and markdown)
       startPerformance('Text-to-Speech');
-      const cleanedForTTS = this.cleanTextForTTS(cleanResponse);
+      let cleanedForTTS = this.cleanTextForTTS(cleanResponse);
+      
+      // Check if text is too long for TTS (5000 bytes limit)
+      const textByteLength = new TextEncoder().encode(cleanedForTTS).length;
+      if (textByteLength > 4500) { // Leave some margin for safety
+        console.warn(`[RealtimeAgent] Text too long for TTS: ${textByteLength} bytes. Truncating...`);
+        
+        // Truncate intelligently at sentence boundaries
+        const sentences = cleanedForTTS.split(/[。．！？\n]/);
+        let truncatedText = '';
+        let currentByteLength = 0;
+        
+        for (const sentence of sentences) {
+          const sentenceBytes = new TextEncoder().encode(sentence + '。').length;
+          if (currentByteLength + sentenceBytes > 4000) { // Leave margin
+            break;
+          }
+          truncatedText += sentence + '。';
+          currentByteLength += sentenceBytes;
+        }
+        
+        // Add ellipsis to indicate truncation
+        cleanedForTTS = truncatedText + '...' + (currentLang === 'ja' ? '（詳細は省略されました）' : '(details omitted)');
+      }
       
       // Set voice parameters based on emotion
       if (emotion && this.voiceService.setSpeakerByEmotion) {
@@ -389,10 +470,19 @@ export class RealtimeAgent extends Agent {
           await qaAgent.setLanguage(language);
         }
         
+        // Normalize input for common speech recognition errors
+        const normalizedInput = input
+          .replace(/engineer confess/gi, 'engineer cafe')
+          .replace(/engineer conference/gi, 'engineer cafe')
+          .replace(/engineer campus/gi, 'engineer cafe');
+        
         if (process.env.NODE_ENV !== 'production') {
-          console.log('[RealtimeAgent] Calling QA agent with input:', input, 'language:', language);
+          console.log('[RealtimeAgent] Calling QA agent with input:', normalizedInput, 'language:', language);
+          if (normalizedInput !== input) {
+            console.log('[RealtimeAgent] Input normalized from:', input, 'to:', normalizedInput);
+          }
         }
-        const qaAnswer: string = await qaAgent.answerQuestion(input);
+        const qaAnswer: string = await qaAgent.answerQuestion(normalizedInput, language);
         if (process.env.NODE_ENV !== 'production') {
           console.log('[RealtimeAgent] QA agent response:', qaAnswer ? qaAnswer.substring(0, 200) + '...' : 'null/empty');
         }
@@ -401,6 +491,12 @@ export class RealtimeAgent extends Agent {
           if (process.env.NODE_ENV !== 'production') {
             console.log('[RealtimeAgent] Using QA agent response');
           }
+          
+          // Check if this is a clarification message and add appropriate emotion tag
+          if (ClarificationUtils.isClarificationMessage(qaAnswer)) {
+            return `[curious]${qaAnswer}[/curious]`;
+          }
+          
           return qaAnswer;
         } else {
           if (process.env.NODE_ENV !== 'production') {
@@ -442,10 +538,14 @@ export class RealtimeAgent extends Agent {
       }
     }
     
-    const currentMode = await this.supabaseMemory.get('currentMode') || 'welcome';
+    // Normalize input for speech recognition errors before memory operations
+    const normalizedInput = input
+      .replace(/engineer confess/gi, 'engineer cafe')
+      .replace(/engineer conference/gi, 'engineer cafe')
+      .replace(/engineer campus/gi, 'engineer cafe');
     
     // Get comprehensive context using SimplifiedMemorySystem
-    const memoryContext = await this.simplifiedMemory.getContext(input, {
+    const memoryContext = await this.simplifiedMemory.getContext(normalizedInput, {
       includeKnowledgeBase: true,
       language: language as 'ja' | 'en'
     });
@@ -454,7 +554,7 @@ export class RealtimeAgent extends Agent {
     const isActiveConversation = await this.simplifiedMemory.isConversationActive();
     
     // Build context-aware prompt with comprehensive memory
-    const prompt = this.buildContextualPrompt(input, language, currentMode, memoryContext, isActiveConversation);
+    const prompt = this.buildContextualPrompt(normalizedInput, language, memoryContext, isActiveConversation);
     
     const response = await this.generate([
       { role: 'user', content: prompt }
@@ -465,7 +565,7 @@ export class RealtimeAgent extends Agent {
     const parsedResponse = EmotionTagParser.parseEmotionTags(responseText);
     const primaryEmotion = parsedResponse.emotions?.[0]?.emotion || 'neutral';
     
-    // Store conversation in SimplifiedMemorySystem
+    // Store conversation in SimplifiedMemorySystem (use original input for accurate conversation history)
     await this.simplifiedMemory.addMessage('user', input, {
       sessionId: this.currentSessionId || undefined
     });
@@ -484,6 +584,115 @@ export class RealtimeAgent extends Agent {
     return responseText;
   }
 
+  /**
+   * Check speech recognition quality and detect issues
+   * Prevents responding to unclear or invalid input
+   * 
+   * @param result STT result with transcript and confidence
+   * @returns Quality assessment with validation details
+   */
+  private checkSpeechQuality(result: any): { isValid: boolean; reason?: string; confidence?: number } {
+    // Basic validation
+    if (!result.success || !result.transcript || !result.transcript.trim()) {
+      return { 
+        isValid: false, 
+        reason: 'no_transcript',
+        confidence: 0 
+      };
+    }
+    
+    const transcript = result.transcript.trim();
+    const confidence = result.confidence || 0;
+    
+    // Confidence threshold check
+    if (confidence < 0.6) {
+      return { 
+        isValid: false, 
+        reason: 'low_confidence',
+        confidence 
+      };
+    }
+    
+    // Length check - very short transcripts might be noise
+    if (transcript.length < 2) {
+      return { 
+        isValid: false, 
+        reason: 'too_short',
+        confidence 
+      };
+    }
+    
+    // Check for common STT errors or gibberish
+    const gibberishPatterns = [
+      /^[a-z]$/, // Single letter
+      /^(uh|um|hmm|ah|eh)$/i, // Filler words only
+      /^[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+$/, // Only punctuation/symbols (excluding Japanese characters)
+      /(.)\1{4,}/, // Repeated characters (aaaaa)
+    ];
+    
+    if (gibberishPatterns.some(pattern => pattern.test(transcript))) {
+      return { 
+        isValid: false, 
+        reason: 'gibberish',
+        confidence 
+      };
+    }
+    
+    // Check for unclear speech patterns
+    const unclearPatterns = [
+      /^(what|what\?|pardon|sorry|excuse me)$/i,
+      /^(なん|何|えっ|すみません)$/,
+    ];
+    
+    if (unclearPatterns.some(pattern => pattern.test(transcript))) {
+      return { 
+        isValid: false, 
+        reason: 'user_unclear',
+        confidence 
+      };
+    }
+    
+    return { 
+      isValid: true, 
+      confidence 
+    };
+  }
+
+  private async generateClarificationRequest(qualityCheck: any, language: SupportedLanguage): Promise<string> {
+    const reason = qualityCheck.reason;
+    
+    let clarification: string;
+    
+    switch (reason) {
+      case 'no_transcript':
+      case 'too_short':
+      case 'gibberish':
+        clarification = language === 'en'
+          ? "I'm sorry, I didn't catch that clearly. Could you please repeat what you said?"
+          : "すみません、よく聞き取れませんでした。もう一度お話しいただけますか？";
+        break;
+        
+      case 'low_confidence':
+        clarification = language === 'en'
+          ? "I think I heard something, but I'm not quite sure. Could you please speak a bit more clearly?"
+          : "少し聞こえましたが、はっきりしませんでした。もう少しはっきりお話しいただけますか？";
+        break;
+        
+      case 'user_unclear':
+        clarification = language === 'en'
+          ? "No problem! Please take your time and let me know what you'd like to ask."
+          : "大丈夫です！ゆっくりで構いませんので、何をお聞きになりたいか教えてください。";
+        break;
+        
+      default:
+        clarification = language === 'en'
+          ? "I'm sorry, could you please repeat that?"
+          : "すみません、もう一度お願いします。";
+    }
+    
+    return clarification;
+  }
+
   private cleanTextForTTS(text: string): string {
     return text
       .replace(/\*\*/g, '')        // Remove bold markers
@@ -497,42 +706,32 @@ export class RealtimeAgent extends Agent {
       .trim();
   }
 
-  private extractFirstSentence(text: string): string {
-    const sentences = text.split(/[。！？.!?]/);
-    if (sentences.length > 0 && sentences[0].trim()) {
-      return sentences[0].trim() + (text.includes('。') ? '。' : '！');
-    }
-    return text.slice(0, 100); // Fallback to first 100 characters
-  }
-
-  private async processRemainingTextAsync(remainingText: string, language: string, emotion?: string): Promise<void> {
-    try {
-      // Generate TTS for remaining text
-      const result = await this.voiceService.textToSpeech(remainingText, language, emotion);
-      
-      if (result.success && result.audioBase64) {
-        // TODO: Send remaining audio to frontend via WebSocket or store for later retrieval
-        console.log(`Background TTS completed for remaining text (${remainingText.length} chars)`);
-      }
-    } catch (error) {
-      console.error('Background TTS processing failed:', error);
-    }
-  }
 
   private buildContextualPrompt(
     input: string, 
     language: SupportedLanguage, 
-    mode: string, 
     memoryContext: any,
     isActiveConversation?: boolean
   ): string {
-    const systemPrompt = language === 'en'
+    // Check for history-related questions
+    const isHistoryQuestion = /history|歴史|background|started|founded|established|開設|設立|始まり|創立/i.test(input);
+    
+    let systemPrompt = language === 'en'
       ? `You're an Engineer Cafe assistant. Use the provided conversation history and knowledge base to give contextual responses. 
          Respond briefly in English with emotion tags: [happy], [neutral], [excited], [relaxed]. 
          Example: "[happy] How can I help?" Keep responses short and natural.`
       : `エンジニアカフェのアシスタントです。提供された会話履歴と知識ベースを使用して文脈のある回答をしてください。
          感情タグ付きで簡潔に日本語で応答: [happy], [neutral], [excited], [relaxed]
          例: "[happy] いかがお手伝いしましょうか？" 短く自然に答えてください。`;
+
+    // Add specific context for history questions
+    if (isHistoryQuestion) {
+      const historyContext = language === 'en'
+        ? `\n\nEngineer Cafe is a public coworking space for IT engineers operated by Fukuoka City. It was established to support the local tech community by providing free workspace, meeting rooms, and networking opportunities. The facility is located in Tenjin, Fukuoka and serves as a hub for engineers and tech professionals.`
+        : `\n\nエンジニアカフェは、福岡市が運営するITエンジニア向けの公共コワーキングスペースです。地域のテックコミュニティを支援するため、無料のワークスペース、会議室、ネットワーキングの機会を提供することを目的として設立されました。福岡天神に位置し、エンジニアや技術者のハブとして機能しています。`;
+      
+      systemPrompt += historyContext;
+    }
 
     // Use the comprehensive context from SimplifiedMemorySystem
     let contextSection = '';
@@ -755,11 +954,23 @@ export class RealtimeAgent extends Agent {
     return this.currentSessionId;
   }
 
+  /**
+   * Set the current language for this agent
+   * Updates both memory systems and voice service
+   */
   async setLanguage(language: 'ja' | 'en'): Promise<void> {
+    // Store in legacy memory system
     await this.supabaseMemory.store('language', language);
+    
+    // Also store in simplified memory system for consistency
+    await this.supabaseMemory.store('currentLanguage', language);
+    
+    // Update voice service language
     if (this.voiceService) {
       this.voiceService.setLanguage(language);
     }
+    
+    console.log(`[RealtimeAgent] Language set to: ${language}`);
   }
 
   async generateTTSAudio(text: string): Promise<ArrayBuffer> {
@@ -1005,4 +1216,5 @@ export class RealtimeAgent extends Agent {
       };
     }
   }
+
 }

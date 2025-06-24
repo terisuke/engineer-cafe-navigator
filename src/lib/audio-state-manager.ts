@@ -1,24 +1,28 @@
+import { MobileAudioService } from './audio/mobile-audio-service';
+import { AudioDataProcessor } from './audio/audio-data-processor';
+import { AudioError, AudioErrorType } from './audio/audio-interfaces';
+
 export class AudioStateManager {
   private audioProcessingCount: number = 0;
   private audioQueue: Array<{
     id: string;
-    audioUrl: string;
+    audioData: string; // base64 audio data
     onComplete?: () => void;
   }> = [];
-  private currentAudio: HTMLAudioElement | null = null;
+  private currentAudioService: MobileAudioService | null = null;
   private isProcessing: boolean = false;
-  private activeAudios: Set<HTMLAudioElement> = new Set();
+  private activeAudioServices: Set<MobileAudioService> = new Set();
   private globalVolume: number = 0.8;
   private globalMuted: boolean = false;
   
   incrementProcessingCount(): void {
     this.audioProcessingCount++;
-    console.log(`[AudioStateManager] Processing count incremented: ${this.audioProcessingCount}`);
+    // Processing count incremented
   }
   
   decrementProcessingCount(): void {
     this.audioProcessingCount--;
-    console.log(`[AudioStateManager] Processing count decremented: ${this.audioProcessingCount}`);
+    // Processing count decremented
     
     if (this.audioProcessingCount === 0) {
       this.onAllAudioComplete();
@@ -29,9 +33,9 @@ export class AudioStateManager {
     return this.audioProcessingCount > 0;
   }
   
-  queueAudio(audioUrl: string, onComplete?: () => void): void {
+  queueAudio(audioData: string, onComplete?: () => void): void {
     const id = `audio_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-    this.audioQueue.push({ id, audioUrl, onComplete });
+    this.audioQueue.push({ id, audioData, onComplete });
     
     if (!this.isProcessing) {
       this.processQueue();
@@ -44,15 +48,15 @@ export class AudioStateManager {
     }
     
     this.isProcessing = true;
-    const { audioUrl, onComplete } = this.audioQueue.shift()!;
+    const { audioData, onComplete } = this.audioQueue.shift()!;
     
     this.incrementProcessingCount();
     
     try {
-      await this.playAudio(audioUrl);
+      await this.playAudio(audioData);
       onComplete?.();
     } catch (error) {
-      console.error('[AudioStateManager] Audio playback error:', error);
+      // Audio playback error
     } finally {
       this.decrementProcessingCount();
       this.isProcessing = false;
@@ -63,91 +67,95 @@ export class AudioStateManager {
     }
   }
   
-  private playAudio(audioUrl: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.currentAudio) {
-        this.currentAudio.pause();
-        this.currentAudio = null;
+  private async playAudio(audioData: string): Promise<void> {
+    try {
+      // Stop current audio if playing
+      if (this.currentAudioService) {
+        this.activeAudioServices.delete(this.currentAudioService);
+        this.currentAudioService = null;
       }
       
-      const audio = new Audio(audioUrl);
-      this.currentAudio = audio;
-      this.registerAudio(audio);
+      // Create new audio service
+      const audioService = new MobileAudioService({
+        volume: this.globalMuted ? 0 : this.globalVolume,
+        onEnded: () => {
+          this.activeAudioServices.delete(audioService);
+          this.currentAudioService = null;
+        },
+        onError: (error) => {
+          this.activeAudioServices.delete(audioService);
+          this.currentAudioService = null;
+          throw error;
+        }
+      });
       
-      // Add small preload delay to prevent audio truncation
-      audio.preload = 'auto';
+      this.currentAudioService = audioService;
+      this.registerAudioService(audioService);
       
-      audio.onended = () => {
-        this.activeAudios.delete(audio);
-        resolve();
-      };
+      // Play the audio
+      const result = await audioService.playAudio(audioData);
+      if (!result.success) {
+        throw result.error || new AudioError(AudioErrorType.PLAYBACK_FAILED, 'Audio playback failed');
+      }
       
-      audio.onerror = (error) => {
-        console.error('[AudioStateManager] Audio error:', error);
-        reject(error);
-      };
-      
-      // Wait for audio to be ready before playing
-      audio.oncanplaythrough = () => {
-        console.log('[AudioStateManager] Audio ready to play');
-        audio.play().catch((error) => {
-          if (error.name === 'NotAllowedError') {
-            console.warn('[AudioStateManager] Autoplay blocked by browser. User interaction required.');
+      // Wait for audio to complete
+      return new Promise((resolve, reject) => {
+        audioService.updateEventHandlers({
+          onEnded: () => {
+            this.activeAudioServices.delete(audioService);
+            this.currentAudioService = null;
             resolve();
-          } else {
-            console.error('[AudioStateManager] Audio play failed:', error);
+          },
+          onError: (error) => {
+            this.activeAudioServices.delete(audioService);
+            this.currentAudioService = null;
             reject(error);
           }
         });
-      };
+      });
       
-      // Start loading the audio
-      audio.load();
-    });
+    } catch (error) {
+      throw error;
+    }
   }
   
   stopAll(): void {
-    if (this.currentAudio) {
-      this.currentAudio.pause();
-      this.currentAudio = null;
+    // Stop current audio service
+    if (this.currentAudioService) {
+      this.currentAudioService.stop();
+      this.currentAudioService = null;
     }
+    
+    // Stop all active audio services
+    this.activeAudioServices.forEach(audioService => {
+      audioService.stop();
+    });
+    
+    this.activeAudioServices.clear();
     this.audioQueue = [];
     this.audioProcessingCount = 0;
     this.isProcessing = false;
   }
   
   private onAllAudioComplete(): void {
-    console.log('[AudioStateManager] All audio processing complete');
+    // All audio processing complete
     window.dispatchEvent(new CustomEvent('audioProcessingComplete'));
   }
   
-  // Register externally created audio instances
-  registerAudio(audio: HTMLAudioElement) {
-    this.activeAudios.add(audio);
-    audio.volume = this.globalMuted ? 0 : this.globalVolume;
-    audio.muted = this.globalMuted;
-    audio.onended = () => {
-      this.activeAudios.delete(audio);
-    };
+  // Register externally created audio service instances
+  registerAudioService(audioService: MobileAudioService) {
+    this.activeAudioServices.add(audioService);
+    // Volume settings will be applied when creating the service
   }
   
   setVolume(vol: number) {
     this.globalVolume = Math.max(0, Math.min(1, vol));
-    this.activeAudios.forEach(a => {
-      a.volume = this.globalMuted ? 0 : this.globalVolume;
-    });
+    // Volume will be applied to new audio service instances
   }
   
   setMuted(muted: boolean) {
     this.globalMuted = muted;
-    this.activeAudios.forEach(a => {
-      a.muted = muted;
-      if (muted) {
-        a.volume = 0;
-      } else {
-        a.volume = this.globalVolume;
-      }
-    });
+    // Mute state will be applied to new audio service instances
   }
 }
 

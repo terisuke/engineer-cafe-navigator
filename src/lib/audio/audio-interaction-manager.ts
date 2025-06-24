@@ -11,6 +11,13 @@ export interface AudioInteractionEvents {
   onError?: (error: Error) => void;
 }
 
+export interface UserInteractionPromptOptions {
+  message?: string;
+  buttonText?: string;
+  timeout?: number;
+  autoShow?: boolean;
+}
+
 export class AudioInteractionManager {
   private static instance: AudioInteractionManager;
   private globalAudioManager: GlobalAudioManager;
@@ -18,6 +25,8 @@ export class AudioInteractionManager {
   private pendingInteractionCallbacks: (() => void)[] = [];
   private interactionEventListeners: AudioInteractionEvents = {};
   private hasUserInteracted = false;
+  private interactionPromptElement: HTMLElement | null = null;
+  private isPromptVisible = false;
 
   private constructor() {
     this.globalAudioManager = GlobalAudioManager.getInstance();
@@ -47,11 +56,27 @@ export class AudioInteractionManager {
 
     const handleUserInteraction = async (event: Event) => {
       if (this.hasUserInteracted) return;
+      
+      console.log('[AudioInteractionManager] User interaction detected:', event.type);
 
       this.hasUserInteracted = true;
       
+      // Hide interaction prompt if visible
+      this.hideInteractionPrompt();
+      
       try {
         await this.initializeAudioContext();
+        
+        // Execute any pending callbacks
+        const callbacks = [...this.pendingInteractionCallbacks];
+        this.pendingInteractionCallbacks = [];
+        callbacks.forEach(callback => {
+          try {
+            callback();
+          } catch (err) {
+            console.error('Error executing pending callback:', err);
+          }
+        });
         
         // Remove event listeners after first interaction
         interactionEvents.forEach(eventType => {
@@ -125,9 +150,89 @@ export class AudioInteractionManager {
   }
 
   /**
+   * Show interaction prompt to user
+   */
+  private showInteractionPrompt(options: UserInteractionPromptOptions = {}): void {
+    if (this.isPromptVisible || this.hasUserInteracted) return;
+
+    const {
+      message = 'タップして音声を有効化 / Tap to enable audio',
+      buttonText = '🔊 音声ON / Enable Audio',
+      timeout = 0
+    } = options;
+
+    // Create prompt element
+    this.interactionPromptElement = document.createElement('div');
+    this.interactionPromptElement.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+      z-index: 10000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      max-width: 300px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+    `;
+
+    this.interactionPromptElement.innerHTML = `
+      <div style="margin-bottom: 16px; font-size: 14px; line-height: 1.4;">
+        ${message}
+      </div>
+      <button id="audio-enable-btn" style="
+        background: #4CAF50;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.2s;
+      ">
+        ${buttonText}
+      </button>
+    `;
+
+    document.body.appendChild(this.interactionPromptElement);
+    this.isPromptVisible = true;
+
+    // Add click handler
+    const button = this.interactionPromptElement.querySelector('#audio-enable-btn');
+    if (button) {
+      button.addEventListener('click', () => {
+        console.log('[AudioInteractionManager] User clicked enable audio button');
+        // This will trigger the existing interaction handler
+      });
+    }
+
+    // Auto-hide after timeout
+    if (timeout > 0) {
+      setTimeout(() => {
+        this.hideInteractionPrompt();
+      }, timeout);
+    }
+  }
+
+  /**
+   * Hide interaction prompt
+   */
+  private hideInteractionPrompt(): void {
+    if (this.interactionPromptElement && this.isPromptVisible) {
+      document.body.removeChild(this.interactionPromptElement);
+      this.interactionPromptElement = null;
+      this.isPromptVisible = false;
+    }
+  }
+
+  /**
    * Request user interaction for audio playback
    */
-  public async requestUserInteraction(): Promise<AudioContext> {
+  public async requestUserInteraction(options: UserInteractionPromptOptions = {}): Promise<AudioContext> {
     return new Promise((resolve, reject) => {
       if (this.isContextInitialized) {
         this.globalAudioManager.ensureResumed().then(() => {
@@ -135,6 +240,9 @@ export class AudioInteractionManager {
         }).catch(reject);
         return;
       }
+
+      // Show prompt to user
+      this.showInteractionPrompt(options);
 
       // Add to pending callbacks
       this.pendingInteractionCallbacks.push(() => {

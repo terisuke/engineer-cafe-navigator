@@ -14,9 +14,22 @@
 
 Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福岡市エンジニアカフェの新規顧客対応を自動化する**多言語対応音声AIエージェントシステム**です。Mastraフレームワークを活用し、スタッフの負担軽減と顧客満足度向上を目指します。
 
-### 🆕 最新アップデート (2025/06/23)
+### 🆕 最新アップデート (2025/06/24)
 
-#### ✅ 実装完了
+#### ✅ 応答精度システムの改善
+- **🎯 特定リクエスト検出** - 営業時間、料金、場所などの具体的質問を自動識別
+- **📏 応答長制限** - 具体的質問には1文回答で冗長性を排除
+- **🔍 情報フィルタリング** - 関連のない情報を除外して必要な情報のみ提供
+- **🌐 多言語パターン対応** - 日英両言語の特定リクエストパターンをサポート
+
+#### ✅ 音声システムの完全リファクタリング（HTML Audio → Web Audio API移行完了）
+- **🎵 AudioPlaybackService統一** - 全ての音声再生を統一する新しいサービスアーキテクチャ
+- **🔧 Web Audio API完全移行** - HTMLAudioElement依存を完全削除、Web Audio API専用に統一
+- **📱 モバイル互換性向上** - iPad/iOS Safariでの音声再生問題を根本解決
+- **♻️ レガシーコード削除** - 非推奨ファイル削除とアーキテクチャ簡素化
+- **⚡ パフォーマンス最適化** - リップシンクキャッシュとフォールバック機構の改善
+
+#### ✅ 実装完了 (2025/06/23)
 - **OpenAI エンベディング統合** - RAG検索システムをOpenAI text-embedding-3-small (1536次元)に統一
 - **多言語RAG検索** - 英語で質問しても日本語コンテンツから回答、逆も可能
 - **知識ベース管理UI** - `/admin/knowledge`でのデータ管理、メタデータテンプレート対応
@@ -116,6 +129,12 @@ graph TB
 - **スライドシステム**: [Marp Core 4.1.0](https://marp.app/) (Markdown Presentation Ecosystem)
 - **データベース**: [PostgreSQL](https://www.postgresql.org/) + [Supabase 2.49.8](https://supabase.com/)
 - **スタイリング**: [Tailwind CSS v3.4.17](https://tailwindcss.com/) ⚠️ **重要: v3を使用**
+
+#### 音声システム（完全リファクタリング済み）
+- **AudioPlaybackService**: 全音声操作を統一する中央管理サービス
+- **Web Audio API専用**: HTMLAudioElement依存を完全削除
+- **MobileAudioService**: Web Audio APIによるモバイル最適化
+- **インテリジェントフォールバック**: エラー時の自動復旧メカニズム
 
 #### セキュリティ・品質
 - **HTMLサニタイゼーション**: カスタム実装によるXSS対策
@@ -336,15 +355,18 @@ engineer-cafe-navigator/
 │   │   │   └── greetings.json        # 挨拶アニメーション
 │   │   └── expressions/              # 表情データ
 │   ├── lib/                          # 共通ライブラリ
-│   │   ├── audio/                    # 音声システム (モバイル対応)
+│   │   ├── audio/                    # 統一音声システム (Web Audio API専用)
+│   │   │   ├── audio-playback-service.ts  # 統一音声再生サービス
 │   │   │   ├── web-audio-player.ts   # Web Audio API音声プレイヤー
 │   │   │   ├── audio-interaction-manager.ts # ユーザーインタラクション管理
-│   │   │   └── mobile-audio-service.ts # モバイル対応音声サービス
-│   │   ├── audio-player.ts           # 旧音声再生（互換性維持）
+│   │   │   ├── mobile-audio-service.ts # モバイル対応音声サービス
+│   │   │   ├── audio-interfaces.ts   # 音声システム型定義
+│   │   │   └── audio-data-processor.ts # 音声データ処理
+│   │   ├── audio-queue.ts            # 音声キューイング
+│   │   ├── audio-state-manager.ts    # 音声状態管理
 │   │   ├── lip-sync-analyzer.ts      # リップシンク解析 (キャッシュ対応)
 │   │   ├── lip-sync-cache.ts         # リップシンクキャッシュシステム
 │   │   ├── marp-processor.ts         # Marp処理
-│   │   ├── narration-manager.ts      # ナレーション管理
 │   │   ├── simplified-memory.ts      # 統一メモリシステム
 │   │   ├── supabase.ts              # Supabase設定
 │   │   ├── supabase-memory.ts       # Supabaseメモリ管理

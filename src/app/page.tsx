@@ -8,29 +8,7 @@ import BackgroundSelector, { BackgroundOption } from './components/BackgroundSel
 import CharacterAvatar from './components/CharacterAvatar';
 import EnvironmentSettings from './components/EnvironmentSettings';
 import MarpViewer from './components/MarpViewer';
-
-// Emotion to expression mapping - used across the component
-const EMOTION_TO_EXPRESSION: Record<string, string> = {
-  'happy': 'happy',
-  'excited': 'happy', 
-  'sad': 'sad',
-  'angry': 'angry',
-  'surprised': 'surprised',
-  'neutral': 'neutral',
-  'relaxed': 'relaxed',
-  'thoughtful': 'relaxed',
-  'confused': 'surprised',
-  'apologetic': 'sad',
-  'curious': 'surprised',
-  'warm': 'happy',
-  'grateful': 'happy',
-  'confident': 'happy',
-  'supportive': 'relaxed',
-  'gentle': 'relaxed',
-  'knowledgeable': 'neutral',
-  'analytical': 'neutral',
-  'energetic': 'happy'
-};
+import { EmotionMapping } from '@/lib/emotion-mapping';
 
 export default function Home() {
   const [showSlideMode, setShowSlideMode] = useState(false);
@@ -127,6 +105,19 @@ export default function Home() {
   };
 
 
+  // Initialize audio context on user interaction
+  const initializeAudioContext = async () => {
+    try {
+      const { AudioInteractionManager } = await import('@/lib/audio/audio-interaction-manager');
+      const manager = AudioInteractionManager.getInstance();
+      await manager.forceInitialize();
+      // Audio context initialized
+    } catch (error) {
+      // Audio context initialization failed
+      // Don't block the UI - audio will request permission later if needed
+    }
+  };
+
   // Handle language-based voice interaction start
   const handleLanguageVoiceStart = async (language: 'ja' | 'en') => {
     setCurrentLanguage(language);
@@ -151,7 +142,7 @@ export default function Home() {
       
       if (cachedGreeting.audioBase64) {
         // Use cached audio for instant playback
-        console.log('[Main] Using cached greeting audio');
+        // Using cached greeting audio
         setIsProcessing(false);
         setProcessingMessage('');
         await playAudioWithLipSync(cachedGreeting.audioBase64);
@@ -175,7 +166,7 @@ export default function Home() {
         }
       } else {
         // Fallback to API if no cached audio
-        console.log('[Main] No cached audio, using API');
+        // No cached audio, using API
         const { EmotionTagParser } = await import('@/lib/emotion-tag-parser');
         let cleanText = EmotionTagParser.parseEmotionTags(cachedGreeting.text).cleanText;
         cleanText = preprocessTTS(cleanText, language);
@@ -218,7 +209,7 @@ export default function Home() {
       });
 
     } catch (error) {
-      console.error('Error starting voice interaction:', error);
+      // Error starting voice interaction
       setIsProcessing(false);
       setProcessingMessage('');
     }
@@ -227,36 +218,36 @@ export default function Home() {
   // Initialize voice recorder
   const initializeVoiceRecorder = async () => {
     if (isInitializingRecorder) {
-      console.log('Voice recorder initialization already in progress');
+      // Voice recorder initialization in progress
       return null;
     }
 
     try {
       setIsInitializingRecorder(true);
-      console.log('Initializing voice recorder...');
+      // Initializing voice recorder
       const { VoiceRecorder } = await import('@/lib/voice-recorder');
       
       const recorder = new VoiceRecorder(
         async (audioBlob: Blob) => {
-          console.log('Audio recorded, processing...', audioBlob.size, 'bytes');
+          // Audio recorded, processing
           // Handle recorded audio
           await processVoiceInput(audioBlob);
         },
         (error: Error) => {
-          console.error('Voice recorder error:', error);
+          // Voice recorder error
           setIsListening(false);
           setIsRecording(false);
         }
       );
       
-      console.log('Voice recorder created, initializing...');
+      // Voice recorder created
       await recorder.initialize();
-      console.log('Voice recorder initialized successfully');
+      // Voice recorder initialized
       setVoiceRecorder(recorder);
       setIsInitializingRecorder(false);
       return recorder;
     } catch (error) {
-      console.error('Failed to initialize voice recorder:', error);
+      // Failed to initialize voice recorder
       setIsInitializingRecorder(false);
       alert('マイクの初期化に失敗しました。ブラウザの設定でマイクの許可を確認してください。');
       return null;
@@ -295,14 +286,14 @@ export default function Home() {
         const { EnhancedEmotionManager } = await import('@/lib/enhanced-emotion-manager');
         const { ConversationMemory } = await import('@/lib/conversation-memory');
         
-        console.log('[Main] Speech transcript:', speechResult.transcript);
+        // Speech transcript received
         
         // First check FAQ database
         const faqMatch = ConversationMemory.searchFAQ(speechResult.transcript, currentLanguage);
         
         let quickResponse;
         if (faqMatch) {
-          console.log('[Main] Found FAQ match:', faqMatch);
+          // FAQ match found
           quickResponse = {
             text: faqMatch.answer,
             emotion: faqMatch.emotion,
@@ -318,7 +309,7 @@ export default function Home() {
         }
         
         if (quickResponse) {
-          console.log('[Main] Using quick response:', quickResponse);
+          // Using quick response
           
           // Analyze emotion from the response text
           const emotionManager = new EnhancedEmotionManager();
@@ -326,27 +317,24 @@ export default function Home() {
           
           // Set emotion with enhanced analysis
           const emotionToUse = quickResponse.emotion || emotionAnalysis.emotion;
-          console.log('[Main] Setting enhanced emotion:', emotionToUse, 'intensity:', emotionAnalysis.intensity);
+          // Setting enhanced emotion
           
           // Apply expressions directly with simple mapping
-          console.log('[Main] ==========================================');
-          console.log('[Main] Processing cached response emotion:', emotionToUse);
-          console.log('[Main] setExpressionFunction available:', !!setExpressionFunction);
+          // Processing cached response emotion
           
           if (setExpressionFunction) {
             // Simple direct emotion to expression mapping
-            const expressionName = EMOTION_TO_EXPRESSION[emotionToUse] || 'neutral';
-            console.log(`[Main] Direct mapping: ${emotionToUse} -> ${expressionName}`);
-            console.log(`[Main] Calling setExpressionFunction('${expressionName}', 0.8)`);
+            const expressionName = EmotionMapping.mapToVRMEmotion(emotionToUse);
+            // Setting character expression
             
             try {
               setExpressionFunction(expressionName, 0.8);
-              console.log(`[Main] Successfully called setExpressionFunction`);
+              // Expression function called successfully
             } catch (error) {
-              console.error(`[Main] Error calling setExpressionFunction:`, error);
+              // Error calling expression function
             }
           } else {
-            console.warn('[Main] setExpressionFunction is not available');
+            // Expression function not available
           }
           
           // If we have cached audio, use it; otherwise generate TTS
@@ -417,7 +405,7 @@ export default function Home() {
       const result = await response.json();
       
       if (result.success) {
-        console.log('[Main] Voice processing result:', result);
+        // Voice processing result received
         
         // Enhanced emotion processing
         if (result.responseText) {
@@ -431,27 +419,24 @@ export default function Home() {
           const emotionToUse = result.primaryEmotion || result.emotion || emotionAnalysis.emotion;
           const intensity = emotionAnalysis.intensity;
           
-          console.log('[Main] Enhanced emotion analysis:', { emotionToUse, intensity, confidence: emotionAnalysis.confidence });
+          // Enhanced emotion analysis complete
           
           // Apply expressions directly with simple mapping
-          console.log('[Main] ==========================================');
-          console.log('[Main] Processing voice result emotion:', emotionToUse);
-          console.log('[Main] setExpressionFunction available:', !!setExpressionFunction);
+          // Processing voice result emotion
           
           if (setExpressionFunction) {
             // Simple direct emotion to expression mapping
-            const expressionName = EMOTION_TO_EXPRESSION[emotionToUse] || 'neutral';
-            console.log(`[Main] Direct mapping: ${emotionToUse} -> ${expressionName}`);
-            console.log(`[Main] Calling setExpressionFunction('${expressionName}', 0.8)`);
+            const expressionName = EmotionMapping.mapToVRMEmotion(emotionToUse);
+            // Setting character expression
             
             try {
               setExpressionFunction(expressionName, 0.8);
-              console.log(`[Main] Successfully called setExpressionFunction`);
+              // Expression function called successfully
             } catch (error) {
-              console.error(`[Main] Error calling setExpressionFunction:`, error);
+              // Error calling expression function
             }
           } else {
-            console.warn('[Main] setExpressionFunction is not available');
+            // Expression function not available
           }
           
           // Cache the response for future use
@@ -490,7 +475,7 @@ export default function Home() {
       setIsProcessing(false);
       setProcessingMessage('');
     } catch (error) {
-      console.error('Error processing voice input:', error);
+      // Error processing voice input
       
       // Fallback error response
       const { ResponseCache } = await import('@/lib/response-cache');
@@ -517,7 +502,7 @@ export default function Home() {
             await playAudioWithLipSync(ttsResult.audioResponse);
           }
         } catch (ttsError) {
-          console.error('Error generating error response TTS:', ttsError);
+          // Error generating TTS response
         }
       }
       setIsProcessing(false);
@@ -528,32 +513,32 @@ export default function Home() {
   // Start voice recording
   const startVoiceRecording = async () => {
     if (isInitializingRecorder) {
-      console.log('Voice recorder is initializing, please wait...');
+      // Voice recorder initializing
       return;
     }
 
     if (isRecording) {
-      console.log('Already recording, ignoring start request');
+      // Already recording
       return;
     }
 
     let recorder = voiceRecorder;
     
     if (!recorder) {
-      console.log('No recorder found, initializing...');
+      // No recorder found, initializing
       recorder = await initializeVoiceRecorder();
       if (!recorder) {
-        console.error('Failed to initialize voice recorder');
+        // Failed to initialize voice recorder
         return;
       }
     }
 
     // Verify recorder is properly initialized
     if (!recorder.isInitialized()) {
-      console.log('Recorder not properly initialized, re-initializing...');
+      // Recorder not initialized, re-initializing
       recorder = await initializeVoiceRecorder();
       if (!recorder) {
-        console.error('Failed to re-initialize voice recorder');
+        // Failed to re-initialize voice recorder
         return;
       }
     }
@@ -561,7 +546,7 @@ export default function Home() {
     // Check if recorder is in a valid state to start
     const recorderState = recorder.getState();
     if (recorderState === 'recording') {
-      console.log('Recorder already recording, stopping first');
+      // Recorder already recording, stopping first
       recorder.stop();
       // Wait a bit for the recorder to fully stop
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -580,7 +565,7 @@ export default function Home() {
       // Store timeout ID for potential cleanup
       (recorder as any).autoStopTimeout = timeoutId;
     } catch (error) {
-      console.error('Error starting voice recording:', error);
+      // Error starting voice recording
       setIsListening(false);
       setIsRecording(false);
     }
@@ -606,73 +591,22 @@ export default function Home() {
   // Play audio with lip-sync
   const playAudioWithLipSync = async (audioBase64: string) => {
     try {
+      const { AudioPlaybackService } = await import('@/lib/audio/audio-playback-service');
       
-      const audioData = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
-      const audioBlob = new Blob([audioData], { type: 'audio/mp3' });
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      audio.volume = volume / 100;
-      audioStateManager.registerAudio(audio);
-
-      // Perform lip-sync analysis
-      if (setVisemeFunction) {
-        
-        try {
-          const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
-          const analyzer = new LipSyncAnalyzer();
-          
-          // Initialize analyzer after user interaction
-          await analyzer.initialize();
-          
-          const lipSyncData = await analyzer.analyzeLipSync(audioBlob);
-          
-          
-          // Schedule viseme updates
-          let frameIndex = 0;
-          const updateLipSync = () => {
-            if (frameIndex < lipSyncData.frames.length && audio.currentTime >= 0) {
-              const frame = lipSyncData.frames[frameIndex];
-              
-              setVisemeFunction(frame.mouthShape, frame.mouthOpen);
-              
-              frameIndex++;
-              setTimeout(updateLipSync, 50); // 20fps
-            } else if (frameIndex >= lipSyncData.frames.length) {
-              setVisemeFunction('Closed', 0); // Reset to closed mouth
-            }
-          };
-          
-          // Start lip-sync when audio starts
-          audio.onplay = () => {
-            updateLipSync();
-          };
-          
-          analyzer.dispose();
-        } catch (lipSyncError) {
-          // Fallback: play without lip-sync
-          if (lipSyncError instanceof Error && 
-              (lipSyncError.message.includes('not allowed') || 
-               lipSyncError.message.includes('permission'))) {
-            console.warn(currentLanguage === 'ja' ? 
-              '音声のみ再生します' : 'Playing audio only');
+      await AudioPlaybackService.playAudioWithLipSync(audioBase64, {
+        volume: volume / 100,
+        enableLipSync: !!setVisemeFunction,
+        onVisemeUpdate: setVisemeFunction || undefined,
+        onError: (error) => {
+          // Audio playback failed
+          // Fallback message for permission errors
+          if (error.message?.includes('not allowed') || error.message?.includes('permission')) {
+            // Playing audio only
           }
         }
-      }
-
-      audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-        
-        // Reset only the viseme (mouth shape) to closed, but keep the current expression
-        if (setVisemeFunction) {
-          setVisemeFunction('Closed', 0);
-        }
-        
-        // Don't reset expression to neutral - keep the current emotion
-      };
-
-      await audio.play();
+      });
     } catch (error) {
-      console.error('Audio playback failed:', error);
+      // Audio playback with lip-sync failed
     }
   };
 
@@ -685,14 +619,14 @@ export default function Home() {
         
         // Only pre-generate if cache is empty or has few greetings
         if (stats.totalCached < 4) {
-          console.log('[Main] Pre-generating greetings for faster responses...');
+          // Pre-generating greetings
           await GreetingCache.preGenerateGreetings();
-          console.log('[Main] Greeting pre-generation complete');
+          // Greeting pre-generation complete
         } else {
-          console.log('[Main] Greetings already cached:', stats);
+          // Greetings already cached
         }
       } catch (error) {
-        console.warn('[Main] Failed to pre-generate greetings:', error);
+        // Failed to pre-generate greetings
       }
     };
 
@@ -769,15 +703,10 @@ export default function Home() {
                     modelRotationOffset={showSlideMode ? { x: -0.1, y: 1, z: 0.1 } : { x: 0, y: 0, z: 0 }}
                     enableClickAnimation={!showSlideMode}
                     onVisemeControl={(setViseme) => {
-                      console.log('[Main] Received viseme control function');
                       setSetVisemeFunction(() => setViseme);
                     }}
                     onExpressionControl={(setExpression) => {
-                      console.log('[Main] === Received expression control function ===');
-                      console.log('[Main] setExpression function type:', typeof setExpression);
-                      console.log('[Main] setExpression function:', setExpression);
                       setSetExpressionFunction(() => setExpression);
-                      console.log('[Main] setExpressionFunction state updated');
                     }}
                   />
                   
@@ -803,7 +732,8 @@ export default function Home() {
                             {/* Japanese buttons group - left side */}
                             <div className="flex flex-col gap-6 w-full lg:w-auto">
                               <button
-                                onClick={() => {
+                                onClick={async () => {
+                                  await initializeAudioContext();
                                   handleLanguageVoiceStart('ja');
                                   setIsVoiceActive(true);
                                 }}
@@ -813,15 +743,20 @@ export default function Home() {
                                 <span className="hidden md:inline text-lg md:text-xl font-semibold ml-2">日本語で話しかける</span>
                               </button>
                               <button
-                                onClick={() => {
+                                onClick={async () => {
+                                  // Button clicked
+                                  await initializeAudioContext();
+                                  // Setting slide mode
                                   setShowSlideMode(true);
                                   // Auto-start presentation in Japanese
                                   setTimeout(() => {
+                                    // Dispatching auto-start event
                                     // Find MarpViewer and trigger auto-play
                                     const autoPlayEvent = new CustomEvent('autoStartPresentation', { 
                                       detail: { autoPlay: true, language: 'ja' } 
                                     });
                                     window.dispatchEvent(autoPlayEvent);
+                                    // Event dispatched
                                   }, 100);
                                 }}
                                 className="flex items-center justify-center gap-4 px-8 py-6 md:py-8 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 min-w-[280px] md:min-w-[320px] touch-manipulation"
@@ -834,7 +769,8 @@ export default function Home() {
                             {/* English buttons group - right side */}
                             <div className="flex flex-col gap-6 w-full lg:w-auto">
                               <button
-                                onClick={() => {
+                                onClick={async () => {
+                                  await initializeAudioContext();
                                   handleLanguageVoiceStart('en');
                                   setIsVoiceActive(true);
                                 }}
@@ -844,7 +780,8 @@ export default function Home() {
                                 <span className="text-lg md:text-xl font-semibold">Speak English</span>
                               </button>
                               <button
-                                onClick={() => {
+                                onClick={async () => {
+                                  await initializeAudioContext();
                                   setShowSlideMode(true);
                                   // Auto-start presentation in English
                                   setTimeout(() => {

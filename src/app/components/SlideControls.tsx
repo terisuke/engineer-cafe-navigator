@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import {
   ChevronLeft,
-  ChevronRight,
   Play,
   Pause,
   SkipBack,
@@ -21,7 +20,7 @@ interface SlideControlsProps {
   isPlaying: boolean;
   isMuted: boolean;
   isFullscreen: boolean;
-  onNavigate: (direction: 'prev' | 'next' | 'first' | number) => void;
+  onNavigate: (direction: 'prev' | 'first' | number) => void;
   onPlayPause: () => void;
   onMuteToggle: () => void;
   onFullscreenToggle: () => void;
@@ -77,15 +76,6 @@ export default function SlideControls({
           title={isPlaying ? "一時停止 (P)" : "再生 (P)"}
         >
           {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-        </button>
-
-        <button
-          onClick={() => onNavigate('next')}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
-          disabled={currentSlide === totalSlides}
-          title="次のスライド (→)"
-        >
-          <ChevronRight className="w-5 h-5" />
         </button>
       </div>
 
