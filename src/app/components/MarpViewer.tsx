@@ -91,7 +91,7 @@ export default function MarpViewer({
             narrationSpeed: parsed.narrationSpeed ?? 1.0,
             skipAnimations: parsed.skipAnimations ?? false,
             preloadCount: parsed.preloadCount ?? 2,
-            enableLipSync: true, // Force enable lip-sync regardless of saved setting
+            enableLipSync: parsed.enableLipSync ?? true,
           };
         }
       } catch (error) {
@@ -219,25 +219,17 @@ export default function MarpViewer({
     return () => stopAutoPlay();
   }, [isPlaying, currentSlide, totalSlides]);
 
-  // Save settings to localStorage whenever they change (but force enable lip-sync)
+  // Save settings to localStorage whenever they change
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        // Always save lip-sync as enabled
-        const settingsToSave = { ...settings, enableLipSync: true };
-        localStorage.setItem('marp-viewer-settings', JSON.stringify(settingsToSave));
+        localStorage.setItem('marp-viewer-settings', JSON.stringify(settings));
       } catch (error) {
         // Failed to save settings to localStorage
       }
     }
   }, [settings]);
 
-  // Force enable lip-sync on component mount (clear any bad localStorage settings)
-  useEffect(() => {
-    if (settings.enableLipSync === false) {
-      setSettings(prev => ({ ...prev, enableLipSync: true }));
-    }
-  }, [settings.enableLipSync]);
 
   // Listen for auto-start presentation event from parent
   useEffect(() => {

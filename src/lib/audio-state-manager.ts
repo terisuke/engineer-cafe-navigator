@@ -6,7 +6,7 @@ export class AudioStateManager {
   private audioProcessingCount: number = 0;
   private audioQueue: Array<{
     id: string;
-    audioData: string; // base64 audio data
+    audioData: string; // base64 encoded audio data (data:audio/wav;base64,...)
     onComplete?: () => void;
   }> = [];
   private currentAudioService: MobileAudioService | null = null;
@@ -17,12 +17,16 @@ export class AudioStateManager {
   
   incrementProcessingCount(): void {
     this.audioProcessingCount++;
-    // Processing count incremented
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[AudioStateManager] Processing count incremented to ${this.audioProcessingCount}`);
+    }
   }
   
   decrementProcessingCount(): void {
     this.audioProcessingCount--;
-    // Processing count decremented
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[AudioStateManager] Processing count decremented to ${this.audioProcessingCount}`);
+    }
     
     if (this.audioProcessingCount === 0) {
       this.onAllAudioComplete();
@@ -56,7 +60,8 @@ export class AudioStateManager {
       await this.playAudio(audioData);
       onComplete?.();
     } catch (error) {
-      // Audio playback error
+      console.error('[AudioStateManager] Audio playback failed:', error);
+      // Continue processing queue despite error
     } finally {
       this.decrementProcessingCount();
       this.isProcessing = false;
@@ -133,7 +138,9 @@ export class AudioStateManager {
   }
   
   private onAllAudioComplete(): void {
-    // All audio processing complete
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[AudioStateManager] All audio processing complete');
+    }
     window.dispatchEvent(new CustomEvent('audioProcessingComplete'));
   }
   

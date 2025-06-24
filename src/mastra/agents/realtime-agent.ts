@@ -474,9 +474,9 @@ export class RealtimeAgent extends Agent {
         console.log('[RealtimeAgent] QA agent available:', !!qaAgent);
       }
       
-      if (qaAgent && qaAgent.answerQuestion) {
+      if (qaAgent?.answerQuestion) {
         // Ensure QA agent uses the same language as RealtimeAgent
-        if (qaAgent.setLanguage) {
+        if (qaAgent?.setLanguage) {
           await qaAgent.setLanguage(language);
         }
         

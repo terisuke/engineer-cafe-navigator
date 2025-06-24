@@ -8,14 +8,14 @@
  * @since 2025-06-24
  */
 
-import { MobileAudioService } from './mobile-audio-service';
 import { AudioDataProcessor } from './audio-data-processor';
-import { 
-  AudioError, 
+import {
+  AudioError,
   AudioErrorType,
-  type AudioOperationResult,
-  type AudioDataInput
+  type AudioDataInput,
+  type AudioOperationResult
 } from './audio-interfaces';
+import { MobileAudioService } from './mobile-audio-service';
 
 export interface AudioPlaybackOptions {
   volume?: number;
@@ -121,6 +121,19 @@ export class AudioPlaybackService {
 
       // Create a Promise that resolves when audio playback is complete
       return new Promise<AudioOperationResult>((resolve, reject) => {
+        // Guard to ensure the promise is settled only once
+        let settled = false;
+        const safeResolve = (value: AudioOperationResult) => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+        };
+        const safeReject = (error: AudioError) => {
+          if (settled) return;
+          settled = true;
+          reject(error);
+        };
+
         // Create mobile audio service with options (Web Audio API only)
         const audioService = new MobileAudioService({
           volume: options.volume || 0.8,
@@ -142,28 +155,40 @@ export class AudioPlaybackService {
             options.onPlaybackEnd?.();
             
             // Resolve the Promise when audio playback ends
-            resolve({ success: true, method: 'web-audio' });
+            safeResolve({ success: true, method: 'web-audio' });
           },
           onError: (error) => {
-            console.error('[AudioPlayback] Playback failed:', error);
-            options.onError?.(error);
-            reject(new AudioError(AudioErrorType.PLAYBACK_FAILED, error.message || 'Audio playback failed'));
+            const audioError = error instanceof AudioError
+              ? error
+              : new AudioError(
+                  AudioErrorType.PLAYBACK_FAILED,
+                  (error as Error)?.message || 'Audio playback failed'
+                );
+            console.error('[AudioPlayback] Playback failed:', audioError);
+            options.onError?.(audioError);
+            safeReject(audioError);
           }
         });
         
         // Start audio playback
-        audioService.playAudio(audioData).then((result) => {
-          if (!result.success) {
-            options.onError?.(result.error!);
-            reject(result.error!);
-          }
-          
-          // Don't resolve here - wait for onEnded callback
-        }).catch((error) => {
-          const audioError = AudioError.fromError(error as Error, AudioErrorType.PLAYBACK_FAILED);
-          options.onError?.(audioError);
-          reject(audioError);
-        });
+        audioService.playAudio(audioData)
+          .then((result) => {
+            if (!result.success) {
+              const audioError = result.error ?? new AudioError(
+                AudioErrorType.PLAYBACK_FAILED,
+                'Audio playback failed'
+              );
+              options.onError?.(audioError);
+              safeReject(audioError);
+              return; // Early exit to prevent further processing
+            }
+            // Don't resolve here - wait for onEnded callback
+          })
+          .catch((error) => {
+            const audioError = AudioError.fromError(error as Error, AudioErrorType.PLAYBACK_FAILED);
+            options.onError?.(audioError);
+            safeReject(audioError);
+          });
       });
       
     } catch (error) {
