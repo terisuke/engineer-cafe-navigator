@@ -4,6 +4,7 @@ import { ragSearchTool } from '../tools/rag-search';
 import { GeneralWebSearchTool } from '../tools/general-web-search';
 import { SupportedLanguage } from '../types/config';
 import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
+import { ClarificationUtils } from '@/lib/clarification-utils';
 
 export class EnhancedQAAgent extends Agent {
   private memory: any;
@@ -33,21 +34,34 @@ export class EnhancedQAAgent extends Agent {
     this._tools.set(name, tool);
   }
 
-  // Method to set language for this agent
+  /**
+   * Set language for this agent
+   * Updates memory to maintain consistency
+   */
   async setLanguage(language: SupportedLanguage) {
     // Store language preference in memory for this agent
     this.memory.set('language', language);
+    console.log(`[EnhancedQAAgent] Language set to: ${language}`);
   }
 
-  async answerQuestion(question: string): Promise<string> {
+  async answerQuestion(question: string, requestLanguage?: SupportedLanguage): Promise<string> {
+    // Use the provided language or fall back to memory/default
+    const language: SupportedLanguage = requestLanguage || this.memory.get('language') || 'ja';
+    
+    // Update memory with the current language to keep it synchronized
+    if (requestLanguage) {
+      this.memory.set('language', requestLanguage);
+    }
+    
     // Get conversation context first
     const memoryContext = await this.simplifiedMemory.getContext(question, {
       includeKnowledgeBase: false, // We'll handle knowledge search separately
-      language: 'ja' // We'll detect language from memory or default to 'ja'
+      language: language
     });
     
-    // Extract language from memory or default to 'ja'
-    const language: SupportedLanguage = this.memory.get('language') || 'ja';
+    // Check if this is a contextual follow-up to a previous specific request
+    const previousSpecificRequest = this.extractPreviousSpecificRequest(memoryContext.recentMessages);
+    console.log('[EnhancedQAAgent] Previous specific request:', previousSpecificRequest);
     
     // Check if the question is about calendar/events or facility information
     const category = await this.categorizeQuestion(question);
@@ -70,8 +84,34 @@ export class EnhancedQAAgent extends Agent {
         return context;
       }
     } else {
-      // Check if this is a memory/conversation-related question
-      if (this.isMemoryRelatedQuestion(question)) {
+      // Check if this is a contextual response (answering a clarification)
+      const isContextual = await this.isContextualResponse(question);
+      
+      if (isContextual) {
+        console.log('[EnhancedQAAgent] Contextual response detected - combining with knowledge search');
+        // For contextual responses, use conversation history AND search for relevant info
+        
+        // Try to understand the original question from conversation history
+        const originalQuestion = this.extractOriginalQuestionFromContext(memoryContext.recentMessages, question);
+        console.log('[EnhancedQAAgent] Extracted original question:', originalQuestion);
+        
+        if (originalQuestion) {
+          // Search knowledge base for the original question + clarification
+          const combinedQuery = `${originalQuestion} ${question}`;
+          context = await this.searchKnowledgeBase(combinedQuery, language);
+          
+          // If no specific results, use conversation history
+          if (!context || context.startsWith('申し訳ございません') || context.startsWith('I couldn\'t find')) {
+            context = memoryContext.recentMessages.length > 0 
+              ? 'Recent conversation history is available' 
+              : 'No recent conversation history available';
+          }
+        } else {
+          context = memoryContext.recentMessages.length > 0 
+            ? 'Recent conversation history is available' 
+            : 'No recent conversation history available';
+        }
+      } else if (this.isMemoryRelatedQuestion(question)) {
         console.log('[EnhancedQAAgent] Memory-related question detected');
         // For memory questions, the context comes from conversation history
         context = memoryContext.recentMessages.length > 0 
@@ -83,10 +123,10 @@ export class EnhancedQAAgent extends Agent {
       } else {
         // Default to RAG search
         console.log('[EnhancedQAAgent] Using RAG search');
-        context = await this.searchKnowledgeBase(question);
+        context = await this.searchKnowledgeBase(question, language);
         
-        // Check if the result is a clarification message (starts with [curious])
-        if (context.startsWith('[curious]')) {
+        // Check if the result is a clarification message (contains question patterns)
+        if (ClarificationUtils.isClarificationMessage(context)) {
           return context;
         }
         
@@ -102,16 +142,68 @@ export class EnhancedQAAgent extends Agent {
     const conversationContext = memoryContext.contextString || '';
     const fullContext = conversationContext ? `${conversationContext}\n\n参考情報: ${context}` : context;
     
-    // Special handling for memory-related questions
+    // Special handling for memory-related questions and contextual responses
     const isMemoryQuestion = this.isMemoryRelatedQuestion(question);
+    const isContextual = await this.isContextualResponse(question);
     
-    const prompt = isMemoryQuestion
-      ? (language === 'en'
+    let prompt;
+    
+    if (isMemoryQuestion || isContextual) {
+      if (isContextual) {
+        // For contextual responses, understand the original question from conversation history
+        prompt = language === 'en'
+          ? `The user is responding to a clarification question. Look at the conversation history to understand what they originally asked, then provide the specific information they need: ${question}\nConversation History: ${conversationContext}\nContext: ${fullContext}\nCombine their clarification with their original question to provide the right answer. Focus on what they specifically chose and their original question.`
+          : `ユーザーは明確化の質問に答えています。会話履歴から元の質問を理解し、必要な具体的情報を提供してください: ${question}\n会話履歴: ${conversationContext}\n文脈: ${fullContext}\n明確化の回答と元の質問を組み合わせて適切な答えを提供してください。ユーザーが選択した内容と元の質問に焦点を当ててください。`;
+      } else {
+        // Standard memory question handling
+        prompt = language === 'en'
           ? `The user is asking about previous conversation. Use the conversation history to answer: ${question}\nConversation History: ${conversationContext}\nIf there is recent conversation history, reference what was discussed. If not, explain that you don't have previous conversation context.`
-          : `ユーザーは過去の会話について質問しています。会話履歴を使って答えてください: ${question}\n会話履歴: ${conversationContext}\n最近の会話履歴がある場合は、何について話したかを参照してください。ない場合は、過去の会話の文脈がないことを説明してください。`)
-      : (language === 'en'
-          ? `Answer the question using the conversation history and knowledge provided. Reference previous conversation when relevant: ${question}\nContext: ${fullContext}\nProvide ONLY the requested information. Keep it to 1-2 sentences maximum.`
-          : `会話履歴と提供された知識を使って質問に答えてください。関連する場合は以前の会話を参照してください: ${question}\n文脈: ${fullContext}\n聞かれた情報のみを答え、余計な説明は不要です。最大1-2文で答えてください。`);
+          : `ユーザーは過去の会話について質問しています。会話履歴を使って答えてください: ${question}\n会話履歴: ${conversationContext}\n最近の会話履歴がある場合は、何について話したかを参照してください。ない場合は、過去の会話の文脈がないことを説明してください。`;
+      }
+    } else {
+      // Standard question handling - with enhanced filtering for specific requests
+      const isSpecificRequest = this.detectSpecificRequest(question, previousSpecificRequest);
+      
+      if (isSpecificRequest) {
+        // Check if it's a follow-up question
+        const isFollowUp = question.includes('じゃ') || question.includes('では') || 
+                          question.includes('の方は') || question.includes('then') || 
+                          question.includes('how about');
+        
+        if (isFollowUp && previousSpecificRequest) {
+          // If following up with a previous specific request (e.g., hours), focus on that
+          const requestTypePrompt = previousSpecificRequest === 'hours' 
+            ? (language === 'en' ? 'operating hours' : '営業時間')
+            : previousSpecificRequest === 'price'
+            ? (language === 'en' ? 'pricing information' : '料金情報')
+            : previousSpecificRequest === 'location'
+            ? (language === 'en' ? 'location information' : '場所情報')
+            : previousSpecificRequest === 'booking'
+            ? (language === 'en' ? 'reservation/booking information' : '予約情報')
+            : previousSpecificRequest === 'facility'
+            ? (language === 'en' ? 'facility/equipment information' : '設備情報')
+            : previousSpecificRequest === 'access'
+            ? (language === 'en' ? 'access/directions' : 'アクセス方法')
+            : (language === 'en' ? 'requested information' : '要求された情報');
+            
+          prompt = language === 'en'
+            ? `The user previously asked about ${requestTypePrompt} and is now asking about a specific option. Give ONLY the ${requestTypePrompt} for what they're asking about: ${question}\nContext: ${fullContext}\n\nIMPORTANT: Answer with ONLY the ${requestTypePrompt}. Do not include any other information. Maximum 1 sentence. Speak naturally in conversational tone, not like reading a table or list.`
+            : `ユーザーは以前${requestTypePrompt}について尋ね、今は特定の選択肢について聞いています。聞かれているものの${requestTypePrompt}のみを答えてください: ${question}\n文脈: ${fullContext}\n\n重要：${requestTypePrompt}のみを答えてください。他の情報は含めないでください。最大1文。表や箇条書きを読み上げるのではなく、自然な会話調で答えてください。`;
+        } else if (isFollowUp) {
+          prompt = language === 'en'
+            ? `The user is asking a follow-up question about another option. Give a brief, direct answer focusing only on what they asked about: ${question}\nContext: ${fullContext}\n\nIMPORTANT: Keep your response extremely brief (1 sentence). Only state the key information they need.`
+            : `ユーザーは別の選択肢についてフォローアップの質問をしています。聞かれたことだけに焦点を当てて、簡潔で直接的な答えを提供してください: ${question}\n文脈: ${fullContext}\n\n重要：極めて簡潔に（1文で）回答してください。必要な主要情報のみを述べてください。`;
+        } else {
+          prompt = language === 'en'
+            ? `Extract ONLY the specific information requested from the knowledge provided. Ignore unrelated information even if it's in the same document: ${question}\nContext: ${fullContext}\n\nIMPORTANT: Answer ONLY what was asked. Do not include additional details, explanations, or unrelated information. Keep response to 1 sentence maximum. Convert lists or tables into natural conversational language. Do not use markdown formatting or bullet points.`
+            : `提供された知識から、質問された特定の情報のみを抽出してください。同じ文書内にあっても関連のない情報は無視してください: ${question}\n文脈: ${fullContext}\n\n重要：質問されたことのみに答えてください。追加の詳細、説明、関連のない情報は含めないでください。回答は最大1文にしてください。リストや表は自然な会話調の言葉に変換してください。マークダウン形式や箇条書きは使用しないでください。`;
+        }
+      } else {
+        prompt = language === 'en'
+          ? `Answer the question using the conversation history and knowledge provided. Reference previous conversation when relevant: ${question}\nContext: ${fullContext}\nProvide ONLY the requested information. Keep it to 1-2 sentences maximum. Use natural conversational language, not lists or formal documentation style.`
+          : `会話履歴と提供された知識を使って質問に答えてください。関連する場合は以前の会話を参照してください: ${question}\n文脈: ${fullContext}\n聞かれた情報のみを答え、余計な説明は不要です。最大1-2文で答えてください。リストや形式的な文書スタイルではなく、自然な会話調の言葉を使用してください。`;
+      }
+    }
     
     const response = await this.generate([
       { role: 'user', content: prompt }
@@ -218,8 +310,8 @@ Official X/Twitter: https://x.com/EngineerCafeJP
     }
   }
 
-  private async searchKnowledgeBase(query: string): Promise<string> {
-    const language: SupportedLanguage = this.memory.get('language') || 'ja';
+  private async searchKnowledgeBase(query: string, language?: SupportedLanguage): Promise<string> {
+    const currentLanguage: SupportedLanguage = language || this.memory.get('language') || 'ja';
     
     console.log('[EnhancedQAAgent] Starting RAG search for query:', query);
     
@@ -243,18 +335,18 @@ Official X/Twitter: https://x.com/EngineerCafeJP
       console.log('[EnhancedQAAgent] Using RAG tool:', !!ragTool);
       
       if (category === 'cafe-clarification-needed') {
-        const clarificationMessage = language === 'en'
-          ? "[curious]Are you asking about Engineer Cafe (the coworking space) or Saino Cafe (the attached cafe & bar)?[/curious]"
-          : "[curious]コワーキングスペースのエンジニアカフェのことですか、それとも併設のカフェ＆バーのsainoカフェのことですか？[/curious]";
+        const clarificationMessage = currentLanguage === 'en'
+          ? "Are you asking about Engineer Cafe (the coworking space) or Saino Cafe (the attached cafe & bar)?"
+          : "コワーキングスペースのエンジニアカフェのことですか、それとも併設のカフェ＆バーのsainoカフェのことですか？";
         
         console.log('[EnhancedQAAgent] Returning clarification message');
         return clarificationMessage;
       }
       
       if (category === 'meeting-room-clarification-needed') {
-        const clarificationMessage = language === 'en'
-          ? "[curious]Are you asking about the basement workspace (free, part of Engineer Cafe) or the 2F meeting rooms (paid, city-managed)?[/curious]"
-          : "[curious]地下の無料ワークスペース（エンジニアカフェの一部）のことですか、それとも2階の有料会議室（市の管理）のことですか？[/curious]";
+        const clarificationMessage = currentLanguage === 'en'
+          ? "Are you asking about the basement workspace (free, part of Engineer Cafe) or the 2F meeting rooms (paid, city-managed)?"
+          : "地下の無料ワークスペース（エンジニアカフェの一部）のことですか、それとも2階の有料会議室（市の管理）のことですか？";
         
         console.log('[EnhancedQAAgent] Returning meeting room clarification message');
         return clarificationMessage;
@@ -329,14 +421,26 @@ Official X/Twitter: https://x.com/EngineerCafeJP
       console.log('[EnhancedQAAgent] Multi-language RAG search result length:', context ? context.length : 0);
       
       if (!context) {
-        console.log('[EnhancedQAAgent] No context found, returning default');
+        console.log('[EnhancedQAAgent] No context found, checking if history question');
+        const isHistoryQuestion = /history|歴史|background|started|founded|established|開設|設立|始まり|創立/i.test(normalizedQuery);
+        
+        if (isHistoryQuestion) {
+          console.log('[EnhancedQAAgent] Providing history context');
+          const historyContext = {
+            en: `Engineer Cafe is a public coworking space for IT engineers operated by Fukuoka City. It was established to support the local tech community by providing free workspace, meeting rooms, and networking opportunities for engineers and tech professionals in the Tenjin area.`,
+            ja: `エンジニアカフェは、福岡市が運営するITエンジニア向けの公共コワーキングスペースです。地域のテックコミュニティを支援するため、天神エリアのエンジニアや技術者に無料のワークスペース、会議室、ネットワーキングの機会を提供することを目的として設立されました。`
+          };
+          return historyContext[currentLanguage] || historyContext.ja;
+        }
+        
+        console.log('[EnhancedQAAgent] Returning default context');
         const defaultContext = {
           en: `I couldn't find specific information about that in my knowledge base. 
                 Engineer Cafe is open from 9:00 to 22:00 daily, a coworking space in Fukuoka designed for IT engineers.`,
           ja: `申し訳ございませんが、その件について具体的な情報が見つかりませんでした。
                 エンジニアカフェは福岡のITエンジニア向け9:00〜22:00営業のコワーキングスペースです。`
         };
-        return defaultContext[language];
+        return defaultContext[currentLanguage] || defaultContext.ja;
       }
       
       console.log('[EnhancedQAAgent] Returning RAG context:', context.substring(0, 100) + '...');
@@ -351,7 +455,7 @@ Official X/Twitter: https://x.com/EngineerCafeJP
               高速インターネット、プライベート会議室、コーヒーサービス、イベントスペースを完備。
               施設は完全無料でご利用いただけます。`
       };
-      return sampleContext[language];
+      return sampleContext[currentLanguage] || sampleContext.ja;
     }
   }
 
@@ -360,7 +464,11 @@ Official X/Twitter: https://x.com/EngineerCafeJP
     const normalizedQuestion = lowerQuestion
       .replace(/coffee say no/g, 'saino')
       .replace(/才能/g, 'saino')
-      .replace(/say no/g, 'saino');
+      .replace(/say no/g, 'saino')
+      // Common speech recognition errors for "engineer cafe"
+      .replace(/engineer confess/g, 'engineer cafe')
+      .replace(/engineer conference/g, 'engineer cafe')
+      .replace(/engineer campus/g, 'engineer cafe');
     
     // Calendar/Events
     if (normalizedQuestion.includes('カレンダー') || normalizedQuestion.includes('calendar') ||
@@ -381,6 +489,16 @@ Official X/Twitter: https://x.com/EngineerCafeJP
         normalizedQuestion.includes('engineer cafe') || 
         normalizedQuestion.includes('engineer カフェ')) {
       console.log('[EnhancedQAAgent] Detected Engineer Cafe specific query');
+      return 'facility-info';
+    }
+    
+    // History-related questions
+    if (normalizedQuestion.includes('history') || normalizedQuestion.includes('歴史') ||
+        normalizedQuestion.includes('background') || normalizedQuestion.includes('started') ||
+        normalizedQuestion.includes('founded') || normalizedQuestion.includes('established') ||
+        normalizedQuestion.includes('開設') || normalizedQuestion.includes('設立') ||
+        normalizedQuestion.includes('始まり') || normalizedQuestion.includes('創立')) {
+      console.log('[EnhancedQAAgent] Detected history-related query');
       return 'facility-info';
     }
     
@@ -485,7 +603,7 @@ Official X/Twitter: https://x.com/EngineerCafeJP
 
   private async isIrrelevantResult(context: string, question: string): Promise<boolean> {
     // Skip relevance check for clarification messages
-    if (context.startsWith('[curious]')) {
+    if (ClarificationUtils.isClarificationMessage(context)) {
       return false;
     }
 
@@ -586,4 +704,278 @@ ${context}
     return allKeywords.some(keyword => normalizedQuestion.includes(keyword));
   }
 
+  private extractOriginalQuestionFromContext(recentMessages: any[], currentResponse: string): string | null {
+    // Look for the most recent user question that might have triggered a clarification
+    const userMessages = recentMessages
+      .filter(msg => msg.role === 'user')
+      .slice(-4); // Look at last 4 user messages for better context
+    
+    if (userMessages.length === 0) {
+      return null;
+    }
+    
+    // Enhanced question detection patterns
+    const questionIndicators = [
+      // Time-related
+      '営業時間', '時間', 'operating hours', 'hours', '営業', 'open', 'close', '何時',
+      // Location-related  
+      'どこ', 'where', '場所', 'location', '階', 'floor', '部屋', 'room',
+      // Facility-related
+      '設備', 'facility', 'equipment', 'wifi', 'コーヒー', 'coffee', '会議室', 'meeting',
+      // Service-related
+      '料金', 'price', 'cost', 'fee', '無料', 'free', 'サービス', 'service',
+      // General inquiry patterns
+      '教えて', 'tell me', '知りたい', 'want to know', '聞きたい', 'ask about',
+      'について', 'about', 'に関して', 'regarding', 'の', 'どう', 'how'
+    ];
+    
+    // Score messages based on how likely they are to be the original question
+    const scoredMessages = userMessages.map(msg => {
+      const content = msg.content.toLowerCase();
+      let score = 0;
+      
+      // Question indicators
+      questionIndicators.forEach(indicator => {
+        if (content.includes(indicator)) score += 2;
+      });
+      
+      // Question marks
+      if (content.includes('?') || content.includes('？')) score += 3;
+      
+      // Question words
+      const questionWords = ['what', 'where', 'when', 'how', 'why', 'who', 
+                           '何', 'どこ', 'いつ', 'どう', 'なぜ', 'だれ'];
+      questionWords.forEach(word => {
+        if (content.includes(word)) score += 3;
+      });
+      
+      // Length bonus (longer messages more likely to be questions)
+      if (content.length > 10) score += 1;
+      if (content.length > 20) score += 1;
+      
+      return { message: msg, score };
+    });
+    
+    // Find the highest scoring message
+    const bestMatch = scoredMessages.reduce((best, current) => 
+      current.score > best.score ? current : best
+    );
+    
+    // Return the best match if it has a reasonable score, otherwise most recent
+    if (bestMatch.score >= 3) {
+      return bestMatch.message.content;
+    }
+    
+    // Fallback to most recent user message
+    return userMessages[userMessages.length - 1]?.content || null;
+  }
+
+  private async isContextualResponse(question: string): Promise<boolean> {
+    const normalizedQuestion = question.toLowerCase().trim();
+    
+    // Enhanced contextual response detection
+    const isShortResponse = question.length < 50; // Increased threshold for more coverage
+    const wordCount = normalizedQuestion.split(/\s+/).length;
+    const isVeryShort = wordCount <= 3; // 3 words or less
+    
+    // Expanded response patterns
+    const contextualPatterns = [
+      // Facility choices
+      'エンジニアカフェ', 'engineer cafe', 'サイノ', 'saino',
+      // Simple affirmatives/negatives  
+      'はい', 'いいえ', 'yes', 'no', 'sure', 'okay',
+      // Common short responses
+      '1階', '2階', '地下', 'basement', 'first floor', 'second floor',
+      '午前', '午後', 'morning', 'afternoon', 'evening',
+      'wifi', 'コーヒー', 'coffee', '会議室', 'meeting room',
+      // Price/time related
+      '無料', 'free', '有料', 'paid', '今日', 'today', '明日', 'tomorrow',
+      // Quantity responses
+      '1つ', '2つ', 'one', 'two', 'first', 'second'
+    ];
+    
+    const hasContextualPattern = contextualPatterns.some(pattern => 
+      normalizedQuestion.includes(pattern.toLowerCase())
+    );
+    
+    // Check if it's a likely contextual response
+    if (!isShortResponse && !isVeryShort && !hasContextualPattern) {
+      return false;
+    }
+    
+    // Check recent conversation history for clarification questions
+    try {
+      const memoryContext = await this.simplifiedMemory.getContext(question, {
+        includeKnowledgeBase: false, // Only look at conversation history
+        language: this.memory.get('language') || 'ja'
+      });
+      
+      const recentMessages = memoryContext.recentMessages;
+      
+      // Look for recent assistant messages asking for clarification
+      const recentAssistantMessages = recentMessages
+        .filter(msg => msg.role === 'assistant')
+        .slice(-2); // Last 2 assistant messages
+      
+      const clarificationPatterns = [
+        // Facility clarification patterns
+        'どちらについてお聞きでしょうか', 'エンジニアカフェのことですか', 'サイノカフェのことですか',
+        '併設のカフェ', 'コワーキングスペース', 
+        'which one', 'engineer cafe', 'saino cafe', 'asking about', 'coworking space',
+        'attached cafe', 'are you asking',
+        // General clarification patterns
+        'どちらを', 'どれを', 'どの', 'いつの', 'どこの',
+        'which', 'what time', 'which floor', 'which room', 'what type',
+        'choose', 'select', 'option', 'prefer',
+        // Question clarification
+        '詳しく', 'もう少し', 'specific', 'more details', 'clarify',
+        '1つ目', '2つ目', 'first option', 'second option',
+        // Yes/No clarification  
+        'そうですか', 'correct', 'right', 'confirm'
+      ];
+      
+      const hasRecentClarification = recentAssistantMessages.some(msg => 
+        clarificationPatterns.some(pattern => 
+          msg.content.toLowerCase().includes(pattern)
+        )
+      );
+      
+      console.log('[EnhancedQAAgent] Contextual response check:', {
+        isShortResponse,
+        isVeryShort,
+        hasContextualPattern,
+        hasRecentClarification,
+        recentAssistantCount: recentAssistantMessages.length
+      });
+      
+      return hasRecentClarification;
+    } catch (error) {
+      console.error('[EnhancedQAAgent] Error checking contextual response:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Extract previous specific request type from conversation history
+   */
+  private extractPreviousSpecificRequest(messages: any[]): string | null {
+    if (!messages || messages.length === 0) return null;
+    
+    // Look for recent user messages that contained specific requests
+    const recentUserMessages = messages
+      .filter(msg => msg.role === 'user')
+      .slice(-3); // Check last 3 user messages
+    
+    for (const msg of recentUserMessages) {
+      const content = msg.content.toLowerCase();
+      if (content.includes('営業時間') || content.includes('hours') || content.includes('time') || 
+          content.includes('何時') || content.includes('いつまで')) {
+        return 'hours';
+      } else if (content.includes('料金') || content.includes('price') || content.includes('cost') ||
+                 content.includes('値段') || content.includes('無料') || content.includes('有料')) {
+        return 'price';
+      } else if (content.includes('場所') || content.includes('location') || content.includes('where') ||
+                 content.includes('どこ') || content.includes('階')) {
+        return 'location';
+      } else if (content.includes('予約') || content.includes('booking') || content.includes('reservation')) {
+        return 'booking';
+      } else if (content.includes('設備') || content.includes('facility') || content.includes('equipment')) {
+        return 'facility';
+      } else if (content.includes('アクセス') || content.includes('access') || content.includes('行き方')) {
+        return 'access';
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Detects if the question is asking for specific information (e.g., just operating hours)
+   * rather than general information about a facility
+   */
+  private detectSpecificRequest(question: string, previousRequest?: string | null): boolean {
+    const lowerQuestion = question.toLowerCase();
+    
+    // Specific time/hours requests
+    const timePatterns = [
+      '営業時間', 'hours', 'time', '何時', 'いつまで', 'when',
+      'open', 'close', '開いて', '閉まる', '時間'
+    ];
+    
+    // Price/cost specific requests
+    const pricePatterns = [
+      '料金', 'cost', 'price', '値段', '金額', 'fee', '費用', '有料', '無料'
+    ];
+    
+    // Location specific requests
+    const locationPatterns = [
+      'どこ', 'where', '場所', 'location', '住所', 'address', 'アクセス', 'access', '階'
+    ];
+    
+    // Contact specific requests
+    const contactPatterns = [
+      '電話', 'phone', '連絡', 'contact', 'メール', 'email'
+    ];
+    
+    // Booking/reservation requests
+    const bookingPatterns = [
+      '予約', 'booking', 'reservation', 'reserve', '申し込み', '申込'
+    ];
+    
+    // Facility/equipment requests
+    const facilityPatterns = [
+      '設備', 'facility', 'equipment', '何がある', 'what is there', '利用できる'
+    ];
+    
+    // Short contextual follow-up patterns
+    const followUpPatterns = [
+      'じゃ', 'では', 'それで', 'then', 'so', 'how about',
+      'の方は', 'はどう', 'については', 'what about'
+    ];
+    
+    // Combine all specific patterns
+    const specificPatterns = [
+      ...timePatterns,
+      ...pricePatterns, 
+      ...locationPatterns,
+      ...contactPatterns,
+      ...bookingPatterns,
+      ...facilityPatterns
+    ];
+    
+    // Check if question contains specific request patterns
+    const hasSpecificPattern = specificPatterns.some(pattern => 
+      lowerQuestion.includes(pattern)
+    );
+    
+    // Check if it's a short follow-up question
+    const isShortFollowUp = followUpPatterns.some(pattern => 
+      lowerQuestion.includes(pattern)
+    ) && lowerQuestion.length < 20;
+    
+    // If there's a previous specific request and this is a follow-up, inherit the request type
+    const inheritsPreviousRequest = !!(previousRequest && isShortFollowUp);
+    
+    // Additional check: avoid general questions even with these keywords
+    const generalPatterns = [
+      'について教えて', 'について知りたい', 'about', 'tell me about',
+      'どんな', 'what kind', 'how is', 'explain', '説明', '詳しく'
+    ];
+    
+    const isGeneralQuestion = generalPatterns.some(pattern => 
+      lowerQuestion.includes(pattern)
+    );
+    
+    console.log('[EnhancedQAAgent] Specific request detection:', {
+      question: lowerQuestion,
+      hasSpecificPattern,
+      isShortFollowUp,
+      inheritsPreviousRequest,
+      previousRequest,
+      isGeneralQuestion,
+      result: (hasSpecificPattern || isShortFollowUp || inheritsPreviousRequest) && !isGeneralQuestion
+    });
+    
+    return (hasSpecificPattern || isShortFollowUp || inheritsPreviousRequest) && !isGeneralQuestion;
+  }
 }

@@ -3,21 +3,23 @@
  * Resolves autoplay policy issues on iPad and other mobile devices
  */
 
-export interface AudioPlayerOptions {
-  volume?: number;
-  onEnded?: () => void;
-  onError?: (error: Error) => void;
-  onPlay?: () => void;
-  onPause?: () => void;
-}
+import { AudioDataProcessor, type AudioProcessingResult } from './audio-data-processor';
+import { 
+  AudioError, 
+  AudioErrorType, 
+  type AudioPlayerOptions,
+  type AudioOperationResult,
+  type AudioDataInput,
+  type AudioInfo,
+  type AudioPlaybackState
+} from './audio-interfaces';
 
 export class WebAudioPlayer {
   private audioContext: AudioContext | null = null;
   private audioBuffer: AudioBuffer | null = null;
   private source: AudioBufferSourceNode | null = null;
   private gainNode: GainNode | null = null;
-  private isPlaying = false;
-  private isPaused = false;
+  private state: AudioPlaybackState = 'idle';
   private startTime = 0;
   private pauseTime = 0;
   private duration = 0;
@@ -61,65 +63,156 @@ export class WebAudioPlayer {
   }
 
   /**
-   * Load audio from URL
+   * Load audio from base64 data (legacy method)
+   * @deprecated Use loadAudioData instead
    */
-  public async loadAudio(url: string): Promise<void> {
-    if (!this.audioContext) {
-      await this.initializeContext();
-    }
-
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch audio: ${response.statusText}`);
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      this.audioBuffer = await this.audioContext!.decodeAudioData(arrayBuffer);
-      this.duration = this.audioBuffer.duration;
-    } catch (error) {
-      console.error('Failed to load audio:', error);
-      this.options.onError?.(error as Error);
-      throw error;
+  public async loadBase64Audio(base64Data: string): Promise<void> {
+    const result = await this.loadAudioData(base64Data);
+    if (!result.success) {
+      throw result.error;
     }
   }
 
   /**
-   * Load audio from base64 data
+   * Load audio from URL (legacy method)
+   * @deprecated Use loadAudioData instead
    */
-  public async loadBase64Audio(base64Data: string): Promise<void> {
+  public async loadAudio(url: string): Promise<void> {
+    const result = await this.loadAudioData(url);
+    if (!result.success) {
+      throw result.error;
+    }
+  }
+
+  /**
+   * Load audio from any supported data type (optimized for Web Audio API)
+   */
+  public async loadAudioData(data: AudioDataInput): Promise<AudioOperationResult<AudioInfo>> {
     if (!this.audioContext) {
       await this.initializeContext();
     }
 
+    this.state = 'loading';
+    
     try {
-      // Remove data URL prefix if present
-      const cleanBase64 = base64Data.replace(/^data:audio\/[^;]+;base64,/, '');
+      let arrayBuffer: ArrayBuffer;
+      let audioFormat = 'audio/mpeg';
       
-      // Convert base64 to ArrayBuffer
-      const binaryString = window.atob(cleanBase64);
-      const arrayBuffer = new ArrayBuffer(binaryString.length);
-      const uint8Array = new Uint8Array(arrayBuffer);
-      
-      for (let i = 0; i < binaryString.length; i++) {
-        uint8Array[i] = binaryString.charCodeAt(i);
+      // Direct conversion for better performance
+      if (typeof data === 'string') {
+        // Base64 string - convert directly to ArrayBuffer
+        console.log('[WebAudioPlayer] Converting base64 to ArrayBuffer:', {
+          base64Length: data.length,
+          base64Prefix: data.substring(0, 50)
+        });
+        
+        // Clean base64 data
+        let cleanedBase64 = data;
+        if (data.includes(',')) {
+          cleanedBase64 = data.split(',')[1];
+        }
+        cleanedBase64 = cleanedBase64.replace(/[^A-Za-z0-9+/=]/g, '');
+        
+        // Convert to binary
+        const binaryString = atob(cleanedBase64);
+        arrayBuffer = new ArrayBuffer(binaryString.length);
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        for (let i = 0; i < binaryString.length; i++) {
+          uint8Array[i] = binaryString.charCodeAt(i);
+        }
+        
+        // Detect audio format from binary data
+        audioFormat = AudioDataProcessor.detectAudioFormat(arrayBuffer);
+        
+      } else if (data instanceof ArrayBuffer) {
+        arrayBuffer = data;
+        audioFormat = AudioDataProcessor.detectAudioFormat(arrayBuffer);
+        
+      } else if (data instanceof Blob) {
+        arrayBuffer = await data.arrayBuffer();
+        audioFormat = data.type || AudioDataProcessor.detectAudioFormat(arrayBuffer);
+        
+      } else {
+        throw new AudioError(
+          AudioErrorType.INVALID_DATA,
+          'Unsupported audio data type'
+        );
       }
-
-      this.audioBuffer = await this.audioContext!.decodeAudioData(arrayBuffer);
+      
+      console.log('[WebAudioPlayer] Attempting to decode audio data:', {
+        arrayBufferSize: arrayBuffer.byteLength,
+        audioFormat,
+        audioContextState: this.audioContext?.state,
+        sampleRate: this.audioContext?.sampleRate,
+        firstFewBytes: arrayBuffer.byteLength > 0 ? Array.from(new Uint8Array(arrayBuffer.slice(0, 10))) : 'NO DATA'
+      });
+      
+      if (arrayBuffer.byteLength === 0) {
+        throw new AudioError(
+          AudioErrorType.INVALID_DATA,
+          'Audio data is empty (0 bytes)'
+        );
+      }
+      
+      try {
+        console.log('[WebAudioPlayer] Starting audio decode...');
+        this.audioBuffer = await this.audioContext!.decodeAudioData(arrayBuffer.slice(0)); // Clone to avoid issues
+        console.log('[WebAudioPlayer] Audio decode successful:', {
+          duration: this.audioBuffer.duration,
+          numberOfChannels: this.audioBuffer.numberOfChannels,
+          sampleRate: this.audioBuffer.sampleRate,
+          length: this.audioBuffer.length
+        });
+      } catch (decodeError) {
+        console.error('[WebAudioPlayer] Failed to decode audio data:', {
+          error: decodeError,
+          arrayBufferSize: arrayBuffer.byteLength,
+          audioContextState: this.audioContext?.state,
+          errorName: decodeError instanceof Error ? decodeError.name : 'Unknown',
+          errorMessage: decodeError instanceof Error ? decodeError.message : 'Unknown error',
+          firstBytes: Array.from(new Uint8Array(arrayBuffer.slice(0, 20)))
+        });
+        throw new AudioError(
+          AudioErrorType.DECODE_FAILED,
+          `Failed to decode audio data: ${decodeError instanceof Error ? decodeError.message : 'Unknown error'}`
+        );
+      }
+      
       this.duration = this.audioBuffer.duration;
+      this.state = 'loaded';
+
+      const audioInfo: AudioInfo = {
+        format: audioFormat as any,
+        duration: this.duration,
+        size: arrayBuffer.byteLength,
+        sampleRate: this.audioBuffer.sampleRate
+      };
+
+      return { success: true, data: audioInfo };
+      
     } catch (error) {
-      console.error('Failed to load base64 audio:', error);
-      this.options.onError?.(error as Error);
-      throw error;
+      console.error('[WebAudioPlayer] Failed to load audio:', error);
+      
+      const audioError = error instanceof AudioError ? error : 
+        AudioError.fromError(error as Error, AudioErrorType.LOAD_FAILED);
+      
+      this.state = 'error';
+      this.options.onError?.(audioError);
+      return { success: false, error: audioError };
     }
   }
 
   /**
    * Play audio
    */
-  public async play(): Promise<void> {
+  public async play(): Promise<AudioOperationResult> {
     if (!this.audioBuffer || !this.audioContext || !this.gainNode) {
-      throw new Error('Audio not loaded or context not initialized');
+      const error = new AudioError(
+        AudioErrorType.PLAYBACK_FAILED,
+        'Audio not loaded or context not initialized'
+      );
+      return { success: false, error };
     }
 
     try {
@@ -133,23 +226,30 @@ export class WebAudioPlayer {
 
       // Set up event handlers
       this.source.onended = () => {
-        this.isPlaying = false;
-        this.isPaused = false;
+        this.state = 'ended';
         this.options.onEnded?.();
       };
 
       // Start playback
-      const offset = this.isPaused ? this.pauseTime : 0;
+      const offset = this.state === 'paused' ? this.pauseTime : 0;
       this.source.start(0, offset);
       this.startTime = this.audioContext.currentTime - offset;
-      this.isPlaying = true;
-      this.isPaused = false;
+      this.state = 'playing';
 
       this.options.onPlay?.();
+      return { success: true, method: 'web-audio' };
+      
     } catch (error) {
-      console.error('Failed to play audio:', error);
-      this.options.onError?.(error as Error);
-      throw error;
+      console.error('[WebAudioPlayer] Failed to play audio:', error);
+      
+      const audioError = AudioError.fromError(
+        error as Error, 
+        AudioErrorType.PLAYBACK_FAILED
+      );
+      
+      this.state = 'error';
+      this.options.onError?.(audioError);
+      return { success: false, error: audioError };
     }
   }
 
@@ -157,11 +257,10 @@ export class WebAudioPlayer {
    * Pause audio
    */
   public pause(): void {
-    if (this.isPlaying && this.source) {
+    if (this.state === 'playing' && this.source) {
       this.pauseTime = this.audioContext!.currentTime - this.startTime;
       this.source.stop();
-      this.isPlaying = false;
-      this.isPaused = true;
+      this.state = 'paused';
       this.options.onPause?.();
     }
   }
@@ -178,9 +277,20 @@ export class WebAudioPlayer {
       }
       this.source = null;
     }
-    this.isPlaying = false;
-    this.isPaused = false;
+    this.state = this.audioBuffer ? 'loaded' : 'idle';
     this.pauseTime = 0;
+  }
+
+  /**
+   * Reset audio player for tablet compatibility
+   */
+  public reset(): void {
+    this.stop();
+    this.audioBuffer = null;
+    this.duration = 0;
+    this.state = 'idle';
+    
+    // Don't reset audioContext and gainNode as they should be reused
   }
 
   /**
@@ -198,9 +308,9 @@ export class WebAudioPlayer {
   public getCurrentTime(): number {
     if (!this.audioContext) return 0;
     
-    if (this.isPlaying) {
+    if (this.state === 'playing') {
       return this.audioContext.currentTime - this.startTime;
-    } else if (this.isPaused) {
+    } else if (this.state === 'paused') {
       return this.pauseTime;
     }
     return 0;
@@ -214,17 +324,31 @@ export class WebAudioPlayer {
   }
 
   /**
+   * Get current playback state
+   */
+  public getState(): AudioPlaybackState {
+    return this.state;
+  }
+
+  /**
    * Check if audio is playing
    */
   public getIsPlaying(): boolean {
-    return this.isPlaying;
+    return this.state === 'playing';
   }
 
   /**
    * Check if audio is paused
    */
   public getIsPaused(): boolean {
-    return this.isPaused;
+    return this.state === 'paused';
+  }
+
+  /**
+   * Check if audio is loaded
+   */
+  public isLoaded(): boolean {
+    return this.state === 'loaded' || this.state === 'playing' || this.state === 'paused';
   }
 
   /**
@@ -232,12 +356,14 @@ export class WebAudioPlayer {
    */
   public dispose(): void {
     this.stop();
+    
     if (this.audioContext && this.audioContext.state !== 'closed') {
       this.audioContext.close();
     }
     this.audioContext = null;
     this.audioBuffer = null;
     this.gainNode = null;
+    this.state = 'idle';
   }
 
   /**

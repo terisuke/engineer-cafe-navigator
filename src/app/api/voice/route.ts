@@ -125,8 +125,33 @@ export async function POST(request: NextRequest) {
         // Convert base64 audio to ArrayBuffer and let agent handle STT internally
         const audioBuffer = Buffer.from(audioData, 'base64').buffer;
         const result = await realtimeAgent.processVoiceInput(audioBuffer, language || 'ja');
+        
+        // Check if audioResponse is valid before accessing its properties
+        if (!result.audioResponse || !(result.audioResponse instanceof ArrayBuffer)) {
+          console.error('[Voice API] Invalid audioResponse:', {
+            audioResponse: result.audioResponse,
+            type: typeof result.audioResponse,
+            isArrayBuffer: result.audioResponse instanceof ArrayBuffer
+          });
+          return NextResponse.json({
+            success: false,
+            error: 'Audio response generation failed',
+            transcript: result.transcript,
+            response: result.response,
+          }, { status: 500 });
+        }
+        
         // result.audioResponseはArrayBufferなので、Buffer.fromで扱うためUint8Arrayに変換する
+        console.log('[Voice API] Converting Uint8Array audio to base64:', {
+          audioResponseSize: result.audioResponse.byteLength,
+          firstFewBytes: result.audioResponse.byteLength > 0 ? Array.from(new Uint8Array(result.audioResponse.slice(0, 10))) : 'NO DATA'
+        });
         const audioResponseBase64 = Buffer.from(new Uint8Array(result.audioResponse)).toString('base64');
+        console.log('[Voice API] Base64 conversion result:', {
+          base64Length: audioResponseBase64.length,
+          base64Prefix: audioResponseBase64.substring(0, 50),
+          isEmpty: audioResponseBase64.length === 0
+        });
         return NextResponse.json({
           success: true,
           transcript: result.transcript,
@@ -202,7 +227,16 @@ export async function POST(request: NextRequest) {
         }
         // Generate TTS audio
         const ttsResult = await realtimeAgent.generateTTSAudio(text);
+        console.log('[Voice API] Converting TTS result to base64:', {
+          ttsResultType: typeof ttsResult,
+          ttsResultSize: ttsResult instanceof ArrayBuffer ? ttsResult.byteLength : 'Not ArrayBuffer'
+        });
         const ttsAudioBase64 = Buffer.from(ttsResult).toString('base64');
+        console.log('[Voice API] TTS Base64 conversion result:', {
+          base64Length: ttsAudioBase64.length,
+          base64Prefix: ttsAudioBase64.substring(0, 50),
+          isEmpty: ttsAudioBase64.length === 0
+        });
         return NextResponse.json({
           success: true,
           audioResponse: ttsAudioBase64,

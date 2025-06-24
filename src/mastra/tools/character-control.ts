@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { EmotionManager, EmotionData } from '@/lib/emotion-manager';
+import { EmotionMapping } from '@/lib/emotion-mapping';
 
 export class CharacterControlTool {
   name = 'character-control';
@@ -103,11 +104,10 @@ export class CharacterControlTool {
     error?: string;
   }> {
     try {
-      // Validate expression name
-      const validExpressions = [
-        'neutral', 'happy', 'sad', 'angry', 'surprised', 
-        'thinking', 'speaking', 'listening', 'greeting', 'explaining'
-      ];
+      // Validate expression name using centralized emotion mapping
+      const supportedEmotions = EmotionMapping.getSupportedEmotions();
+      const additionalExpressions = ['thinking', 'speaking', 'listening', 'greeting', 'explaining'];
+      const validExpressions = [...supportedEmotions, ...additionalExpressions];
 
       if (!validExpressions.includes(expression)) {
         return {
@@ -379,7 +379,7 @@ export class CharacterControlTool {
   }> {
     return {
       expressions: [
-        'neutral', 'happy', 'sad', 'angry', 'surprised', 
+        'neutral', 'happy', 'sad', 'angry', 'curious', 
         'thinking', 'speaking', 'listening', 'greeting', 'explaining'
       ],
       animations: [
@@ -472,7 +472,7 @@ export class CharacterControlTool {
       'happy': 'greeting',
       'sad': 'thinking',
       'angry': 'explaining',
-      'surprised': 'greeting',
+      'curious': 'greeting',
       'thinking': 'thinking',
       'explaining': 'explaining',
       'greeting': 'greeting',

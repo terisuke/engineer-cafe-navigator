@@ -61,8 +61,8 @@ pnpm cron:update-slides     # Manually trigger slide update
 The application follows a multi-layered architecture:
 
 1. **Frontend Layer** (`/src/app/`): React components and API routes
-   - VoiceInterface: Audio recording and playback
-   - MarpViewer: Presentation slides display
+   - VoiceInterface: Audio recording and playback with MobileAudioService
+   - MarpViewer: Presentation slides display with unified audio playback
    - CharacterAvatar: 3D VRM character rendering
    - API routes handle voice, slides, character control, and Q&A
 
@@ -71,7 +71,14 @@ The application follows a multi-layered architecture:
    - Tools: SlideControl, MarpRenderer, CharacterControl, etc.
    - Voice service integration with Google Cloud
 
-3. **Data Layer**: Supabase/PostgreSQL with pgvector
+3. **Audio Layer** (`/src/lib/audio/`): Fully migrated Web Audio API system
+   - AudioPlaybackService: Unified audio service standardizing all playback operations
+   - MobileAudioService: Web Audio API with tablet optimization and intelligent fallbacks
+   - AudioInteractionManager: User interaction handling for autoplay policy compliance
+   - WebAudioPlayer: Core Web Audio API implementation with Safari/iOS compatibility
+   - All legacy HTML Audio Element dependencies removed (2024)
+
+4. **Data Layer**: Supabase/PostgreSQL with pgvector
    - Conversation sessions, history, and analytics
    - Knowledge base with vector embeddings (1536 dimensions)
    - Multi-language support (Japanese/English content)
@@ -412,6 +419,45 @@ The application features an optimized lip-sync system for VRM character animatio
 
 This system provides fast, reliable lip-sync with mobile-first performance optimizations while maintaining high-quality mouth animations.
 
+### Audio Playback Service
+
+The application features a unified audio playback service that standardizes all audio operations:
+
+#### **AudioPlaybackService** (`/src/lib/audio/audio-playback-service.ts`)
+A comprehensive service that handles all audio playback with optional lip-sync support.
+
+**Key Features:**
+- **Unified API**: Single interface for all audio playback needs
+- **Lip-sync Integration**: Optional lip-sync analysis and animation
+- **Error Handling**: Consistent error management across the application
+- **Performance Optimized**: Automatic fallback and retry mechanisms
+
+**Usage:**
+```typescript
+import { AudioPlaybackService } from '@/lib/audio/audio-playback-service';
+
+// Play audio with lip-sync
+await AudioPlaybackService.playAudioWithLipSync(audioBase64, {
+  volume: 0.8,
+  enableLipSync: true,
+  onVisemeUpdate: (viseme, intensity) => {
+    // Update character mouth shape
+  },
+  onPlaybackEnd: () => {
+    console.log('Playback completed');
+  }
+});
+
+// Fast audio playback (no lip-sync)
+await AudioPlaybackService.playAudioFast(audioBase64, 0.8);
+```
+
+**Benefits:**
+- Eliminates code duplication
+- Consistent behavior across components
+- Easier maintenance and updates
+- Better tablet compatibility
+
 ### Conversation Memory System
 
 The application features an advanced conversation memory system that enables natural, contextual interactions:
@@ -501,6 +547,22 @@ The application includes a comprehensive production monitoring system:
 - Efficient TTL cleanup via Supabase
 - Memory-aware query routing
 - Cached context building
+
+### Response Precision System (2024)
+
+#### **Specific Request Detection**
+The `EnhancedQAAgent` now includes intelligent response filtering to prevent overly verbose responses:
+
+- **detectSpecificRequest()**: Identifies when users ask for specific information (営業時間,料金, 場所, etc.)
+- **Enhanced Prompts**: Uses restrictive prompts for specific requests to extract only requested information
+- **General Question Filtering**: Avoids over-filtering general inquiry patterns
+- **Multi-language Support**: Handles both Japanese and English specific request patterns
+
+#### **Response Quality Improvements**
+- **1-sentence Maximum**: For specific requests, responses are limited to essential information only
+- **Context Filtering**: Ignores unrelated information even within the same knowledge base document
+- **Precision Over Completeness**: Prioritizes answering exactly what was asked vs. providing comprehensive information
+- **User Experience**: Eliminates 3000+ character responses when users only want basic facts
 
 ### Knowledge Base Enhancements
 

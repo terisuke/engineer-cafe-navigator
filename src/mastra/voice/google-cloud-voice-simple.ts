@@ -266,6 +266,13 @@ export class GoogleCloudVoiceSimple {
 
       const result = await response.json();
       
+      console.log('[GoogleCloudVoice] TTS API Response:', {
+        hasAudioContent: !!result.audioContent,
+        audioContentLength: result.audioContent ? result.audioContent.length : 0,
+        audioContentPrefix: result.audioContent ? result.audioContent.substring(0, 50) : 'NO CONTENT',
+        responseKeys: Object.keys(result)
+      });
+      
       if (result.audioContent) {
         console.log(`Text-to-Speech successful for: "${text.substring(0, 50)}..."`);
         return {
@@ -273,6 +280,7 @@ export class GoogleCloudVoiceSimple {
           audioBase64: result.audioContent
         };
       } else {
+        console.error('[GoogleCloudVoice] No audio content in TTS response');
         return {
           success: false,
           error: 'No audio content in response'

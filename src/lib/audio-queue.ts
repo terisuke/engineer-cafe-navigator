@@ -1,7 +1,10 @@
 /**
  * Audio Queue for managing sequential audio playback
- * Handles TTS audio streaming and queueing
+ * Handles TTS audio streaming and queueing using Web Audio API
  */
+
+import { MobileAudioService } from './audio/mobile-audio-service';
+import { AudioError, AudioErrorType } from './audio/audio-interfaces';
 
 export interface AudioQueueItem {
   id: string;
@@ -14,7 +17,7 @@ export interface AudioQueueItem {
 export class AudioQueue {
   private queue: AudioQueueItem[] = [];
   private isPlaying = false;
-  private currentAudio: HTMLAudioElement | null = null;
+  private currentAudioService: MobileAudioService | null = null;
   private volume = 0.8;
   private onFinishedCallback?: () => void;
   private isSkipping = false;
@@ -59,9 +62,8 @@ export class AudioQueue {
    */
   clear(): void {
     this.queue = [];
-    if (this.currentAudio) {
-      this.currentAudio.pause();
-      this.currentAudio = null;
+    if (this.currentAudioService) {
+      this.currentAudioService = null;
     }
     this.isPlaying = false;
   }
@@ -71,9 +73,7 @@ export class AudioQueue {
    */
   setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1, volume));
-    if (this.currentAudio) {
-      this.currentAudio.volume = this.volume;
-    }
+    // Volume will be applied to next audio service instance
   }
 
   /**
@@ -134,78 +134,41 @@ export class AudioQueue {
   }
 
   /**
-   * Play a single audio item
+   * Play a single audio item using Web Audio API
    */
   private async playAudio(item: AudioQueueItem): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        // Convert base64 to audio blob
-        let audioData: Uint8Array;
-        try {
-          audioData = Uint8Array.from(atob(item.audioData), c => c.charCodeAt(0));
-        } catch (error) {
-          throw new Error(`Invalid base64 audio data: ${error}`);
-        }
-        
-        const audioBuffer = new Uint8Array(audioData).buffer;
-        const audioBlob = new Blob([audioBuffer], { type: 'audio/mp3' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        const audio = new Audio(audioUrl);
-        audio.volume = this.volume;
-        this.currentAudio = audio;
-
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          this.currentAudio = null;
-          resolve();
-        };
-
-        audio.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
-          this.currentAudio = null;
-          reject(new Error('Audio playback failed'));
-        };
-
-        // Try to play with iOS/Safari compatibility
-        audio.play().then(() => {
-          console.log('Audio queue playback started successfully');
-        }).catch(error => {
-          console.error('Audio queue playback failed:', error);
-          
-          // Handle autoplay policy restrictions
-          if (error.name === 'NotAllowedError') {
-            console.warn('Autoplay blocked in audio queue. User interaction required.');
-            
-            // Create a one-time click handler to retry playback
-            const retryPlayback = async () => {
-              try {
-                await audio.play();
-                console.log('Audio queue playback started after user interaction');
-              } catch (retryError) {
-                console.error('Retry playback failed in audio queue:', retryError);
-                URL.revokeObjectURL(audioUrl);
-                this.currentAudio = null;
-                reject(retryError);
-              }
-              document.removeEventListener('click', retryPlayback);
-              document.removeEventListener('touchstart', retryPlayback);
-            };
-            
-            document.addEventListener('click', retryPlayback, { once: true });
-            document.addEventListener('touchstart', retryPlayback, { once: true });
-            
-            // Don't reject immediately - wait for user interaction
-            console.log('Waiting for user interaction to play audio...');
-          } else {
-            URL.revokeObjectURL(audioUrl);
-            this.currentAudio = null;
-            reject(error);
-          }
-        });
-      } catch (error) {
-        reject(error);
+    // Create audio service with current volume
+    const audioService = new MobileAudioService({
+      volume: this.volume,
+      onEnded: () => {
+        this.currentAudioService = null;
+      },
+      onError: (error) => {
+        this.currentAudioService = null;
+        throw error;
       }
+    });
+    
+    this.currentAudioService = audioService;
+    
+    // Play the audio using Web Audio API
+    const result = await audioService.playAudio(item.audioData);
+    if (!result.success) {
+      throw result.error || new AudioError(AudioErrorType.PLAYBACK_FAILED, 'Audio playback failed');
+    }
+    
+    // Wait for audio to complete
+    return new Promise((resolve, reject) => {
+      audioService.updateEventHandlers({
+        onEnded: () => {
+          this.currentAudioService = null;
+          resolve();
+        },
+        onError: (error) => {
+          this.currentAudioService = null;
+          reject(error);
+        }
+      });
     });
   }
 
@@ -213,11 +176,10 @@ export class AudioQueue {
    * Skip the current audio and play next
    */
   skip(): void {
-    if (this.currentAudio) {
+    if (this.currentAudioService) {
       this.isSkipping = true;
-      this.currentAudio.pause();
-      this.currentAudio = null;
-      this.isPlaying = false; // Set isPlaying to false immediately after pausing
+      this.currentAudioService = null;
+      this.isPlaying = false; // Set isPlaying to false immediately
       
       // Trigger next playback safely using setTimeout to avoid race conditions
       setTimeout(() => {
@@ -233,8 +195,9 @@ export class AudioQueue {
    * Pause current playback
    */
   pause(): void {
-    if (this.currentAudio) {
-      this.currentAudio.pause();
+    if (this.currentAudioService) {
+      // Web Audio API doesn't support pause/resume, so we stop the current audio
+      this.currentAudioService = null;
     }
   }
 
@@ -242,10 +205,10 @@ export class AudioQueue {
    * Resume current playback
    */
   resume(): void {
-    if (this.currentAudio && this.currentAudio.paused) {
-      this.currentAudio.play().catch(error => {
-        console.error('Error resuming audio:', error);
-      });
+    // Web Audio API doesn't support pause/resume
+    // If needed, we would need to restart from the beginning
+    if (!this.isPlaying && this.queue.length > 0) {
+      this.playNext();
     }
   }
 

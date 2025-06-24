@@ -4,6 +4,8 @@ import { AudioQueue } from '@/lib/audio-queue';
 import { formatError } from '@/lib/error-messages';
 import { MobileAudioService } from '@/lib/audio/mobile-audio-service';
 import { useAudioInteraction } from '@/lib/audio/audio-interaction-manager';
+import { VoiceRecorder } from '@/lib/voice-recorder';
+import { audioStateManager } from '@/lib/audio-state-manager';
 import { AlertCircle, Loader2, Mic, MicOff, Settings, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -12,13 +14,15 @@ interface VoiceInterfaceProps {
   layout?: 'vertical' | 'horizontal';
   language?: 'ja' | 'en';
   autoGreeting?: boolean;
+  onVisemeControl?: ((viseme: string, intensity: number) => void) | null;
 }
 
 export default function VoiceInterface({ 
   onLanguageChange, 
   layout = 'vertical',
   language = 'ja',
-  autoGreeting = false
+  autoGreeting = false,
+  onVisemeControl
 }: VoiceInterfaceProps) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -46,10 +50,9 @@ export default function VoiceInterface({
   
 
   const audioContextRef = useRef<AudioContext | null>(null);
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioQueueRef = useRef<AudioQueue | null>(null);
   const mobileAudioServiceRef = useRef<MobileAudioService | null>(null);
-  const voiceRecorderRef = useRef<any>(null); // VoiceRecorder instance
+  const voiceRecorderRef = useRef<VoiceRecorder | null>(null);
   const { ensureAudioContext, isReady: isAudioReady, hasInteraction } = useAudioInteraction();
   
 
@@ -188,6 +191,15 @@ export default function VoiceInterface({
     try {
       setError(null);
       
+      // Stop any currently playing audio to prevent overlap
+      console.log('[AUDIO] Stopping any playing audio before recording...');
+      audioStateManager.stopAll();
+      
+      // Also stop local audio queue if it exists
+      if (audioQueueRef.current && audioQueueRef.current.clear) {
+        audioQueueRef.current.clear();
+      }
+      
       // Initialize and unlock audio for iOS - this is critical!
       console.log('[AUDIO] Preparing audio unlock for iOS...');
       
@@ -258,6 +270,15 @@ export default function VoiceInterface({
 
   // Stop voice recording
   const stopListening = () => {
+    // Stop any currently playing audio
+    console.log('[AUDIO] Stopping audio on stopListening...');
+    audioStateManager.stopAll();
+    
+    // Also stop local audio queue if it exists
+    if (audioQueueRef.current && audioQueueRef.current.clear) {
+      audioQueueRef.current.clear();
+    }
+    
     if (isRecording && voiceRecorderRef.current) {
       const recorder = voiceRecorderRef.current;
       recorder.stop();
@@ -383,11 +404,9 @@ export default function VoiceInterface({
       setIsSpeaking(true);
       setConversationState('speaking');
 
-      // Stop any currently playing audio and clean up
-      if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
-        currentAudioRef.current.src = '';  // Clear source to free memory
-        currentAudioRef.current = null;
+      // Stop any currently playing audio via mobile audio service
+      if (mobileAudioServiceRef.current) {
+        mobileAudioServiceRef.current.stop();
       }
       
       // Clean up audio queue if exists
@@ -435,51 +454,36 @@ export default function VoiceInterface({
           
           console.log('Lip-sync analysis complete:', lipSyncData.frames.length, 'frames, duration:', lipSyncData.duration);
           
-          // Apply lip-sync to character
-          const startLipSyncResponse = await fetch('/api/character', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'startLipSync',
-              lipSyncData,
-            }),
-          });
-          console.log('Start lip-sync API response:', await startLipSyncResponse.json());
-
-          // Schedule viseme updates
-          let frameIndex = 0;
-          const updateLipSync = () => {
-            if (frameIndex < lipSyncData.frames.length && currentAudioRef.current) {
-              const frame = lipSyncData.frames[frameIndex];
-              
-              console.log(`Lip-sync frame ${frameIndex}:`, frame.mouthShape, 'intensity:', frame.mouthOpen);
-              
-              // Send viseme to character
-              fetch('/api/character', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  action: 'setViseme',
-                  viseme: frame.mouthShape,
-                  intensity: frame.mouthOpen,
-                }),
-              }).then(response => response.json())
-                .then(result => console.log('Viseme API response:', result))
-                .catch(console.error);
-              
-              frameIndex++;
-              setTimeout(updateLipSync, 100); // 10fps for better performance
-            } else {
-              console.log('Lip-sync animation complete or audio stopped');
-            }
-          };
-          
-          // Wait for audio to start playing before beginning lip-sync
-          if (currentAudioRef.current) {
-            currentAudioRef.current.addEventListener('play', () => {
-              console.log('Audio started playing, beginning lip-sync animation');
-              updateLipSync();
-            }, { once: true });
+          // Apply lip-sync to character using direct viseme callback
+          if (onVisemeControl) {
+            console.log('Starting lip-sync animation with direct viseme control');
+            
+            // Schedule viseme updates using direct callback
+            let frameIndex = 0;
+            const updateLipSync = () => {
+              if (frameIndex < lipSyncData.frames.length && onVisemeControl) {
+                const frame = lipSyncData.frames[frameIndex];
+                
+                console.log(`Lip-sync frame ${frameIndex}:`, frame.mouthShape, 'intensity:', frame.mouthOpen);
+                
+                // Use direct viseme callback instead of API
+                onVisemeControl(frame.mouthShape, frame.mouthOpen);
+                
+                frameIndex++;
+                setTimeout(updateLipSync, 100); // 10fps for better performance
+              } else {
+                console.log('Lip-sync animation complete or audio stopped');
+                // Reset to closed mouth
+                if (onVisemeControl) {
+                  onVisemeControl('X', 0);
+                }
+              }
+            };
+            
+            // Start lip-sync animation immediately since we control playback timing
+            updateLipSync();
+          } else {
+            console.warn('onVisemeControl callback not available - skipping lip-sync');
           }
 
           analyzer.dispose();
@@ -508,14 +512,10 @@ export default function VoiceInterface({
           URL.revokeObjectURL(audioUrl);
         }, 100);
         
-        // Stop lip-sync
-        fetch('/api/character', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'stopLipSync',
-          }),
-        }).catch(console.error);
+        // Stop lip-sync with direct callback
+        if (onVisemeControl) {
+          onVisemeControl('X', 0);
+        }
         
         // Restore emotion expression after lip-sync if needed
         if (currentEmotion && currentEmotion !== 'neutral') {
@@ -543,14 +543,10 @@ export default function VoiceInterface({
         setError(formatError({ code: 'VOICE_PROCESSING_ERROR' }, currentLanguage));
         URL.revokeObjectURL(audioUrl);
         
-        // Stop lip-sync on error
-        fetch('/api/character', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'stopLipSync',
-          }),
-        }).catch(console.error);
+        // Stop lip-sync on error with direct callback
+        if (onVisemeControl) {
+          onVisemeControl('X', 0);
+        }
       };
 
       // Update event handlers for this specific playback
@@ -565,8 +561,25 @@ export default function VoiceInterface({
       setLoadingMessage('');
       
       try {
+        const isTablet = /iPad|Android.*Tablet/i.test(navigator.userAgent);
+        console.log('[AUDIO] Starting audio playback attempt...', {
+          audioUrl: audioUrl.substring(0, 50) + '...',
+          volume,
+          userAgent: navigator.userAgent,
+          isTablet,
+          audioContextState: mobileAudioServiceRef.current ? 'initialized' : 'not-initialized'
+        });
+
         // Use mobile audio service for better compatibility
         const result = await mobileAudioServiceRef.current!.playAudio(audioUrl);
+        
+        console.log('[AUDIO] Playback result:', {
+          success: result.success,
+          method: result.method,
+          error: result.error?.message,
+          requiresInteraction: result.error?.requiresUserInteraction || false,
+          isTablet
+        });
         
         if (result.success) {
           console.log(`[AUDIO] Audio playback started successfully using ${result.method}`);
@@ -579,6 +592,12 @@ export default function VoiceInterface({
             });
           }
         } else {
+          console.error('[AUDIO] Audio playback failed:', {
+            error: result.error,
+            method: result.method,
+            requiresInteraction: result.error?.requiresUserInteraction || false,
+            isTablet
+          });
           throw result.error || new Error('Audio playback failed');
         }
       } catch (playError: any) {
@@ -701,10 +720,9 @@ export default function VoiceInterface({
   // Handle interruption
   const handleInterruption = async () => {
     if (isSpeaking) {
-      // Stop current audio
-      if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
-        currentAudioRef.current = null;
+      // Stop current audio via mobile audio service
+      if (mobileAudioServiceRef.current) {
+        mobileAudioServiceRef.current.stop();
       }
       
       // Stop audio queue if streaming

@@ -2,7 +2,7 @@
 
 import { useKeyboardControls } from '@/app/hooks/useKeyboardControls';
 import { audioStateManager } from '@/lib/audio-state-manager';
-import { ChevronLeft, ChevronRight, Keyboard, MessageCircle, Pause, Play, RotateCcw, Settings } from 'lucide-react';
+import { ChevronLeft, Keyboard, MessageCircle, Pause, Play, RotateCcw, Settings } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import SlideDebugPanel from './SlideDebugPanel';
 
@@ -91,11 +91,11 @@ export default function MarpViewer({
             narrationSpeed: parsed.narrationSpeed ?? 1.0,
             skipAnimations: parsed.skipAnimations ?? false,
             preloadCount: parsed.preloadCount ?? 2,
-            enableLipSync: parsed.enableLipSync ?? false,
+            enableLipSync: parsed.enableLipSync ?? true,
           };
         }
       } catch (error) {
-        console.warn('Failed to load settings from localStorage:', error);
+        // Failed to load settings from localStorage, using defaults
       }
     }
     return {
@@ -103,7 +103,7 @@ export default function MarpViewer({
       narrationSpeed: 1.0,
       skipAnimations: false,
       preloadCount: 2,
-      enableLipSync: false,
+      enableLipSync: true,
     };
   });
   const [retryCount, setRetryCount] = useState(0);
@@ -118,11 +118,18 @@ export default function MarpViewer({
   const abortControllerRef = useRef<AbortController | null>(null);
   const narrationAbortControllerRef = useRef<AbortController | null>(null);
   const currentRequestIdRef = useRef<string>('');
+  const currentAudioServiceRef = useRef<any>(null);
 
   // Analytics tracking
   const trackPresentationEvent = (event: string, data: any) => {
     const timestamp = new Date().toISOString();
-    console.log(`[Analytics] ${timestamp}`, event, data);
+    // Analytics event tracked
+  };
+
+  // Helper to reset narration flags without causing redundant re-renders
+  const resetNarrationFlags = () => {
+    setIsNarrating(false);
+    setIsNarrationInProgress(false);
   };
 
   // Error recovery with retry logic
@@ -133,7 +140,7 @@ export default function MarpViewer({
         setRetryCount(0);
         break;
       } catch (error) {
-        console.error(`[MarpViewer] Narration attempt ${i + 1} failed:`, error);
+        // Narration attempt failed, retrying
         setRetryCount(i + 1);
         
         if (i === retries - 1) {
@@ -151,9 +158,12 @@ export default function MarpViewer({
           
           if (shouldContinue && isPlaying && currentSlide < totalSlides) {
             setTimeout(() => {
-              const newSlide = currentSlide + 1;
-              setCurrentSlide(newSlide);
-              onSlideChange?.(newSlide);
+              resetNarrationFlags();
+              setCurrentSlide(prev => {
+                const nextSlide = prev + 1;
+                onSlideChange?.(nextSlide);
+                return nextSlide;
+              });
             }, 1000);
           }
         } else {
@@ -166,7 +176,7 @@ export default function MarpViewer({
   // Load slides and narration data when slideFile or language prop changes
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`[MarpViewer] useEffect triggered - slideFile: ${slideFile}, currentLanguage: ${currentLanguage}`);
+      // Loading slides for current language
     }
     // Always load slide data when slideFile or language changes
     loadSlideData(currentLanguage);
@@ -189,8 +199,8 @@ export default function MarpViewer({
 
   // Auto-play functionality with narration
   useEffect(() => {
-    if (isPlaying && totalSlides > 0 && !isNarrating) {
-      console.log(`[DEBUG] Auto-play triggered for slide ${currentSlide}`);
+    if (isPlaying && totalSlides > 0 && !isNarrating && !isNarrationInProgress) {
+      // Auto-play triggered
       if (!presentationStartTime) {
         setPresentationStartTime(Date.now());
         trackPresentationEvent('presentation_started', {
@@ -202,6 +212,8 @@ export default function MarpViewer({
       narrateWithRetry();
     } else if (!isPlaying) {
       stopAutoPlay();
+    } else {
+      // Auto-play skipped - already playing
     }
 
     return () => stopAutoPlay();
@@ -213,14 +225,22 @@ export default function MarpViewer({
       try {
         localStorage.setItem('marp-viewer-settings', JSON.stringify(settings));
       } catch (error) {
-        console.warn('Failed to save settings to localStorage:', error);
+        // Failed to save settings to localStorage
       }
     }
   }, [settings]);
 
+
   // Listen for auto-start presentation event from parent
   useEffect(() => {
     const handleAutoStartPresentation = (event: CustomEvent) => {
+      console.log('[MarpViewer] handleAutoStartPresentation triggered', {
+        detail: event.detail,
+        autoPlay: event.detail?.autoPlay,
+        language: event.detail?.language,
+        isPlaying
+      });
+      
       if (event.detail?.autoPlay) {
         // Set character to neutral expression for slide presentation
         if (onExpressionControl) {
@@ -236,15 +256,16 @@ export default function MarpViewer({
         
         // Load slides with specified language
         const eventLanguage = event.detail?.language || 'ja';
-        if (process.env.NODE_ENV !== 'production') {
-          console.log(`[MarpViewer] Auto-start presentation event received for language: ${eventLanguage}`);
-        }
+        // Auto-start presentation event received
         
         // Force update the current language state immediately
         setCurrentLanguage(eventLanguage as 'ja' | 'en');
         
         loadSlideData(eventLanguage).then(() => {
+          // Slide data loaded, starting auto-play
           setIsPlaying(true);
+        }).catch((error) => {
+          // Failed to load slide data
         });
       }
     };
@@ -274,14 +295,12 @@ export default function MarpViewer({
       ];
       
       if (!allowedOrigins.includes(event.origin)) {
-        console.warn('Rejected message from untrusted origin:', event.origin);
+        // Rejected message from untrusted origin
         return;
       }
 
       if (event.data.type === 'slide-control') {
-        if (event.data.action === 'next') {
-          nextSlide();
-        } else if (event.data.action === 'previous') {
+        if (event.data.action === 'previous') {
           previousSlide();
         }
       } else if (event.data.type === 'marp-ready') {
@@ -334,9 +353,7 @@ export default function MarpViewer({
       const languageSlideFile = requestedLang === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
       
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[MarpViewer] Loading slides for language: ${requestedLang} (Request ID: ${currentRequestId})`);
-        console.log(`[MarpViewer] Base slideFile: ${slideFile}`);
-        console.log(`[MarpViewer] Language-specific slideFile: ${languageSlideFile}`);
+        // Loading slides for language
       }
 
       // Prepare request body
@@ -357,7 +374,7 @@ export default function MarpViewer({
       };
 
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[MarpViewer] Sending request body:`, requestBody);
+        // Sending request to API
       }
 
       // Render slides with narration
@@ -373,13 +390,13 @@ export default function MarpViewer({
       const result = await response.json();
       
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[MarpViewer] Slide loading API response for ${requestedLang} (Request ID: ${currentRequestId}):`, result);
+        // Received API response
       }
 
       // Check if this is still the current request
       if (currentRequestIdRef.current !== currentRequestId) {
         if (process.env.NODE_ENV !== 'production') {
-          console.log(`[MarpViewer] Ignoring outdated response for ${requestedLang} (Request ID: ${currentRequestId})`);
+          // Ignoring outdated response
         }
         return;
       }
@@ -491,7 +508,7 @@ export default function MarpViewer({
       // Don't show error if request was aborted
       if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))) {
         if (process.env.NODE_ENV !== 'production') {
-          console.log(`[MarpViewer] Request for ${requestedLang} was aborted`);
+          // Request was aborted
         }
         return;
       }
@@ -499,12 +516,12 @@ export default function MarpViewer({
       // Check if this is still the current request before showing error
       if (currentRequestIdRef.current !== currentRequestId) {
         if (process.env.NODE_ENV !== 'production') {
-          console.log(`[MarpViewer] Ignoring error from outdated request for ${requestedLang}`);
+          // Ignoring error from outdated request
         }
         return;
       }
       
-      console.error('Error loading slides:', error);
+      // Error loading slides
       setError('Error loading slides');
     } finally {
       // Only clear loading if this is still the current request
@@ -516,8 +533,10 @@ export default function MarpViewer({
 
 
   const narrateCurrentSlide = async () => {
+    // Narrating current slide
+    
     if (!isPlaying || isNarrating || isNarrationInProgress) {
-      console.log(`[DEBUG] Skipping narration - isPlaying: ${isPlaying}, isNarrating: ${isNarrating}, inProgress: ${isNarrationInProgress}`);
+      // Skipping narration - already playing
       return;
     }
     
@@ -533,6 +552,8 @@ export default function MarpViewer({
       // Determine the slide file path based on current language
       const languageSlideFile = currentLanguage === 'en' ? `en/${slideFile}` : `ja/${slideFile}`;
       
+      // Sending API request for slide
+      
       const response = await fetch('/api/slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -545,6 +566,8 @@ export default function MarpViewer({
         signal: narrationAbortControllerRef.current.signal,
       });
       
+      // API response received
+      
       // Check if response is ok
       if (!response.ok) {
         throw new Error(`API request failed with status ${response.status}`);
@@ -554,38 +577,71 @@ export default function MarpViewer({
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const textResponse = await response.text();
-        console.error('Non-JSON response received:', textResponse);
+        // Non-JSON response received
         throw new Error('Invalid response format - expected JSON');
       }
       
       result = await response.json();
       
+      console.log(`[MarpViewer] API response for slide ${currentSlide}:`, {
+        hasAudioResponse: !!result.audioResponse,
+        audioResponseType: typeof result.audioResponse,
+        audioResponseLength: result.audioResponse?.length || 0,
+        resultKeys: Object.keys(result)
+      });
       
       if (result.audioResponse) {
-        // Add small delay to ensure audio is properly loaded before playing
-        setTimeout(async () => {
-          try {
-            await playAudioWithLipSync(result.audioResponse);
-            setIsNarrating(false);
-            setIsNarrationInProgress(false);
-            
-            // Directly advance to next slide if still playing
-            if (isPlaying && currentSlide < totalSlides) {
-              const nextSlide = currentSlide + 1;
-              setCurrentSlide(nextSlide);
+        try {
+          // Starting audio playback
+          
+          // Wait for audio playback to complete before advancing
+          await playAudioWithLipSync(result.audioResponse);
+          
+          // Audio playback completed
+          resetNarrationFlags();
+          
+          // Advance to next slide only after audio completion
+          if (isPlaying && currentSlide < totalSlides) {
+            setCurrentSlide(prev => {
+              const nextSlide = prev + 1;
               onSlideChange?.(nextSlide);
-            } else if (currentSlide >= totalSlides) {
-              setIsPlaying(false);
-              trackPresentationEvent('presentation_completed', {
-                totalDuration: presentationStartTime ? Date.now() - presentationStartTime : 0
-              });
-            }
-          } catch (error) {
-            console.error('[MarpViewer] Error during audio playback:', error);
-            setIsNarrating(false);
-            setIsNarrationInProgress(false);
+              return nextSlide;
+            });
+          } else if (currentSlide >= totalSlides) {
+            // Presentation completed
+            setIsPlaying(false);
+            trackPresentationEvent('presentation_completed', {
+              totalDuration: presentationStartTime ? Date.now() - presentationStartTime : 0
+            });
           }
-        }, 300); // 300ms delay to ensure audio is ready
+        } catch (error: any) {
+          // Error during audio playback
+          
+          resetNarrationFlags();
+          
+          // Check if it's a user interaction required error
+          if (error?.type === 'user_interaction_required' || 
+              error?.requiresUserInteraction ||
+              error?.name === 'NotAllowedError' || 
+              error?.message?.includes('interaction')) {
+            // User interaction required
+            setShowAudioPermissionPrompt(true);
+            setIsPlaying(false); // Stop auto-play until user grants permission
+            return;
+          }
+          
+          // Continue to next slide even if audio fails (for other errors)
+          if (isPlaying && currentSlide < totalSlides) {
+            setTimeout(() => {
+              resetNarrationFlags();
+              setCurrentSlide(prev => {
+                const nextSlide = prev + 1;
+                onSlideChange?.(nextSlide);
+                return nextSlide;
+              });
+            }, 1000);
+          }
+        }
         
         // Note: Expressions disabled for slide mode - only lip sync is used
         // This provides natural presentation without distracting facial expressions
@@ -593,8 +649,7 @@ export default function MarpViewer({
           updateCharacterAction(result.characterAction);
         }
       } else {
-        setIsNarrating(false);
-        setIsNarrationInProgress(false);
+        resetNarrationFlags();
       }
     } catch (error) {
       // Check if the error is due to abort
@@ -603,8 +658,7 @@ export default function MarpViewer({
       } else {
         console.error('[MarpViewer] Error narrating slide:', error);
       }
-      setIsNarrating(false);
-      setIsNarrationInProgress(false);
+      resetNarrationFlags();
     }
   };
 
@@ -612,34 +666,13 @@ export default function MarpViewer({
   // Fast audio playback without lip sync analysis
   const playAudioFast = async (audioBase64: string): Promise<void> => {
     try {
-      console.log('[MarpViewer] Playing audio fast (no lip sync)');
-      
-      const audioData = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
-      const audioBlob = new Blob([audioData], { type: 'audio/mp3' });
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      audio.volume = volume / 100;
-      audioStateManager.registerAudio(audio);
-
-      return new Promise<void>((resolve) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          console.log('[MarpViewer] Fast audio ended');
-          resolve();
-        };
-
-        audio.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
-          console.error('[MarpViewer] Fast audio error');
-          resolve();
-        };
-
-        audio.play().catch((error) => {
-          console.error('[MarpViewer] Fast audio play failed:', error);
-          URL.revokeObjectURL(audioUrl);
-          resolve();
-        });
+      console.log('[MarpViewer] Playing audio fast (no lip sync)', {
+        audioLength: audioBase64?.length || 0
       });
+      const { AudioPlaybackService } = await import('@/lib/audio/audio-playback-service');
+      
+      await AudioPlaybackService.playAudioFast(audioBase64, volume / 100);
+      console.log('[MarpViewer] Fast audio ended');
     } catch (error) {
       console.error('[MarpViewer] Error playing fast audio:', error);
     }
@@ -653,80 +686,21 @@ export default function MarpViewer({
     }
 
     try {
-      console.log('[MarpViewer] Playing audio with lip-sync');
+      const { AudioPlaybackService } = await import('@/lib/audio/audio-playback-service');
+      const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
       
-      const audioData = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
-      const audioBlob = new Blob([audioData], { type: 'audio/mp3' });
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      audio.volume = volume / 100;
-      audioStateManager.registerAudio(audio);
+      // Update cache stats for UI
+      const analyzer = new LipSyncAnalyzer();
+      setLipSyncCacheStats(analyzer.getCacheStats());
+      analyzer.dispose();
 
-      // Perform lip-sync analysis
-      if (onVisemeControl) {
-        console.log('[MarpViewer] Starting lip-sync analysis with direct viseme control');
-        
-        try {
-          const { LipSyncAnalyzer } = await import('@/lib/lip-sync-analyzer');
-          const analyzer = new LipSyncAnalyzer();
-          
-          const analysisStartTime = performance.now();
-          const lipSyncData = await analyzer.analyzeLipSync(audioBlob);
-          const analysisTime = performance.now() - analysisStartTime;
-          
-          console.log('[MarpViewer] Lip-sync analysis complete:', lipSyncData.frames.length, 'frames', `in ${analysisTime.toFixed(1)}ms`);
-          
-          // Update cache stats for UI
-          setLipSyncCacheStats(analyzer.getCacheStats());
-          
-          // Schedule viseme updates
-          let frameIndex = 0;
-          const updateLipSync = () => {
-            if (frameIndex < lipSyncData.frames.length && audio.currentTime >= 0) {
-              const frame = lipSyncData.frames[frameIndex];
-              
-              console.log(`[MarpViewer] Lip-sync frame ${frameIndex}:`, frame.mouthShape, 'intensity:', frame.mouthOpen);
-              onVisemeControl(frame.mouthShape, frame.mouthOpen);
-              
-              frameIndex++;
-              setTimeout(updateLipSync, 50); // 20fps
-            } else if (frameIndex >= lipSyncData.frames.length) {
-              console.log('[MarpViewer] Lip-sync animation complete');
-              onVisemeControl('Closed', 0); // Reset to closed mouth
-            }
-          };
-          
-          // Start lip-sync when audio starts
-          audio.onplay = () => {
-            console.log('[MarpViewer] Audio started, beginning lip-sync animation');
-            updateLipSync();
-          };
-          
-          analyzer.dispose();
-        } catch (lipSyncError) {
-          console.warn('[MarpViewer] Lip-sync analysis failed:', lipSyncError);
-        }
-      } else {
-        console.warn('[MarpViewer] Viseme control function not available');
-      }
-
-      return new Promise<void>((resolve) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          console.log('[MarpViewer] Audio ended');
-          
-          // Reset only the viseme (mouth shape) to closed, but keep the current expression
-          if (onVisemeControl) {
-            onVisemeControl('Closed', 0);
-          }
-          
-          resolve();
-        };
-
-        audio.play().catch((error) => {
+      await AudioPlaybackService.playAudioWithLipSync(audioBase64, {
+        volume: volume / 100,
+        enableLipSync: true,
+        onVisemeUpdate: onVisemeControl || undefined,
+        onError: (error) => {
           console.error('[MarpViewer] Audio play failed:', error);
-          resolve();
-        });
+        }
       });
     } catch (error) {
       console.error('[MarpViewer] Error playing audio with lip-sync:', error);
@@ -764,8 +738,7 @@ export default function MarpViewer({
       clearTimeout(autoPlayTimerRef.current);
       autoPlayTimerRef.current = null;
     }
-    setIsNarrating(false);
-    setIsNarrationInProgress(false);
+    resetNarrationFlags();
     audioStateManager.stopAll();
     
     // Reset viseme to closed mouth when stopping
@@ -839,26 +812,6 @@ export default function MarpViewer({
     }
   };
 
-  const nextSlide = async () => {
-    if (audioStateManager.isAudioProcessing()) {
-      console.log('[MarpViewer] Cannot advance - audio still processing');
-      return;
-    }
-    
-    if (currentSlide < totalSlides) {
-      // Stop current narration when manually advancing
-      if (isPlaying) {
-        console.log('[MarpViewer] Stopping auto-play due to manual navigation');
-        setIsPlaying(false); // Set this first to prevent new narrations
-        stopAutoPlay();
-      }
-      
-      const newSlide = currentSlide + 1;
-      setCurrentSlide(newSlide);
-      onSlideChange?.(newSlide);
-      handleSlideNavigation('next', newSlide);
-    }
-  };
 
   const previousSlide = async () => {
     if (currentSlide > 1) {
@@ -919,35 +872,50 @@ export default function MarpViewer({
     // Resume from current slide (not from the beginning)
     console.log(`[MarpViewer] Starting/resuming auto-play from slide ${currentSlide}`);
     
-    // Test audio permission by playing a silent audio
+    // Initialize audio context and mark user interaction
     try {
-      const testAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
-      await testAudio.play();
-      testAudio.pause();
+      const { AudioInteractionManager } = await import('@/lib/audio/audio-interaction-manager');
+      const manager = AudioInteractionManager.getInstance();
+      
+      // Force initialize to mark this as a user interaction (button click)
+      await manager.forceInitialize();
+      
+      console.log('[MarpViewer] Audio context ready, starting presentation');
       setIsPlaying(true);
-    } catch (error) {
-      if (error instanceof Error && error.name === 'NotAllowedError') {
-        setShowAudioPermissionPrompt(true);
-      } else {
-        console.error('Audio test failed:', error);
-        setIsPlaying(true); // Continue anyway
-      }
+    } catch (error: any) {
+      console.log('[MarpViewer] Audio context not ready, showing permission prompt');
+      console.error('Audio initialization failed:', error);
+      setShowAudioPermissionPrompt(true);
     }
   };
   
-  const enableAudioAndStartPresentation = () => {
-    // Set character to neutral expression for slide presentation
-    if (onExpressionControl) {
-      onExpressionControl('neutral', 1.0);
-      console.log('[MarpViewer] Set character to neutral for slide presentation');
+  const enableAudioAndStartPresentation = async () => {
+    try {
+      // Initialize audio context with user interaction
+      const { AudioInteractionManager } = await import('@/lib/audio/audio-interaction-manager');
+      const manager = AudioInteractionManager.getInstance();
+      await manager.forceInitialize();
+      
+      console.log('[MarpViewer] Audio context initialized successfully');
+      
+      // Set character to neutral expression for slide presentation
+      if (onExpressionControl) {
+        onExpressionControl('neutral', 1.0);
+        console.log('[MarpViewer] Set character to neutral for slide presentation');
+      }
+      
+      setShowAudioPermissionPrompt(false);
+      setIsPlaying(true);
+    } catch (error) {
+      console.error('[MarpViewer] Failed to initialize audio context:', error);
+      // Continue anyway - some audio might still work
+      setShowAudioPermissionPrompt(false);
+      setIsPlaying(true);
     }
-    setShowAudioPermissionPrompt(false);
-    setIsPlaying(true);
   };
 
   // Use keyboard controls
   const { shortcuts } = useKeyboardControls({
-    onNext: nextSlide,
     onPrevious: previousSlide,
     onReset: () => gotoSlide(1),
     onTogglePlay: toggleAutoPlay,
@@ -1149,7 +1117,7 @@ export default function MarpViewer({
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const textResponse = await response.text();
-        console.error('Non-JSON response received:', textResponse);
+        // Non-JSON response received
         throw new Error('Invalid response format - expected JSON');
       }
 
@@ -1224,13 +1192,6 @@ export default function MarpViewer({
             {currentSlide} / {totalSlides}
           </span>
           
-          <button
-            onClick={nextSlide}
-            disabled={currentSlide === totalSlides}
-            className="p-2 rounded bg-blue-500 text-white disabled:bg-gray-300 hover:bg-blue-600 transition-colors"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
         </div>
 
         <div className="flex items-center space-x-2">

@@ -28,8 +28,13 @@ export class QAAgent extends Agent {
     this._tools.set(name, tool);
   }
 
-  async answerQuestion(question: string): Promise<string> {
-    const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+  async answerQuestion(question: string, requestLanguage?: SupportedLanguage): Promise<string> {
+    const language = requestLanguage || await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
+    
+    // Update memory with the current language if provided
+    if (requestLanguage) {
+      await this.supabaseMemory.store('language', requestLanguage);
+    }
     
     // Get context from RAG
     const context = await this.searchKnowledgeBase(question);

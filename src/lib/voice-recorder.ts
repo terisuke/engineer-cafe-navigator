@@ -306,15 +306,18 @@ export class VoiceRecorder {
 
   // Duration utilities
   static async getAudioDuration(blob: Blob): Promise<number> {
-    return new Promise((resolve, reject) => {
-      const audio = new Audio();
-      audio.onloadedmetadata = () => {
-        URL.revokeObjectURL(audio.src);
-        resolve(audio.duration);
-      };
-      audio.onerror = reject;
-      audio.src = URL.createObjectURL(blob);
-    });
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      
+      const duration = audioBuffer.duration;
+      await audioContext.close();
+      
+      return duration;
+    } catch (error) {
+      throw new Error(`Failed to get audio duration: ${error}`);
+    }
   }
 
   // Format utilities

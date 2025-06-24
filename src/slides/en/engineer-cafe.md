@@ -33,10 +33,10 @@ class: lead
 
 ![bg contain right:40%](/backgrounds/IMG_5573.JPG)
 
-| Space             | Features                  |
-|-------------------|---------------------------|
-| Main Hall         | Open, free when no events |
-| 4 Basement Spaces | See next page for details |
+| Space             | Features                                                         |
+|-------------------|------------------------------------------------------------------|
+| Main Hall         | Open coworking space – free when not reserved for private events |
+| 4 Basement Spaces | See next page for details                                        |
 
 ---
 
@@ -90,7 +90,7 @@ class: lead
 1. Connect to Wi-Fi  
    - **engnrcf-guest-5GHz** / **akarenga-112years**  
 2. Scan the QR code, fill in the form  
-3. Show your screen to staff when entering your ID
+3. A membership number is issued after registration. It cannot be viewed again on your phone, so please record it and tell staff.
 
 <!-- _narration: Start by connecting to our guest Wi-Fi, then register via the QR code. Please enter the membership ID together with staff to avoid mistakes. -->
 
@@ -99,11 +99,9 @@ class: lead
 ## About Membership Cards
 ![bg contain right:40%](/assets/images/membershipcards.jpg)
 
-- Laser-cut on site → **cannot be re-issued**  
-- Lost card?  
-  - Look-up by phone or name  
-  - Photo of card accepted  
-- NFC/IC card & mobile wallet linking available  
+- Link your membership number with an **NFC/IC card** such as Suica for easy tap entry  
+- Your membership number cannot be viewed later on your phone; we recommend you keep it noted down.  
+- If you lose your card or forget it, staff can look up your number  
 - One neck strap per person (no re-supply)
 
 ---
@@ -120,20 +118,6 @@ class: lead
 Discord invite code on the back
 
 <!-- _narration: For your next visit, tell reception your preferred workspace. The neck holder has Wi-Fi and Discord info. If leaving for over 15 minutes, take all belongings—staff may need to check unattended items. Please return the holder when you leave. -->
-
----
-
-## Our Philosophy
-
-![bg contain right:45%](/assets/images/welcomeoerson.png)
-
-> Fewer rules, more collaboration
-
-- We avoid strict regulations  
-- Lack of cooperation forces rules on everyone  
-- Let's keep Engineer Cafe free, comfortable and fun
-
-<!-- _narration: We strive to minimise formal rules. With mutual respect, we can keep the café flexible and welcoming for all. -->
 
 ---
 

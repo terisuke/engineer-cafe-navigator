@@ -3,32 +3,33 @@
  * Provides fallback mechanisms and better error handling for mobile devices
  */
 
-import { WebAudioPlayer, type AudioPlayerOptions } from './web-audio-player';
+import { WebAudioPlayer } from './web-audio-player';
 import { AudioInteractionManager } from './audio-interaction-manager';
+import { AudioDataProcessor } from './audio-data-processor';
+import { 
+  AudioError, 
+  AudioErrorType, 
+  type AudioOperationResult,
+  type AudioDataInput,
+  type MobileAudioPlayerOptions
+} from './audio-interfaces';
 
-export interface MobileAudioOptions extends AudioPlayerOptions {
-  enableFallback?: boolean;
+export interface MobileAudioOptions extends MobileAudioPlayerOptions {
   retryAttempts?: number;
   retryDelay?: number;
 }
 
-export interface AudioPlaybackResult {
-  success: boolean;
-  method: 'web-audio' | 'html-audio' | 'failed';
-  error?: Error;
-  requiresInteraction?: boolean;
-}
+// Legacy type alias for backward compatibility
+export type AudioPlaybackResult = AudioOperationResult;
 
 export class MobileAudioService {
   private webAudioPlayer: WebAudioPlayer | null = null;
-  private htmlAudioElement: HTMLAudioElement | null = null;
   private interactionManager: AudioInteractionManager;
   private options: MobileAudioOptions;
-  private currentMethod: 'web-audio' | 'html-audio' | null = null;
+  private currentMethod: 'web-audio' | null = null;
 
   constructor(options: MobileAudioOptions = {}) {
     this.options = {
-      enableFallback: true,
       retryAttempts: 3,
       retryDelay: 1000,
       ...options
@@ -44,262 +45,124 @@ export class MobileAudioService {
   }
 
   /**
-   * Load and play audio with automatic fallback
+   * Load and play audio using Web Audio API only
    */
-  public async playAudio(audioData: string | ArrayBuffer): Promise<AudioPlaybackResult> {
-    let lastError: Error | null = null;
-
-    // Try Web Audio API first
+  public async playAudio(audioData: AudioDataInput): Promise<AudioOperationResult> {
     try {
       const result = await this.tryWebAudio(audioData);
       if (result.success) {
         this.currentMethod = 'web-audio';
-        return result;
+        return { ...result, method: 'web-audio' };
       }
-      lastError = result.error || new Error('Web Audio failed');
+      
+      const error = result.error || new AudioError(
+        AudioErrorType.PLAYBACK_FAILED, 
+        'Web Audio API playback failed'
+      );
+
+      return {
+        success: false,
+        method: 'web-audio',
+        error
+      };
     } catch (error) {
-      lastError = error as Error;
+      const audioError = AudioError.fromError(error as Error, AudioErrorType.PLAYBACK_FAILED);
+      return {
+        success: false,
+        method: 'web-audio',
+        error: audioError
+      };
     }
-
-    // Fallback to HTML Audio if enabled
-    if (this.options.enableFallback) {
-      try {
-        const result = await this.tryHtmlAudio(audioData);
-        if (result.success) {
-          this.currentMethod = 'html-audio';
-          return result;
-        }
-        lastError = result.error || lastError;
-      } catch (error) {
-        lastError = error as Error;
-      }
-    }
-
-    return {
-      success: false,
-      method: 'failed',
-      error: lastError || new Error('All audio playback methods failed'),
-      requiresInteraction: this.checkIfInteractionRequired(lastError)
-    };
   }
 
   /**
    * Try Web Audio API playback
+   * Uses AudioContext.decodeAudioData() - no HTMLAudioElement needed
    */
-  private async tryWebAudio(audioData: string | ArrayBuffer): Promise<AudioPlaybackResult> {
+  private async tryWebAudio(audioData: AudioDataInput): Promise<AudioOperationResult> {
     try {
+      const isTablet = /iPad|Android.*Tablet/i.test(navigator.userAgent);
+      
+      console.log('[MOBILE-AUDIO] Attempting Web Audio playback...', {
+        isTablet,
+        hasWebAudioPlayer: !!this.webAudioPlayer,
+        audioDataType: typeof audioData,
+        audioDataSize: audioData instanceof ArrayBuffer ? audioData.byteLength : 
+                      audioData instanceof Blob ? audioData.size : audioData.length
+      });
+
       // Ensure audio context is ready
-      await this.interactionManager.ensureAudioContext();
-
-      // Create new player if needed
-      if (!this.webAudioPlayer) {
-        this.webAudioPlayer = new WebAudioPlayer(this.options);
-      }
-
-      // Load audio data
-      if (typeof audioData === 'string') {
-        if (audioData.startsWith('data:') || audioData.startsWith('blob:')) {
-          await this.webAudioPlayer.loadBase64Audio(audioData);
+      try {
+        await this.interactionManager.ensureAudioContext();
+      } catch (error) {
+        // If user interaction is required, let the UI handle it
+        if (error instanceof Error && error.message.includes('User interaction required')) {
+          console.log('[MOBILE-AUDIO] User interaction required - letting UI handle this');
+          throw new AudioError(
+            AudioErrorType.USER_INTERACTION_REQUIRED,
+            'User interaction required for audio playback',
+            error as Error,
+            true // requiresUserInteraction flag
+          );
         } else {
-          await this.webAudioPlayer.loadAudio(audioData);
+          throw error;
         }
-      } else {
-        // Handle ArrayBuffer - detect format and convert to appropriate data URL
-        const audioFormat = this.detectAudioFormat(audioData);
-        const base64 = this.arrayBufferToBase64(audioData);
-        await this.webAudioPlayer.loadBase64Audio(`data:${audioFormat};base64,${base64}`);
       }
 
-      // Play audio
-      await this.webAudioPlayer.play();
+      // For tablets, always recreate the player to avoid state issues
+      if (!this.webAudioPlayer) {
+        console.log('[MOBILE-AUDIO] Creating new WebAudioPlayer');
+        this.webAudioPlayer = new WebAudioPlayer(this.options);
+      } else if (isTablet) {
+        // Reset existing player for tablets to avoid state issues
+        console.log('[MOBILE-AUDIO] Resetting WebAudioPlayer for tablet compatibility');
+        this.webAudioPlayer.reset();
+      }
 
+      // Load audio data using the new unified method
+      const loadResult = await this.webAudioPlayer.loadAudioData(audioData);
+      if (!loadResult.success) {
+        return {
+          success: false,
+          method: 'web-audio',
+          error: loadResult.error
+        };
+      }
+
+      // Start audio playback
+      const playResult = await this.webAudioPlayer.play();
+      if (!playResult.success) {
+        return playResult;
+      }
+
+      console.log('[MOBILE-AUDIO] Web Audio playback started successfully');
+      
+      // Simply return success - let AudioPlaybackService handle the waiting
       return {
         success: true,
         method: 'web-audio'
       };
     } catch (error) {
-      console.warn('Web Audio playback failed:', error);
+      console.warn('[MOBILE-AUDIO] Web Audio playback failed:', error);
+      const audioError = AudioError.fromError(error as Error, AudioErrorType.PLAYBACK_FAILED);
       return {
         success: false,
         method: 'web-audio',
-        error: error as Error,
-        requiresInteraction: this.checkIfInteractionRequired(error as Error)
+        error: audioError
       };
     }
   }
 
-  /**
-   * Try HTML Audio fallback
-   */
-  private async tryHtmlAudio(audioData: string | ArrayBuffer): Promise<AudioPlaybackResult> {
-    try {
-      let audioUrl: string;
 
-      if (typeof audioData === 'string') {
-        audioUrl = audioData;
-      } else {
-        // Convert ArrayBuffer to blob URL with proper MIME type detection
-        const audioFormat = this.detectAudioFormat(audioData);
-        const blob = new Blob([audioData], { type: audioFormat });
-        audioUrl = URL.createObjectURL(blob);
-      }
 
-      // Create HTML audio element
-      this.htmlAudioElement = new Audio(audioUrl);
-      
-      // Set up event handlers
-      if (this.options.onPlay) {
-        this.htmlAudioElement.addEventListener('play', this.options.onPlay);
-      }
-      if (this.options.onPause) {
-        this.htmlAudioElement.addEventListener('pause', this.options.onPause);
-      }
-      if (this.options.onEnded) {
-        this.htmlAudioElement.addEventListener('ended', this.options.onEnded);
-      }
-
-      // Set volume
-      if (this.options.volume !== undefined) {
-        this.htmlAudioElement.volume = this.options.volume;
-      }
-
-      // Play with retry mechanism
-      await this.playWithRetry(this.htmlAudioElement);
-
-      return {
-        success: true,
-        method: 'html-audio'
-      };
-    } catch (error) {
-      console.warn('HTML Audio playback failed:', error);
-      return {
-        success: false,
-        method: 'html-audio',
-        error: error as Error,
-        requiresInteraction: this.checkIfInteractionRequired(error as Error)
-      };
-    }
-  }
-
-  /**
-   * Play HTML audio with retry mechanism
-   */
-  private async playWithRetry(audio: HTMLAudioElement): Promise<void> {
-    let attempts = 0;
-    const maxAttempts = this.options.retryAttempts || 3;
-
-    while (attempts < maxAttempts) {
-      try {
-        await audio.play();
-        return; // Success
-      } catch (error) {
-        attempts++;
-        
-        if (attempts >= maxAttempts) {
-          throw error;
-        }
-
-        // Check if it's an interaction error
-        if (this.checkIfInteractionRequired(error as Error)) {
-          // Wait for user interaction
-          await this.interactionManager.requestUserInteraction();
-        } else {
-          // General retry delay
-          await this.delay(this.options.retryDelay || 1000);
-        }
-      }
-    }
-  }
-
-  /**
-   * Check if error is due to missing user interaction
-   */
-  private checkIfInteractionRequired(error: Error): boolean {
-    const errorMessage = error.message.toLowerCase();
-    return (
-      errorMessage.includes('user gesture') ||
-      errorMessage.includes('user interaction') ||
-      errorMessage.includes('autoplay') ||
-      errorMessage.includes('not allowed') ||
-      error.name === 'NotAllowedError'
-    );
-  }
-
-  /**
-   * Detect audio format from ArrayBuffer by examining file headers
-   */
-  private detectAudioFormat(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    
-    // Check for common audio format signatures
-    if (bytes.length < 12) {
-      return 'audio/wav'; // Default fallback
-    }
-
-    // MP3: ID3 tag or MPEG sync word
-    if ((bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) || // ID3
-        (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0)) { // MPEG sync
-      return 'audio/mpeg';
-    }
-
-    // WAV: RIFF header + WAVE format
-    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && // RIFF
-        bytes[8] === 0x57 && bytes[9] === 0x41 && bytes[10] === 0x56 && bytes[11] === 0x45) { // WAVE
-      return 'audio/wav';
-    }
-
-    // MP4/AAC: ftyp box
-    if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) { // ftyp
-      return 'audio/mp4';
-    }
-
-    // OGG: OggS signature
-    if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) { // OggS
-      return 'audio/ogg';
-    }
-
-    // WebM: EBML signature
-    if (bytes[0] === 0x1A && bytes[1] === 0x45 && bytes[2] === 0xDF && bytes[3] === 0xA3) { // EBML
-      return 'audio/webm';
-    }
-
-    // FLAC: fLaC signature
-    if (bytes[0] === 0x66 && bytes[1] === 0x4C && bytes[2] === 0x61 && bytes[3] === 0x43) { // fLaC
-      return 'audio/flac';
-    }
-
-    // Default to WAV if format cannot be determined
-    console.warn('Could not detect audio format, defaulting to audio/wav');
-    return 'audio/wav';
-  }
-
-  /**
-   * Convert ArrayBuffer to base64
-   */
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return window.btoa(binary);
-  }
-
-  /**
-   * Delay helper
-   */
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+  // Removed helper methods - now using shared utilities from AudioDataProcessor and AudioError
 
   /**
    * Pause current playback
    */
   public pause(): void {
-    if (this.currentMethod === 'web-audio' && this.webAudioPlayer) {
+    if (this.webAudioPlayer) {
       this.webAudioPlayer.pause();
-    } else if (this.currentMethod === 'html-audio' && this.htmlAudioElement) {
-      this.htmlAudioElement.pause();
     }
   }
 
@@ -307,11 +170,15 @@ export class MobileAudioService {
    * Stop current playback
    */
   public stop(): void {
-    if (this.currentMethod === 'web-audio' && this.webAudioPlayer) {
+    if (this.webAudioPlayer) {
       this.webAudioPlayer.stop();
-    } else if (this.currentMethod === 'html-audio' && this.htmlAudioElement) {
-      this.htmlAudioElement.pause();
-      this.htmlAudioElement.currentTime = 0;
+      
+      // Reset for tablets to prevent state issues
+      const isTablet = /iPad|Android.*Tablet/i.test(navigator.userAgent);
+      if (isTablet) {
+        console.log('[MOBILE-AUDIO] Resetting WebAudioPlayer after stop for tablet compatibility');
+        this.webAudioPlayer.reset();
+      }
     }
   }
 
@@ -319,10 +186,8 @@ export class MobileAudioService {
    * Set volume
    */
   public setVolume(volume: number): void {
-    if (this.currentMethod === 'web-audio' && this.webAudioPlayer) {
+    if (this.webAudioPlayer) {
       this.webAudioPlayer.setVolume(volume);
-    } else if (this.currentMethod === 'html-audio' && this.htmlAudioElement) {
-      this.htmlAudioElement.volume = volume;
     }
   }
 
@@ -330,10 +195,8 @@ export class MobileAudioService {
    * Get current playback time
    */
   public getCurrentTime(): number {
-    if (this.currentMethod === 'web-audio' && this.webAudioPlayer) {
+    if (this.webAudioPlayer) {
       return this.webAudioPlayer.getCurrentTime();
-    } else if (this.currentMethod === 'html-audio' && this.htmlAudioElement) {
-      return this.htmlAudioElement.currentTime;
     }
     return 0;
   }
@@ -342,10 +205,8 @@ export class MobileAudioService {
    * Get duration
    */
   public getDuration(): number {
-    if (this.currentMethod === 'web-audio' && this.webAudioPlayer) {
+    if (this.webAudioPlayer) {
       return this.webAudioPlayer.getDuration();
-    } else if (this.currentMethod === 'html-audio' && this.htmlAudioElement) {
-      return this.htmlAudioElement.duration || 0;
     }
     return 0;
   }
@@ -354,10 +215,8 @@ export class MobileAudioService {
    * Check if playing
    */
   public isPlaying(): boolean {
-    if (this.currentMethod === 'web-audio' && this.webAudioPlayer) {
+    if (this.webAudioPlayer) {
       return this.webAudioPlayer.getIsPlaying();
-    } else if (this.currentMethod === 'html-audio' && this.htmlAudioElement) {
-      return !this.htmlAudioElement.paused;
     }
     return false;
   }
@@ -365,7 +224,7 @@ export class MobileAudioService {
   /**
    * Get current playback method
    */
-  public getCurrentMethod(): 'web-audio' | 'html-audio' | null {
+  public getCurrentMethod(): 'web-audio' | null {
     return this.currentMethod;
   }
 
@@ -383,11 +242,6 @@ export class MobileAudioService {
     if (this.webAudioPlayer) {
       this.webAudioPlayer.dispose();
       this.webAudioPlayer = null;
-    }
-
-    if (this.htmlAudioElement) {
-      this.htmlAudioElement.pause();
-      this.htmlAudioElement = null;
     }
 
     this.currentMethod = null;

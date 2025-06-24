@@ -1,6 +1,8 @@
+import { EmotionMapping, type SupportedEmotion } from './emotion-mapping';
+
 /**
  * Emotion Tag Parser for VRM character expression control
- * Parses emotion tags like [happy], [sad], [surprised] from AI responses
+ * Parses emotion tags like [happy], [sad], [curious] from AI responses
  */
 
 export interface ParsedResponse {
@@ -16,55 +18,6 @@ export interface EmotionTag {
 }
 
 export class EmotionTagParser {
-  // aituber-kit standardized emotions: neutral, happy, sad, angry, relaxed, surprised
-  private static readonly EMOTION_MAPPING: Record<string, string> = {
-    // Basic emotions
-    'neutral': 'neutral',
-    'calm': 'neutral',
-    'normal': 'neutral',
-    'explaining': 'neutral',
-    'teaching': 'neutral',
-    'describing': 'neutral',
-    
-    'happy': 'happy',
-    'joy': 'happy',
-    'excited': 'happy',
-    'cheerful': 'happy',
-    'pleased': 'happy',
-    'greeting': 'happy',
-    'welcoming': 'happy',
-    'confident': 'happy',
-    'proud': 'happy',
-    'grateful': 'happy',
-    
-    'sad': 'sad',
-    'disappointed': 'sad',
-    'melancholy': 'sad',
-    'down': 'sad',
-    'worried': 'sad',
-    'embarrassed': 'sad',
-    'apologetic': 'sad',
-    
-    'angry': 'angry',
-    'mad': 'angry',
-    'frustrated': 'angry',
-    'annoyed': 'angry',
-    
-    'relaxed': 'relaxed',
-    'thinking': 'relaxed',
-    'pondering': 'relaxed',
-    'wondering': 'relaxed',
-    'listening': 'relaxed',
-    'attentive': 'relaxed',
-    'concerned': 'relaxed',
-    'shy': 'relaxed',
-    'confused': 'relaxed',
-    
-    'surprised': 'surprised',
-    'shocked': 'surprised',
-    'amazed': 'surprised',
-    'astonished': 'surprised',
-  };
 
   /**
    * Parse emotion tags from text
@@ -84,8 +37,8 @@ export class EmotionTagParser {
       const position = match.index;
 
       // Map to VRM expression if supported
-      const mappedEmotion = this.EMOTION_MAPPING[emotion];
-      if (mappedEmotion) {
+      if (EmotionMapping.isSupportedEmotion(emotion)) {
+        const mappedEmotion = EmotionMapping.mapToVRMEmotion(emotion);
         emotions.push({
           emotion: mappedEmotion,
           position,
@@ -121,44 +74,20 @@ export class EmotionTagParser {
    * Get VRM expression weights for given emotion
    */
   static getExpressionWeights(emotion: string, intensity: number = 1.0): Record<string, number> {
-    const weights: Record<string, number> = {
-      neutral: 0,
-      happy: 0,
-      sad: 0,
-      angry: 0,
-      relaxed: 0,
-      surprised: 0,
-    };
+    const supportedEmotions = EmotionMapping.getSupportedEmotions();
+    const weights: Record<string, number> = {};
+    
+    // Initialize all emotions to 0
+    supportedEmotions.forEach(e => weights[e] = 0);
 
+    const normalizedEmotion = EmotionMapping.mapToVRMEmotion(emotion);
     const normalizedIntensity = Math.max(0, Math.min(1, intensity));
 
-    switch (emotion) {
-      case 'neutral':
-        weights.neutral = 1;
-        break;
-      case 'happy':
-        weights.happy = normalizedIntensity;
-        weights.neutral = 1 - normalizedIntensity;
-        break;
-      case 'sad':
-        weights.sad = normalizedIntensity;
-        weights.neutral = 1 - normalizedIntensity;
-        break;
-      case 'angry':
-        weights.angry = normalizedIntensity;
-        weights.neutral = 1 - normalizedIntensity;
-        break;
-      case 'relaxed':
-        weights.relaxed = normalizedIntensity;
-        weights.neutral = 1 - normalizedIntensity;
-        break;
-      case 'surprised':
-        weights.surprised = normalizedIntensity;
-        weights.neutral = 1 - normalizedIntensity;
-        break;
-      default:
-        weights.neutral = 1;
-        break;
+    if (normalizedEmotion === 'neutral') {
+      weights.neutral = 1;
+    } else {
+      weights[normalizedEmotion] = normalizedIntensity;
+      weights.neutral = 1 - normalizedIntensity;
     }
 
     return weights;
@@ -179,21 +108,21 @@ export class EmotionTagParser {
    * Validate if emotion tag is supported
    */
   static isValidEmotion(emotion: string): boolean {
-    return emotion.toLowerCase() in this.EMOTION_MAPPING;
+    return EmotionMapping.isSupportedEmotion(emotion);
   }
 
   /**
    * Get all supported emotions
    */
   static getSupportedEmotions(): string[] {
-    return Object.keys(this.EMOTION_MAPPING);
+    return EmotionMapping.getAllEmotionAliases();
   }
 
   /**
    * Get mapped VRM expressions
    */
   static getVRMExpressions(): string[] {
-    return Array.from(new Set(Object.values(this.EMOTION_MAPPING)));
+    return EmotionMapping.getSupportedEmotions();
   }
 
   /**
@@ -218,7 +147,7 @@ export class EmotionTagParser {
       } else if (lowerText.includes('考え') || lowerText.includes('うーん') || lowerText.includes('どうしよう') || lowerText.includes('リラックス')) {
         emotion = 'relaxed';
       } else if (lowerText.includes('びっくり') || lowerText.includes('驚き') || lowerText.includes('すごい') || lowerText.includes('まさか')) {
-        emotion = 'surprised';
+        emotion = 'curious';
       } else if (lowerText.includes('問題') || lowerText.includes('怒り') || lowerText.includes('イライラ')) {
         emotion = 'angry';
       }
@@ -230,7 +159,7 @@ export class EmotionTagParser {
       } else if (lowerText.includes('think') || lowerText.includes('consider') || lowerText.includes('hmm') || lowerText.includes('relax')) {
         emotion = 'relaxed';
       } else if (lowerText.includes('wow') || lowerText.includes('amazing') || lowerText.includes('surprised') || lowerText.includes('incredible')) {
-        emotion = 'surprised';
+        emotion = 'curious';
       } else if (lowerText.includes('angry') || lowerText.includes('frustrated') || lowerText.includes('annoying')) {
         emotion = 'angry';
       }
