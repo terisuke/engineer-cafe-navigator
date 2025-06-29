@@ -68,7 +68,21 @@ export class RAGSearchTool {
         }
       };
 
+      // Check if this is a specific query (e.g., Saino Cafe)
+      const isSpecificQuery = query.toLowerCase().includes('saino') || 
+                             query.toLowerCase().includes('才能') ||
+                             query.toLowerCase().includes('併設');
+
       const sorted = results.sort((a,b)=>{
+        // For specific queries, prioritize similarity over importance
+        if (isSpecificQuery) {
+          // If similarity difference is significant (>0.2), use similarity
+          const simDiff = b.similarity - a.similarity;
+          if (Math.abs(simDiff) > 0.2) {
+            return simDiff;
+          }
+        }
+
         const diffImp = importanceRank(b.metadata?.importance) - importanceRank(a.metadata?.importance);
         if (diffImp !== 0) return diffImp;
 
