@@ -187,21 +187,21 @@ export class EnhancedQAAgent extends Agent {
             : (language === 'en' ? 'requested information' : '要求された情報');
             
           prompt = language === 'en'
-            ? `The user previously asked about ${requestTypePrompt} and is now asking about a specific option. Give ONLY the ${requestTypePrompt} for what they're asking about: ${question}\nContext: ${fullContext}\n\nIMPORTANT: Answer with ONLY the ${requestTypePrompt}. Do not include any other information. Maximum 1 sentence. Speak naturally in conversational tone, not like reading a table or list.`
-            : `ユーザーは以前${requestTypePrompt}について尋ね、今は特定の選択肢について聞いています。聞かれているものの${requestTypePrompt}のみを答えてください: ${question}\n文脈: ${fullContext}\n\n重要：${requestTypePrompt}のみを答えてください。他の情報は含めないでください。最大1文。表や箇条書きを読み上げるのではなく、自然な会話調で答えてください。`;
+            ? `The user previously asked about ${requestTypePrompt} and is now asking about a specific option. Give ONLY the ${requestTypePrompt} for what they're asking about: ${question}\nContext: ${fullContext}\n\nIMPORTANT: Answer with ONLY the ${requestTypePrompt}. Do not include any other information. Maximum 1 sentence. Speak naturally in conversational tone, not like reading a table or list. Do NOT include any tags, titles, or labels in square brackets like [Tag Name].`
+            : `ユーザーは以前${requestTypePrompt}について尋ね、今は特定の選択肢について聞いています。聞かれているものの${requestTypePrompt}のみを答えてください: ${question}\n文脈: ${fullContext}\n\n重要：${requestTypePrompt}のみを答えてください。他の情報は含めないでください。最大1文。表や箇条書きを読み上げるのではなく、自然な会話調で答えてください。[タグ名]のような角括弧付きのタグ、タイトル、ラベルを含めないでください。`;
         } else if (isFollowUp) {
           prompt = language === 'en'
-            ? `The user is asking a follow-up question about another option. Give a brief, direct answer focusing only on what they asked about: ${question}\nContext: ${fullContext}\n\nIMPORTANT: Keep your response extremely brief (1 sentence). Only state the key information they need.`
-            : `ユーザーは別の選択肢についてフォローアップの質問をしています。聞かれたことだけに焦点を当てて、簡潔で直接的な答えを提供してください: ${question}\n文脈: ${fullContext}\n\n重要：極めて簡潔に（1文で）回答してください。必要な主要情報のみを述べてください。`;
+            ? `The user is asking a follow-up question about another option. Give a brief, direct answer focusing only on what they asked about: ${question}\nContext: ${fullContext}\n\nIMPORTANT: Keep your response extremely brief (1 sentence). Only state the key information they need. Do NOT include any tags, titles, or labels in square brackets like [Tag Name].`
+            : `ユーザーは別の選択肢についてフォローアップの質問をしています。聞かれたことだけに焦点を当てて、簡潔で直接的な答えを提供してください: ${question}\n文脈: ${fullContext}\n\n重要：極めて簡潔に（1文で）回答してください。必要な主要情報のみを述べてください。[タグ名]のような角括弧付きのタグ、タイトル、ラベルを含めないでください。`;
         } else {
           prompt = language === 'en'
-            ? `Extract ONLY the specific information requested from the knowledge provided. Ignore unrelated information even if it's in the same document: ${question}\nContext: ${fullContext}\n\nIMPORTANT: Answer ONLY what was asked. Do not include additional details, explanations, or unrelated information. Keep response to 1 sentence maximum. Convert lists or tables into natural conversational language. Do not use markdown formatting or bullet points.`
-            : `提供された知識から、質問された特定の情報のみを抽出してください。同じ文書内にあっても関連のない情報は無視してください: ${question}\n文脈: ${fullContext}\n\n重要：質問されたことのみに答えてください。追加の詳細、説明、関連のない情報は含めないでください。回答は最大1文にしてください。リストや表は自然な会話調の言葉に変換してください。マークダウン形式や箇条書きは使用しないでください。`;
+            ? `Extract ONLY the specific information requested from the knowledge provided. Ignore unrelated information even if it's in the same document: ${question}\nContext: ${fullContext}\n\nIMPORTANT: Answer ONLY what was asked. Do not include additional details, explanations, or unrelated information. Keep response to 1 sentence maximum. Convert lists or tables into natural conversational language. Do not use markdown formatting or bullet points. Do NOT include any tags, titles, or labels in square brackets like [Tag Name].`
+            : `提供された知識から、質問された特定の情報のみを抽出してください。同じ文書内にあっても関連のない情報は無視してください: ${question}\n文脈: ${fullContext}\n\n重要：質問されたことのみに答えてください。追加の詳細、説明、関連のない情報は含めないでください。回答は最大1文にしてください。リストや表は自然な会話調の言葉に変換してください。マークダウン形式や箇条書きは使用しないでください。[タグ名]のような角括弧付きのタグ、タイトル、ラベルを含めないでください。`;
         }
       } else {
         prompt = language === 'en'
-          ? `Answer the question using the conversation history and knowledge provided. Reference previous conversation when relevant: ${question}\nContext: ${fullContext}\nProvide ONLY the requested information. Keep it to 1-2 sentences maximum. Use natural conversational language, not lists or formal documentation style.`
-          : `会話履歴と提供された知識を使って質問に答えてください。関連する場合は以前の会話を参照してください: ${question}\n文脈: ${fullContext}\n聞かれた情報のみを答え、余計な説明は不要です。最大1-2文で答えてください。リストや形式的な文書スタイルではなく、自然な会話調の言葉を使用してください。`;
+          ? `Answer the question using the conversation history and knowledge provided. Reference previous conversation when relevant: ${question}\nContext: ${fullContext}\nProvide ONLY the requested information. Keep it to 1-2 sentences maximum. Use natural conversational language, not lists or formal documentation style. Do NOT include any tags, titles, or labels in square brackets like [Tag Name].`
+          : `会話履歴と提供された知識を使って質問に答えてください。関連する場合は以前の会話を参照してください: ${question}\n文脈: ${fullContext}\n聞かれた情報のみを答え、余計な説明は不要です。最大1-2文で答えてください。リストや形式的な文書スタイルではなく、自然な会話調の言葉を使用してください。[タグ名]のような角括弧付きのタグ、タイトル、ラベルを含めないでください。`;
       }
     }
     
@@ -209,17 +209,37 @@ export class EnhancedQAAgent extends Agent {
       { role: 'user', content: prompt }
     ]);
     
+    // Post-process response to ensure it doesn't contain knowledge base tags
+    let cleanedResponse = response.text;
+    
+    // Remove any square bracket tags that might have leaked through
+    cleanedResponse = cleanedResponse.replace(/\[[^\]]+\]\s*/g, '');
+    
+    // If this was a specific request, ensure the response is focused
+    if (isSpecificRequest && cleanedResponse.length > 150) {
+      // If response is too long for a specific request, extract the key information
+      const extractPrompt = language === 'en'
+        ? `Extract ONLY the specific answer from this text. Keep it to 1 sentence maximum: ${cleanedResponse}`
+        : `このテキストから特定の答えのみを抽出してください。最大1文にしてください: ${cleanedResponse}`;
+      
+      const extractedResponse = await this.generate([
+        { role: 'user', content: extractPrompt }
+      ]);
+      
+      cleanedResponse = extractedResponse.text;
+    }
+    
     // Store the Q&A interaction in memory with error handling
     try {
       await this.simplifiedMemory.addMessage('user', question);
-      await this.simplifiedMemory.addMessage('assistant', response.text);
+      await this.simplifiedMemory.addMessage('assistant', cleanedResponse);
     } catch (error) {
       console.error('[EnhancedQAAgent] Failed to store conversation in memory:', error);
       // Continue execution even if memory storage fails
     }
     
     // Auto-enhance response with emotion tags
-    return EmotionTagParser.enhanceAgentResponse(response.text, 'qa', language);
+    return EmotionTagParser.enhanceAgentResponse(cleanedResponse, 'qa', language);
   }
 
   private async getCalendarContext(query: string): Promise<string> {

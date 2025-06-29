@@ -321,7 +321,8 @@ export class RAGSearchTool {
         contentLength: item.content.length,
         category: item.category
       });
-      return `[${title}]\n${item.content}`;
+      // Return only the content without the title in brackets
+      return item.content;
     });
 
     const finalContext = contextParts.join('\n\n');
@@ -378,7 +379,8 @@ export class RAGSearchTool {
         contentLength: item.content.length,
         category: item.category
       });
-      return `[${title}]\n${item.content}`;
+      // Return only the content without the title in brackets
+      return item.content;
     });
 
     const finalContext = contextParts.join('\n\n');
