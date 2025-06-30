@@ -5,6 +5,7 @@ import { GeneralWebSearchTool } from '../tools/general-web-search';
 import { SupportedLanguage } from '../types/config';
 import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
 import { ClarificationUtils } from '@/lib/clarification-utils';
+import { applySttCorrections } from '@/utils/stt-corrections';
 
 export class EnhancedQAAgent extends Agent {
   private memory: any;
@@ -387,8 +388,11 @@ Official X/Twitter: https://x.com/EngineerCafeJP
     
     console.log('[EnhancedQAAgent] Starting RAG search for query:', query);
     
+    // Apply STT corrections first (handles cafe/wall confusion and other misrecognitions)
+    const sttCorrectedQuery = applySttCorrections(query);
+    
     // Normalize query for better matching
-    const normalizedQuery = query.toLowerCase()
+    const normalizedQuery = sttCorrectedQuery.toLowerCase()
       .replace(/coffee say no/g, 'saino cafe')
       .replace(/才能/g, 'saino')
       .replace(/say no/g, 'saino')
@@ -397,6 +401,9 @@ Official X/Twitter: https://x.com/EngineerCafeJP
       .replace(/セイノ/g, 'saino')
       .replace(/サイノ/g, 'saino');
     
+    if (query !== sttCorrectedQuery) {
+      console.log('[EnhancedQAAgent] STT correction applied:', query, '→', sttCorrectedQuery);
+    }
     console.log('[EnhancedQAAgent] Normalized query:', normalizedQuery);
     
     const category = await this.categorizeQuestion(normalizedQuery);
@@ -532,15 +539,15 @@ Official X/Twitter: https://x.com/EngineerCafeJP
   }
 
   async categorizeQuestion(question: string): Promise<string> {
-    const lowerQuestion = question.toLowerCase();
+    // Apply STT corrections first
+    const correctedQuestion = applySttCorrections(question);
+    const lowerQuestion = correctedQuestion.toLowerCase();
     const normalizedQuestion = lowerQuestion
       .replace(/coffee say no/g, 'saino')
       .replace(/才能/g, 'saino')
       .replace(/say no/g, 'saino')
-      // Common speech recognition errors for "engineer cafe"
-      .replace(/engineer confess/g, 'engineer cafe')
-      .replace(/engineer conference/g, 'engineer cafe')
-      .replace(/engineer campus/g, 'engineer cafe');
+      // Common speech recognition errors for "engineer cafe" are now handled by applySttCorrections
+      ;
     
     // Calendar/Events
     if (normalizedQuestion.includes('カレンダー') || normalizedQuestion.includes('calendar') ||

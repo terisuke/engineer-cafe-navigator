@@ -31,9 +31,17 @@ APIはGoogle CloudサービスにService Account認証を使用します。ク�
 ### Service Account設定
 
 1. Google Cloud ConsoleでService Accountを作成
-2. ロールを付与: `roles/speech.client`
+2. ロールを付与: `roles/speech.client` および `roles/texttospeech.client`
 3. JSONキーをダウンロードし `./config/service-account-key.json` に配置
 4. 環境変数を設定: `GOOGLE_CLOUD_CREDENTIALS=./config/service-account-key.json`
+
+### CRONジョブ認証
+
+CRONジョブエンドポイントは`CRON_SECRET`環境変数と一致するBearerトークンが必要です：
+
+```http
+Authorization: Bearer your-cron-secret
+```
 
 ## 🎤 音声処理 API
 
@@ -589,6 +597,16 @@ curl http://localhost:3000/api/voice?action=supported_languages
 - セッション管理の改善
 - 感情検出機能の追加
 
+### v2.1.0 (2025-06-30)
+- SimplifiedMemorySystemによる3分間TTLメモリ
+- クロス言語検索対応のマルチ言語RAG
+- Web Audio APIによるモバイル音声互換性
+- インテリジェントキャッシング付きリップシンク最適化
+- 本番環境監視ダッシュボード
+- 知識更新用自動CRONジョブ
+- 管理者向け知識管理インターフェース
+- メモリを意識した会話処理
+
 ### v1.2.0 (2024-01-30)
 - 背景制御API追加
 
@@ -599,5 +617,142 @@ curl http://localhost:3000/api/voice?action=supported_languages
 - 初期APIリリース
 
 ---
+
+## 🔍 知識ベース検索API
+
+### POST /api/knowledge/search
+
+マルチ言語対応のRAG（検索拡張生成）ベースの知識ベース検索。
+
+#### リクエスト
+
+```json
+{
+  "query": "エンジニアカフェの利用時間は？",
+  "language": "ja",
+  "limit": 5,
+  "similarityThreshold": 0.7
+}
+```
+
+#### レスポンス
+
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "content": "エンジニアカフェの営業時間は9:00-22:00です",
+      "similarity": 0.85,
+      "metadata": {
+        "source": "facility-info",
+        "category": "基本情報",
+        "subcategory": "営業時間",
+        "language": "ja",
+        "importance": "high"
+      }
+    }
+  ],
+  "total": 1,
+  "embeddingModel": "text-embedding-004",
+  "searchLanguage": "ja"
+}
+```
+
+**機能:**
+- クロス言語検索: 英語の質問で日本語コンテンツを検索可能
+- Google text-embedding-004使用（768次元、1536次元にパディング）
+- OpenAI text-embedding-3-smallへのフォールバック
+- クロス言語結果の自動重複除去
+
+## 📊 監視API
+
+### GET /api/monitoring/dashboard
+
+システム監視ダッシュボード用データの取得。
+
+#### レスポンス
+
+```json
+{
+  "success": true,
+  "metrics": {
+    "ragSearchMetrics": {
+      "totalSearches": 1250,
+      "avgLatency": 580,
+      "successRate": 0.95
+    },
+    "cacheMetrics": {
+      "hitRate": 0.82,
+      "totalHits": 1025
+    },
+    "externalApiMetrics": {
+      "connpass": {
+        "totalCalls": 48,
+        "avgLatency": 1200
+      }
+    },
+    "systemHealth": {
+      "status": "healthy",
+      "uptime": 99.95
+    }
+  }
+}
+```
+
+## 🤖 管理API
+
+### GET /admin/knowledge
+
+Webベースの知識ベース管理インターフェース。
+
+### POST /api/admin/knowledge/import
+
+重複検出付きバッチインポート。
+
+## 🔄 CRON API
+
+### POST /api/cron/update-knowledge-base
+
+外部ソースからの自動知識ベース同期。
+
+**ヘッダー:**
+```http
+Authorization: Bearer your-cron-secret
+```
+
+**機能:**
+- 本番環境では6時間ごとに実行
+- Connpass、Googleカレンダー、Webサイトから同期
+- 期限切れイベントの自動クリーンアップ
+- マルチ言語コンテンツ生成
+
+### POST /api/cron/update-slides
+
+スライドコンテンツの自動更新。
+
+## 🏥 ヘルスチェックAPI
+
+### GET /api/health/knowledge
+
+知識ベースの健全性ステータス。
+
+#### レスポンス
+
+```json
+{
+  "success": true,
+  "health": {
+    "totalEntries": 84,
+    "languages": {
+      "ja": 42,
+      "en": 42
+    },
+    "lastUpdate": "2025-06-30T12:00:00Z",
+    "embeddingModel": "text-embedding-004",
+    "status": "healthy"
+  }
+}
+```
 
 詳細については[メインドキュメント](./README.md)を参照するか、開発チームにお問い合わせください。

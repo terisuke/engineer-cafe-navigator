@@ -15,6 +15,7 @@ pnpm start                  # Start production server
 
 # Code Quality
 pnpm lint                   # Run Next.js linting
+pnpm typecheck              # Run TypeScript type checking
 
 # CSS Dependencies
 pnpm install:css            # Install correct Tailwind CSS v3 dependencies
@@ -24,14 +25,20 @@ pnpm seed:knowledge         # Seed knowledge base with initial data
 pnpm migrate:embeddings     # Migrate existing knowledge to OpenAI embeddings
 pnpm import:knowledge       # Import knowledge from markdown files
 pnpm import:narrations      # Import slide narrations
+pnpm update:embeddings      # Update embeddings for existing knowledge
 
 # Database Management
 pnpm db:migrate             # Run database migrations
 pnpm db:setup-admin         # Setup admin knowledge interface
+pnpm db:reset               # Reset database (development only)
 
 # CRON Jobs (Production)
 pnpm cron:update-knowledge  # Manually trigger knowledge base update
 pnpm cron:update-slides     # Manually trigger slide update
+
+# Monitoring & Health
+pnpm health:check           # Run system health checks
+pnpm metrics:dashboard      # View performance metrics
 ```
 
 ## ⚠️ CRITICAL: Tailwind CSS Version
@@ -51,6 +58,7 @@ pnpm cron:update-slides     # Manually trigger slide update
   - Google text-embedding-004 (768 dimensions, padded to 1536 for compatibility)
   - OpenAI text-embedding-3-small (1536 dimensions as fallback)
 - **Voice**: Google Cloud Speech-to-Text/Text-to-Speech with Web Audio API for mobile compatibility
+  - STT Correction System for improved Japanese recognition accuracy
 - **3D Graphics**: Three.js 0.176.0 with @pixiv/three-vrm 3.4.1
 - **Database**: PostgreSQL with pgvector extension
 - **Backend Services**: Supabase 2.49.8
@@ -467,6 +475,7 @@ The application features an advanced conversation memory system that enables nat
 - **Question History**: Agents remember previous questions and can reference them in responses
 - **Conversation Continuity**: 3-minute conversation windows maintain context across multiple interactions
 - **Intelligent Routing**: Memory-related questions automatically use conversation history instead of knowledge base search
+- **SessionId Tracking**: Proper sessionId propagation ensures consistent conversation threading
 
 #### **Natural Language Memory Queries**
 The system recognizes memory-related questions in both languages:
@@ -478,6 +487,7 @@ The system recognizes memory-related questions in both languages:
 - **TTL Management**: Automatic 3-minute expiration with Supabase-based cleanup
 - **Emotion Context**: Emotional state is preserved and referenced in memory retrieval
 - **Performance Optimization**: Hash-based message indexing for efficient memory access
+- **SessionId Fix (2024)**: Corrected sessionId extraction from conversation history for proper memory association
 
 #### **User Experience Benefits**
 - **Natural Interactions**: Users can reference previous conversations naturally
@@ -500,19 +510,31 @@ The application includes a comprehensive production monitoring system:
   - Error rates and types
   - Percentile latencies (p50, p95, p99)
   - System health indicators
+  - Memory usage and conversation volumes
+  - Audio playback success rates
 
 #### **Alert System**
 - **Webhook Integration**: `/api/alerts/webhook`
 - **Alert Types**:
-  - Performance degradation
-  - Error rate spikes
+  - Performance degradation (>2x baseline latency)
+  - Error rate spikes (>5% error rate)
   - Knowledge base health issues
   - External API failures
+  - Memory system anomalies
+  - Audio service failures
 
 #### **Metrics Storage**
 - Automatic aggregation of performance data
 - Historical trending and analysis
 - Baseline tracking for anomaly detection
+- 30-day retention for detailed metrics
+- Hourly/daily aggregations for long-term trends
+
+#### **Health Check Endpoints**
+- `/api/health`: Basic system health
+- `/api/health/knowledge`: Knowledge base integrity
+- `/api/health/memory`: Memory system status
+- `/api/health/audio`: Audio service availability
 
 ### Automated Knowledge Base Updates
 
@@ -586,3 +608,88 @@ Utility scripts for maintenance and migration:
 - `scripts/setup-admin-knowledge.ts`: Initialize admin interface
 - `scripts/update-database-schema.ts`: Schema migrations
 - `scripts/migrate-all-knowledge.ts`: Comprehensive migration tool
+
+### STT Correction System
+
+The application includes an advanced Speech-to-Text correction system for improved Japanese recognition accuracy:
+
+#### **Core Features**
+- **Pattern-based Corrections**: Fixes common Google Cloud STT misrecognitions for Japanese terms
+- **Context-aware Processing**: Considers surrounding text for more accurate corrections
+- **Specific Term Support**: Handles Engineer Cafe-specific terminology and technical terms
+- **Multi-pattern Matching**: Supports various misrecognition patterns for single terms
+
+#### **Common Corrections**
+- エンジニアカフェ variations (エンジンカフェ, エンジニアカフ, etc.)
+- 地下/階下 disambiguation (properly handles "地下" references)
+- Technical terms and facility names
+- Common Japanese homophones and similar-sounding words
+
+#### **Implementation Details**
+- **Location**: `src/lib/stt-correction.ts`
+- **Integration**: Automatically applied in voice processing pipeline
+- **Extensibility**: Easy to add new correction patterns
+- **Performance**: Minimal overhead with efficient pattern matching
+
+### Response Precision Enhancements
+
+#### **Specific Request Type Extraction**
+The system now intelligently extracts specific request types from user queries:
+
+- **営業時間 (Business Hours)**: Detects variations like "何時まで", "開いてる時間"
+- **料金 (Pricing)**: Identifies "いくら", "価格", "料金" queries
+- **場所 (Location)**: Recognizes "どこ", "場所", "アクセス" questions
+- **設備 (Facilities)**: Captures specific facility queries with room/space names
+- **利用方法 (How to Use)**: Handles "使い方", "利用方法", "予約" questions
+
+#### **Enhanced Response Quality**
+- **Precision Mode**: Automatically activated for specific information requests
+- **1-2 Sentence Responses**: Concise answers for factual queries
+- **Context Isolation**: Prevents inclusion of unrelated information
+- **Natural Language**: Maintains conversational tone while being precise
+
+### SimplifiedMemorySystem Improvements (2024)
+
+#### **Recent Enhancements**
+- **Improved SessionId Handling**: Fixed sessionId extraction from conversation history
+- **Better Error Recovery**: Graceful handling of memory operation failures
+- **Enhanced Context Building**: More intelligent combination of memory and knowledge base
+- **Optimized Query Performance**: Reduced database calls through better caching
+
+#### **Memory-Aware Features**
+- **Conversation Threading**: Proper sessionId propagation ensures conversations stay connected
+- **Question Reference**: Users can ask about "さっき聞いた質問" and get accurate history
+- **Context Preservation**: Emotional states and metadata preserved across interactions
+- **Smart TTL Management**: Automatic cleanup with configurable expiration windows
+
+## Recent Fixes and Improvements (2024)
+
+### SessionId Tracking Fix
+- **Issue**: SessionId was not properly extracted from conversation history
+- **Fix**: Updated SimplifiedMemorySystem to correctly parse sessionId from history entries
+- **Impact**: Improved conversation threading and memory association
+
+### Response Precision System
+- **Issue**: Overly verbose responses for simple factual queries
+- **Solution**: Implemented detectSpecificRequest() for intelligent response filtering
+- **Result**: Concise 1-2 sentence answers for specific information requests
+
+### STT Correction Implementation
+- **Challenge**: Google Cloud STT frequently misrecognizes Japanese terms
+- **Solution**: Pattern-based correction system with context awareness
+- **Benefit**: Significantly improved recognition accuracy for Engineer Cafe terminology
+
+### Memory System Enhancements
+- **Improvement**: Better handling of memory-related questions
+- **Feature**: Automatic detection of "さっき何を聞いた？" type queries
+- **Enhancement**: Proper conversation history retrieval with emotion context
+
+### Production Monitoring Addition
+- **New Features**: Comprehensive metrics tracking and alerting
+- **Dashboards**: Real-time performance visualization
+- **Automation**: CRON-based knowledge base updates every 6 hours
+
+### Audio Service Unification
+- **Refactor**: Consolidated all audio playback through AudioPlaybackService
+- **Benefit**: Consistent behavior and better tablet compatibility
+- **Performance**: Improved lip-sync caching and mobile optimization

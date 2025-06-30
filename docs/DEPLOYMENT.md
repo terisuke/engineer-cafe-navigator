@@ -305,10 +305,32 @@ UPSTASH_REDIS_TOKEN=your-redis-token
 ```typescript
 // vercel.json に追加
 {
-  "crons": [{
-    "path": "/api/cron/update-knowledge-base",
-    "schedule": "0 */6 * * *"  // 6時間ごと
-  }]
+  "crons": [
+    {
+      "path": "/api/cron/update-knowledge-base",
+      "schedule": "0 */6 * * *"  // 6時間ごと
+    },
+    {
+      "path": "/api/cron/update-slides",
+      "schedule": "0 0 * * *"  // 毎日午前0時
+    }
+  ]
+}
+```
+
+#### CRON ジョブセキュリティ
+
+```typescript
+// api/cron/update-knowledge-base/route.ts
+export async function POST(request: NextRequest) {
+  // CRONシークレット検証
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  // 知識ベース更新処理
+  // ...
 }
 ```
 
@@ -343,21 +365,27 @@ GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
 GOOGLE_CLOUD_PROJECT_ID=your-gcp-project-id
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 
-# OpenAI (Embeddings)
+# OpenAI (Embeddings - 1536 dimensions)
 OPENAI_API_KEY=your-openai-api-key
 
 # Database
 POSTGRES_URL=postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
 SUPABASE_URL=https://[project-ref].supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # Authentication
 NEXTAUTH_SECRET=your-32-character-secret-key
 NEXTAUTH_URL=https://engineer-cafe-navigator.com
 
+# CRON Jobs
+CRON_SECRET=your-cron-secret
+
 # Optional: External Services
 WEBSOCKET_URL=wss://your-websocket-server.com
 RECEPTION_API_URL=https://your-reception-api.com
+GOOGLE_CALENDAR_CLIENT_ID=your-client-id
+GOOGLE_CALENDAR_CLIENT_SECRET=your-client-secret
 ```
 
 #### セキュリティ設定
@@ -710,6 +738,57 @@ echo "$HEADERS" | grep -q "X-Content-Type-Options" || { echo "❌ X-Content-Type
 echo "✅ デプロイ後検証完了!"
 ```
 
+## 📦 本番環境固有の設定
+
+### 監視ダッシュボード
+
+```typescript
+// /api/monitoring/dashboardのレスポンス
+{
+  "ragSearchMetrics": {
+    "totalSearches": 1250,
+    "avgLatency": 580,
+    "successRate": 0.95
+  },
+  "cacheMetrics": {
+    "hitRate": 0.82,
+    "totalHits": 1025,
+    "totalMisses": 225
+  },
+  "externalApiMetrics": {
+    "connpass": {
+      "totalCalls": 48,
+      "avgLatency": 1200,
+      "errorRate": 0.02
+    },
+    "googleCalendar": {
+      "totalCalls": 96,
+      "avgLatency": 800,
+      "errorRate": 0.01
+    }
+  },
+  "systemHealth": {
+    "status": "healthy",
+    "uptime": 99.95,
+    "lastError": null
+  }
+}
+```
+
+### アラート設定
+
+```bash
+# Webhook URLの設定
+vercel env add ALERT_WEBHOOK_URL production
+vercel env add ALERT_WEBHOOK_SECRET production
+
+# アラート条件
+- RAG検索レイテンシ > 2秒
+- キャッシュヒット率 < 60%
+- エラー率 > 5%
+- システムステータス != healthy
+```
+
 ## 🔧 トラブルシューティング
 
 ### 1. よくある問題と解決方法
@@ -761,6 +840,18 @@ psql $POSTGRES_URL -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
 ### 2. パフォーマンス問題
+
+#### iPad/iOSの音声問題
+
+```typescript
+// 問題
+AudioContextがSafariでブロックされる
+
+// 解決策
+1. MobileAudioServiceが自動的にフォールバック
+2. ユーザーにタップを促すUI表示
+3. AudioInteractionManagerがイベントをキャッチ
+```
 
 #### 遅いAPIレスポンス
 
@@ -840,6 +931,9 @@ const memoryUsage = () => {
 - [ ] RAG検索機能の動作確認
 - [ ] 外部API接続確認（Connpass、Google Calendar）
 - [ ] 知識ベース更新ジョブの稼働確認
+- [ ] スライド更新ジョブの稼働確認
+- [ ] 監視ダッシュボードの動作確認
+- [ ] アラートWebhookの設定確認
 
 ### 緊急時対応
 

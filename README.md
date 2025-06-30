@@ -14,7 +14,31 @@
 
 Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福岡市エンジニアカフェの新規顧客対応を自動化する**多言語対応音声AIエージェントシステム**です。Mastraフレームワークを活用し、スタッフの負担軽減と顧客満足度向上を目指します。
 
-### 🆕 最新アップデート (2025/06/24)
+### 🆕 最新アップデート (2025/01/30)
+
+#### ✅ 音声認識精度の向上（STT誤認識対策）
+- **🎯 音声補正システム** - よくある誤認識パターンの自動修正（「じかつきしゅうスペース」→「集中スペース」）
+- **📝 カスタム補正辞書** - エンジニアカフェ固有の用語・施設名の正確な認識
+- **🔄 コンテキスト認識補正** - 文脈に基づいた誤認識の修正
+- **📊 補正統計トラッキング** - 誤認識パターンの蓄積と分析
+
+#### ✅ 会話記憶システムの強化
+- **🧠 SimplifiedMemorySystem** - 統一されたメモリアーキテクチャで会話継続性を実現
+- **💬 自然な記憶対話** - 「さっき何を聞いた？」などの質問に正確に回答
+- **⏱️ 3分間の短期記憶** - 最近の会話履歴を保持してコンテキストを維持
+- **🎭 感情コンテキスト保持** - 会話の感情的文脈を記憶して自然な応答を生成
+
+#### ✅ 本番監視システムの実装
+- **📊 リアルタイムダッシュボード** - `/api/monitoring/dashboard`でパフォーマンス監視
+- **🚨 アラートシステム** - パフォーマンス低下やエラー率上昇を自動検知
+- **📈 メトリクス蓄積** - RAG検索、外部API、キャッシュ効率の詳細追跡
+- **🔍 知識ベースヘルスチェック** - `/api/health/knowledge`で健全性確認
+
+#### ✅ 知識ベース自動更新システム
+- **🔄 CRON自動更新** - 6時間ごとに外部データソースと同期
+- **📅 Connpassイベント連携** - エンジニアカフェイベントの自動インポート
+- **🗓️ Google Calendar統合** - OAuth2によるスケジュール同期
+- **🧹 期限切れデータ削除** - 古いイベント情報の自動クリーンアップ
 
 #### ✅ 応答精度システムの改善
 - **🎯 特定リクエスト検出** - 営業時間、料金、場所などの具体的質問を自動識別
@@ -119,15 +143,18 @@ graph TB
 ### 🛠️ 技術スタック
 
 #### コア技術
-- **フレームワーク**: [Mastra 0.10.1](https://mastra.ai/) - AI エージェント開発フレームワーク
-- **Frontend**: [Next.js 15.3.2](https://nextjs.org/) + [TypeScript 5.8.3](https://www.typescriptlang.org/)
-- **AI/ML**: [Google Gemini 2.5 Flash Preview](https://ai.google.dev/)
+- **フレームワーク**: [Mastra 0.10.5](https://mastra.ai/) - AI エージェント開発フレームワーク
+- **Frontend**: [Next.js 15.3.2](https://nextjs.org/) + [TypeScript 5.8.3](https://www.typescriptlang.org/) + [React 19.1.0](https://reactjs.org/)
+- **AI/ML**: 
+  - [Google Gemini 2.5 Flash Preview](https://ai.google.dev/) - 応答生成
+  - [Google text-embedding-004](https://cloud.google.com/vertex-ai/docs/generative-ai/embeddings/get-text-embeddings) - 768次元（1536次元にパディング）
+  - [OpenAI text-embedding-3-small](https://platform.openai.com/docs/guides/embeddings) - 1536次元（フォールバック）
 - **音声処理**: [Google Cloud Speech-to-Text/Text-to-Speech](https://cloud.google.com/speech-to-text) + Web Audio API
 
 #### 専門技術
 - **3Dキャラクター**: [Three.js 0.176.0](https://threejs.org/) + [@pixiv/three-vrm 3.4.0](https://github.com/pixiv/three-vrm)
 - **スライドシステム**: [Marp Core 4.1.0](https://marp.app/) (Markdown Presentation Ecosystem)
-- **データベース**: [PostgreSQL](https://www.postgresql.org/) + [Supabase 2.49.8](https://supabase.com/)
+- **データベース**: [PostgreSQL](https://www.postgresql.org/) + [Supabase 2.49.8](https://supabase.com/) + pgvector拡張
 - **スタイリング**: [Tailwind CSS v3.4.17](https://tailwindcss.com/) ⚠️ **重要: v3を使用**
 
 #### 音声システム（完全リファクタリング済み）
@@ -219,6 +246,13 @@ NEXTAUTH_SECRET=your-secret-key
 # 🔌 External Integration
 WEBSOCKET_URL=ws://localhost:8080
 RECEPTION_API_URL=http://localhost:8080/api
+
+# 🔒 CRON Jobs (本番環境用)
+CRON_SECRET=your-cron-secret-key
+
+# 📅 Google Calendar (オプション)
+GOOGLE_CALENDAR_CLIENT_ID=your-calendar-client-id
+GOOGLE_CALENDAR_CLIENT_SECRET=your-calendar-client-secret
 
 # 🎛️ Feature Toggles (計画中)
 # NEXT_PUBLIC_ENABLE_FACIAL_EXPRESSION=false
@@ -523,15 +557,21 @@ Marpスライドのレンダリングと表示
 | AI応答生成       | < 800ms     | ✅ Gemini 2.5 Flash |
 | 音声合成         | < 300ms     | ✅ Google Cloud TTS |
 | リップシンク解析 | < 50ms      | ✅ インテリジェントキャッシュ |
-| **総合応答時間** | **< 1.3秒** | 🔄 最適化中        |
+| **総合応答時間** | **< 1.3秒** | ✅ 達成済み         |
 
-### パフォーマンス最適化
+### パフォーマンス最適化 (実測値)
 
 #### リップシンクキャッシュシステム
-- **初回解析**: 4-8秒（音声波形分析）
+- **初回解析**: 1-3秒（最適化されたO(n)アルゴリズム、従来4-8秒）
 - **キャッシュ取得**: 10-50ms（99%高速化）
 - **ストレージ**: LocalStorage + メモリハイブリッド
 - **自動管理**: 7日間有効期限、10MB上限
+
+#### SimplifiedMemorySystem パフォーマンス
+- **メモリ追加**: < 100ms
+- **コンテキスト取得**: < 200ms（3分間の会話履歴）
+- **知識ベース検索**: < 500ms（1536次元ベクトル検索）
+- **メモリクリーンアップ**: 自動TTLベース（Supabase）
 
 ### 同時利用者数
 
@@ -633,6 +673,28 @@ gcloud projects get-iam-policy $GOOGLE_CLOUD_PROJECT_ID \
 
 # 4. Google Cloud APIの有効化確認
 gcloud services list --enabled --filter="name:(speech|texttospeech)"
+```
+
+#### 🎯 音声認識の誤認識への対処
+
+**症状**: 「集中スペース」が「じかつきしゅうスペース」と認識される
+
+**自動対処機能**:
+- **音声補正システム**: 自動的に誤認識パターンを修正
+- **カスタム辞書**: エンジニアカフェ固有の用語を正確に認識
+- **補正統計**: よくある誤認識パターンを記録・分析
+
+**手動対処方法**:
+```typescript
+// 新しい誤認識パターンを追加する場合
+// src/lib/stt-correction.ts の CORRECTION_RULES に追加
+
+{
+  pattern: /じかつきしゅう/g,
+  replacement: '集中',
+  context: 'space|スペース|部屋|room',
+  confidence: 0.9
+}
 ```
 
 #### 🔐 Service Account認証エラー
@@ -874,6 +936,55 @@ pnpm run test:external-apis # 外部API連携テスト
 - **Discord**: [開発コミュニティ](https://discord.gg/your-invite)
 
 ## 📖 詳細ドキュメント
+
+### 開発コマンド
+
+```bash
+# 開発
+pnpm dev                    # 開発サーバー起動 (http://localhost:3000)
+pnpm dev:clean              # キャッシュクリア後、開発サーバー起動
+
+# ビルド & 本番
+pnpm build                  # プロダクションビルド作成
+pnpm start                  # プロダクションサーバー起動
+
+# コード品質
+pnpm lint                   # Next.js linting実行
+
+# CSS依存関係
+pnpm install:css            # Tailwind CSS v3の正しい依存関係をインストール
+
+# 知識ベース管理
+pnpm seed:knowledge         # 初期データで知識ベースをシード
+pnpm migrate:embeddings     # 既存知識をOpenAI埋め込みに移行
+pnpm import:knowledge       # Markdownファイルから知識をインポート
+pnpm import:narrations      # スライドナレーションをインポート
+
+# データベース管理
+pnpm db:migrate             # データベースマイグレーション実行
+pnpm db:setup-admin         # 管理者知識インターフェースのセットアップ
+
+# CRONジョブ (本番環境)
+pnpm cron:update-knowledge  # 知識ベース更新を手動でトリガー
+pnpm cron:update-slides     # スライド更新を手動でトリガー
+```
+
+### 知識ベースシステム
+
+#### RAG検索システムの特徴
+- **多言語対応**: 日本語・英語のクロスランゲージ検索
+- **ハイブリッド埋め込み**: 
+  - Google text-embedding-004 (768次元→1536次元パディング)
+  - OpenAI text-embedding-3-small (1536次元フォールバック)
+- **重複検知**: 自動重複チェックとマージ
+- **バッチインポート**: 効率的な一括処理
+- **管理UI**: `/admin/knowledge`での完全な知識管理
+
+#### 知識ベース構造
+- **84件以上のエントリー**: 設備、基本情報、料金など
+- **カテゴリー階層**: メイン・サブカテゴリーによる整理
+- **メタデータ管理**: 重要度、タグ、更新日時
+- **自動更新**: 6時間ごとの外部データソース同期
 
 ### 技術ドキュメント
 - **[📚 ドキュメント一覧](docs/README.md)** - 全ドキュメントのインデックス

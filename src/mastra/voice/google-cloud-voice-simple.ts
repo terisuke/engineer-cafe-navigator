@@ -5,6 +5,7 @@
 
 import { GoogleAuth } from 'google-auth-library';
 import * as fs from 'fs';
+import { applySttCorrections, adjustConfidenceAfterCorrection } from '@/utils/stt-corrections';
 
 interface VoiceSettings {
   language: string;
@@ -195,12 +196,31 @@ export class GoogleCloudVoiceSimple {
         }
         
         const trimmedTranscript = transcript.trim();
-        console.log(`Speech-to-Text successful: "${trimmedTranscript}" (confidence: ${confidence})`);
+        
+        // Apply STT corrections for common misrecognitions
+        const correctedTranscript = applySttCorrections(trimmedTranscript, language, confidence);
+        
+        // Adjust confidence if corrections were made
+        const adjustedConfidence = adjustConfidenceAfterCorrection(
+          trimmedTranscript,
+          correctedTranscript,
+          confidence
+        );
+        
+        // Log the results
+        if (trimmedTranscript !== correctedTranscript) {
+          console.log(`Speech-to-Text correction applied:`);
+          console.log(`  Original: "${trimmedTranscript}"`);
+          console.log(`  Corrected: "${correctedTranscript}"`);
+          console.log(`  Confidence: ${confidence} → ${adjustedConfidence}`);
+        } else {
+          console.log(`Speech-to-Text successful: "${correctedTranscript}" (confidence: ${adjustedConfidence})`);
+        }
         
         return {
           success: true,
-          transcript: trimmedTranscript,
-          confidence
+          transcript: correctedTranscript,
+          confidence: adjustedConfidence
         };
       } else {
         console.log('No transcription results in API response:', result);

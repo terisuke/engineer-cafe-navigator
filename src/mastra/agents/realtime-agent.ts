@@ -41,12 +41,13 @@ export class RealtimeAgent extends Agent {
 
   /**
    * Normalize input for common speech recognition errors
+   * Note: Primary corrections are now handled in GoogleCloudVoiceSimple.speechToText
+   * This is kept as a secondary fallback for any missed corrections
    */
   private normalizeInput(input: string): string {
-    return input
-      .replace(/engineer confess/gi, 'engineer cafe')
-      .replace(/engineer conference/gi, 'engineer cafe')
-      .replace(/engineer campus/gi, 'engineer cafe');
+    // Import the correction function for consistency
+    const { applySttCorrections } = require('@/utils/stt-corrections');
+    return applySttCorrections(input);
   }
 
   constructor(config: any, voiceService?: any) {

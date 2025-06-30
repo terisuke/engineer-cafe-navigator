@@ -31,9 +31,17 @@ The API uses Service Account authentication for Google Cloud services. Session-b
 ### Service Account Setup
 
 1. Create a service account in Google Cloud Console
-2. Grant roles: `roles/speech.client`
+2. Grant roles: `roles/speech.client` and `roles/texttospeech.client`
 3. Download JSON key and place at `./config/service-account-key.json`
 4. Set environment variable: `GOOGLE_CLOUD_CREDENTIALS=./config/service-account-key.json`
+
+### CRON Job Authentication
+
+CRON job endpoints require a Bearer token matching the `CRON_SECRET` environment variable:
+
+```http
+Authorization: Bearer your-cron-secret
+```
 
 ## 🎤 音声処理 API
 
@@ -638,7 +646,7 @@ curl https://engineer-cafe-navigator.vercel.app/api/voice?action=health
 
 ### POST /api/knowledge/search
 
-RAG (Retrieval-Augmented Generation) based knowledge base search.
+RAG (Retrieval-Augmented Generation) based knowledge base search with multi-language support.
 
 #### Request
 
@@ -654,7 +662,8 @@ RAG (Retrieval-Augmented Generation) based knowledge base search.
 {
   "query": "エンジニアカフェの利用時間は？",
   "language": "ja",
-  "limit": 5
+  "limit": 5,
+  "similarityThreshold": 0.7
 }
 ```
 
@@ -669,13 +678,24 @@ RAG (Retrieval-Augmented Generation) based knowledge base search.
       "similarity": 0.85,
       "metadata": {
         "source": "facility-info",
-        "category": "hours"
+        "category": "基本情報",
+        "subcategory": "営業時間",
+        "language": "ja",
+        "importance": "high"
       }
     }
   ],
-  "total": 1
+  "total": 1,
+  "embedingModel": "text-embedding-004",
+  "searchLanguage": "ja"
 }
 ```
+
+**Features:**
+- Cross-language search: English queries can find Japanese content and vice versa
+- Uses Google text-embedding-004 (768 dimensions, padded to 1536)
+- Fallback to OpenAI text-embedding-3-small if needed
+- Automatic duplicate removal for cross-language results
 
 ## 📊 Monitoring API
 
@@ -713,6 +733,78 @@ RAG移行ステータスの監視。
       "searchAccuracy": 0.92,
       "avgLatency": 580
     }
+  }
+}
+```
+
+## 🤖 Admin API
+
+### GET /admin/knowledge
+
+Web-based knowledge base management interface.
+
+### POST /admin/knowledge
+
+Create or update knowledge base entries.
+
+### GET /api/admin/knowledge/categories
+
+Get available categories and subcategories.
+
+### GET /api/admin/knowledge/metadata-templates
+
+Get metadata templates for different content types.
+
+### POST /api/admin/knowledge/import
+
+Batch import knowledge entries with duplicate detection.
+
+## 🔄 CRON API
+
+### POST /api/cron/update-knowledge-base
+
+Automated knowledge base synchronization from external sources.
+
+**Headers:**
+```http
+Authorization: Bearer your-cron-secret
+```
+
+**Features:**
+- Runs every 6 hours in production
+- Syncs from Connpass, Google Calendar, and website
+- Automatic cleanup of expired events
+- Multi-language content generation
+
+### POST /api/cron/update-slides
+
+Automated slide content updates.
+
+**Headers:**
+```http
+Authorization: Bearer your-cron-secret
+```
+
+## 🏥 Health Check API
+
+### GET /api/health/knowledge
+
+Knowledge base health status.
+
+#### Response
+
+```json
+{
+  "success": true,
+  "health": {
+    "totalEntries": 84,
+    "languages": {
+      "ja": 42,
+      "en": 42
+    },
+    "lastUpdate": "2025-06-30T12:00:00Z",
+    "embeddingModel": "text-embedding-004",
+    "status": "healthy"
   }
 }
 ```
@@ -766,6 +858,15 @@ curl -X POST http://localhost:3000/api/knowledge/search \
   - Multi-turn conversation support
   - Simplified voice service for Next.js compatibility
   - Session management improvements
+- **v2.1.0** (2025-06-30):
+  - SimplifiedMemorySystem with 3-minute TTL
+  - Multi-language RAG with cross-language search
+  - Mobile audio compatibility (Web Audio API)
+  - Lip-sync optimization with intelligent caching
+  - Production monitoring dashboard
+  - Automated CRON jobs for knowledge updates
+  - Admin knowledge management interface
+  - Memory-aware conversation handling
 
 ---
 

@@ -50,11 +50,16 @@ cp .env.example .env.local
 GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
 GOOGLE_CLOUD_PROJECT_ID=your-gcp-project
 GOOGLE_CLOUD_CREDENTIALS=./config/service-account-key.json
-OPENAI_API_KEY=your-openai-api-key  # RAG検索用埋め込みモデル
+OPENAI_API_KEY=your-openai-api-key  # RAG検索用埋め込みモデル (1536次元)
 NEXT_PUBLIC_SUPABASE_URL=https://project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 NEXTAUTH_SECRET=your-secret-key
+CRON_SECRET=your-cron-secret  # CRON ジョブ認証用
+
+# オプション: 外部連携
+GOOGLE_CALENDAR_CLIENT_ID=your-client-id
+GOOGLE_CALENDAR_CLIENT_SECRET=your-client-secret
 ```
 
 ## 🏗️ アーキテクチャ詳細
@@ -66,6 +71,7 @@ src/
 ├── app/                    # Next.js 15 App Router
 │   ├── api/               # API Routes
 │   ├── components/        # UIコンポーネント
+│   ├── admin/            # 管理画面
 │   ├── globals.css        # グローバルスタイル
 │   └── page.tsx          # メインページ
 ├── mastra/               # Mastra AI設定
@@ -74,8 +80,12 @@ src/
 │   ├── types/           # 型定義
 │   └── index.ts         # Mastra設定
 ├── lib/                 # 共通ライブラリ
+│   ├── audio/           # 音声関連サービス
+│   ├── rag/             # RAG検索システム
+│   └── simplified-memory.ts # メモリシステム
 ├── types/               # TypeScript型定義
 └── slides/              # プレゼンテーションコンテンツ
+    └── narration/       # スライドナレーションJSON
 ```
 
 ### コンポーネント設計原則
@@ -606,14 +616,27 @@ export const executeAgent = async (input: z.infer<typeof AgentInputSchema>) => {
 
 現在、プロジェクトにはテストフレームワークが設定されていません。APIの統合テストのみが利用可能です。
 
-### APIテストの実行
+### 利用可能なテストコマンド
 
 ```bash
 # API接続テスト
 pnpm test:api
-```
 
-このコマンドは`scripts/test-api-connection.ts`を実行し、APIエンドポイントの基本的な動作を確認します。
+# RAG検索機能テスト
+pnpm test:rag
+
+# 外部API統合テスト
+pnpm test:external-apis
+
+# ローカル環境セットアップテスト
+pnpm test:local
+
+# 本番環境デプロイメントテスト
+pnpm test:production
+
+# 外部データフェッチャーテスト
+pnpm test:external-data
+```
 
 ### 将来のテスト計画
 
@@ -742,9 +765,65 @@ const collectMetrics = {
 };
 ```
 
-## 📋 コード品質・規約
+## 🎯 新機能の開発ガイド
 
-### 1. ESLint設定
+### メモリシステムの利用
+
+```typescript
+import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
+
+// エージェント用メモリの初期化
+const memory = new SimplifiedMemorySystem('MyAgent');
+
+// メッセージの追加
+await memory.addMessage('user', 'エンジニアカフェの営業時間は？', {
+  emotion: 'curious',
+  sessionId: 'session_123'
+});
+
+// コンテキストの取得
+const context = await memory.getContext('さっき何を聞いた？', {
+  includeKnowledgeBase: true,
+  language: 'ja'
+});
+```
+
+### 音声再生サービスの利用
+
+```typescript
+import { AudioPlaybackService } from '@/lib/audio/audio-playback-service';
+
+// リップシンク付き音声再生
+await AudioPlaybackService.playAudioWithLipSync(audioBase64, {
+  volume: 0.8,
+  enableLipSync: true,
+  onVisemeUpdate: (viseme, intensity) => {
+    // キャラクターの口の形を更新
+  },
+  onPlaybackEnd: () => {
+    console.log('再生完了');
+  }
+});
+
+// 高速音声再生（リップシンクなし）
+await AudioPlaybackService.playAudioFast(audioBase64, 0.8);
+```
+
+### RAG検索の実装
+
+```typescript
+import { searchKnowledgeBaseEmbedding } from '@/lib/rag/search-knowledge-base-embedding';
+
+// 知識ベース検索
+const results = await searchKnowledgeBaseEmbedding(
+  '営業時間について教えて',
+  0.7,  // 類似度しきい値
+  5,    // 最大結果数
+  'ja'  // 言語
+);
+```
+
+## 📋 コード品質・規約
 
 ```json
 // .eslintrc.json
@@ -805,6 +884,52 @@ const collectMetrics = {
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }
+```
+
+## 🔧 開発用コマンド一覧
+
+### 開発・ビルド
+```bash
+pnpm dev                    # 開発サーバー起動 (http://localhost:3000)
+pnpm dev:clean              # キャッシュクリア後に開発サーバー起動
+pnpm build                  # 本番ビルド作成
+pnpm start                  # 本番サーバー起動
+pnpm lint                   # Next.js リンティング
+```
+
+### 依存関係管理
+```bash
+pnpm install:css            # Tailwind CSS v3 依存関係の正しいインストール
+# 注意: Tailwind CSS v4にアップグレードしないでください
+```
+
+### 知識ベース管理
+```bash
+pnpm seed:knowledge         # 初期データで知識ベースをシード
+pnpm migrate:embeddings     # 既存知識をOpenAI埋め込みに移行
+pnpm import:knowledge       # マークダウンファイルから知識をインポート
+pnpm import:narrations      # スライドナレーションをインポート
+```
+
+### データベース管理
+```bash
+pnpm db:migrate             # データベースマイグレーション実行
+pnpm db:setup-admin         # 管理知識インターフェースのセットアップ
+```
+
+### CRONジョブ（本番環境）
+```bash
+pnpm cron:update-knowledge  # 知識ベース更新を手動でトリガー
+pnpm cron:update-slides     # スライド更新を手動でトリガー
+```
+
+### 監視・分析
+```bash
+pnpm monitor:baseline       # パフォーマンスベースライン収集
+pnpm monitor:migration      # マイグレーションステータス監視
+pnpm compare:implementations # 実装パフォーマンス比較
+pnpm validate:production    # 本番環境準備状況検証
+pnpm check:deployment       # デプロイメント準備状況確認
 ```
 
 ## 🚀 デプロイ・CI/CD
