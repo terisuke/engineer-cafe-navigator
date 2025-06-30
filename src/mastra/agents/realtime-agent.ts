@@ -9,6 +9,7 @@ import { getEngineerCafeNavigator } from '@/mastra';
 import { Agent } from '@mastra/core/agent';
 import { SupportedLanguage } from '../types/config';
 import { EnhancedQAAgent } from './enhanced-qa-agent';
+import { applySttCorrections } from '@/utils/stt-corrections';
 
 /**
  * RealtimeAgent handles real-time voice interactions with contextual memory
@@ -45,8 +46,6 @@ export class RealtimeAgent extends Agent {
    * This is kept as a secondary fallback for any missed corrections
    */
   private normalizeInput(input: string): string {
-    // Import the correction function for consistency
-    const { applySttCorrections } = require('@/utils/stt-corrections');
     return applySttCorrections(input);
   }
 
