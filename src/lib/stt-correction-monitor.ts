@@ -5,7 +5,7 @@
  * to help identify patterns and improve the correction rules over time.
  */
 
-import { getSupabase } from './supabase-client';
+import { getSupabase } from './supabase';
 
 interface CorrectionEvent {
   original: string;
