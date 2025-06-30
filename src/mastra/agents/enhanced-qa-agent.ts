@@ -44,7 +44,7 @@ export class EnhancedQAAgent extends Agent {
     console.log(`[EnhancedQAAgent] Language set to: ${language}`);
   }
 
-  async answerQuestion(question: string, requestLanguage?: SupportedLanguage): Promise<string> {
+  async answerQuestion(question: string, requestLanguage?: SupportedLanguage, sessionId?: string): Promise<string> {
     // Use the provided language or fall back to memory/default
     const language: SupportedLanguage = requestLanguage || this.memory.get('language') || 'ja';
     
@@ -54,9 +54,15 @@ export class EnhancedQAAgent extends Agent {
     }
     
     // Get conversation context first
+    console.log(`[EnhancedQAAgent] Getting memory context for question: "${question}", language: ${language}`);
     const memoryContext = await this.simplifiedMemory.getContext(question, {
       includeKnowledgeBase: false, // We'll handle knowledge search separately
       language: language
+    });
+    console.log(`[EnhancedQAAgent] Memory context result:`, {
+      recentMessagesCount: memoryContext.recentMessages.length,
+      hasContext: !!memoryContext.contextString,
+      firstMessage: memoryContext.recentMessages[0]
     });
     
     // Check if this is a contextual follow-up to a previous specific request
@@ -70,6 +76,7 @@ export class EnhancedQAAgent extends Agent {
     console.log('[EnhancedQAAgent] Memory context available:', memoryContext.recentMessages.length > 0);
     
     let context = '';
+    let isContextual = false; // Declare at top level
     
     // Use appropriate tool based on category
     if (category === 'calendar' || category === 'events') {
@@ -85,7 +92,7 @@ export class EnhancedQAAgent extends Agent {
       }
     } else {
       // Check if this is a contextual response (answering a clarification)
-      const isContextual = await this.isContextualResponse(question);
+      isContextual = await this.isContextualResponse(question);
       
       if (isContextual) {
         console.log('[EnhancedQAAgent] Contextual response detected - combining with knowledge search');
@@ -144,16 +151,53 @@ export class EnhancedQAAgent extends Agent {
     
     // Special handling for memory-related questions and contextual responses
     const isMemoryQuestion = this.isMemoryRelatedQuestion(question);
-    const isContextual = await this.isContextualResponse(question);
+    // isContextual is already declared in the context building logic above
+    const isSpecificRequest = this.detectSpecificRequest(question, previousSpecificRequest);
+    
+    // Debug logging
+    console.log('[EnhancedQAAgent] Building prompt with:', {
+      isContextual,
+      isMemoryQuestion,
+      previousSpecificRequest,
+      isSpecificRequest,
+      hasConversationContext: !!conversationContext,
+      recentMessagesCount: memoryContext.recentMessages.length
+    });
     
     let prompt;
     
     if (isMemoryQuestion || isContextual) {
       if (isContextual) {
         // For contextual responses, understand the original question from conversation history
-        prompt = language === 'en'
-          ? `The user is responding to a clarification question. Look at the conversation history to understand what they originally asked, then provide the specific information they need: ${question}\nConversation History: ${conversationContext}\nContext: ${fullContext}\nCombine their clarification with their original question to provide the right answer. Focus on what they specifically chose and their original question.`
-          : `ユーザーは明確化の質問に答えています。会話履歴から元の質問を理解し、必要な具体的情報を提供してください: ${question}\n会話履歴: ${conversationContext}\n文脈: ${fullContext}\n明確化の回答と元の質問を組み合わせて適切な答えを提供してください。ユーザーが選択した内容と元の質問に焦点を当ててください。`;
+        // Extract the specific request type from the previous conversation
+        const originalSpecificRequest = this.extractPreviousSpecificRequest(memoryContext.recentMessages);
+        
+        if (originalSpecificRequest) {
+          // Get the specific information type that was requested
+          const requestTypePrompt = originalSpecificRequest === 'hours' 
+            ? (language === 'en' ? 'operating hours' : '営業時間')
+            : originalSpecificRequest === 'price'
+            ? (language === 'en' ? 'pricing information' : '料金情報')
+            : originalSpecificRequest === 'location'
+            ? (language === 'en' ? 'location information' : '場所情報')
+            : originalSpecificRequest === 'booking'
+            ? (language === 'en' ? 'reservation/booking information' : '予約情報')
+            : originalSpecificRequest === 'facility'
+            ? (language === 'en' ? 'facility/equipment information' : '設備情報')
+            : originalSpecificRequest === 'access'
+            ? (language === 'en' ? 'access/directions' : 'アクセス方法')
+            : (language === 'en' ? 'requested information' : '要求された情報');
+          
+          // Use a focused prompt that specifically asks for the original request type
+          prompt = language === 'en'
+            ? `The user originally asked about ${requestTypePrompt} and is now clarifying which place they meant. Give ONLY the ${requestTypePrompt} for: ${question}\nContext: ${fullContext}\n\nIMPORTANT: Answer with ONLY the ${requestTypePrompt}. Do not include any other information about the place. Maximum 1 sentence.`
+            : `ユーザーは最初に${requestTypePrompt}について尋ね、今どの場所について聞いているか明確にしています。次の場所の${requestTypePrompt}のみを答えてください: ${question}\n文脈: ${fullContext}\n\n重要：${requestTypePrompt}のみを答えてください。その場所の他の情報は含めないでください。最大1文。`;
+        } else {
+          // Fallback to general contextual response if no specific request was found
+          prompt = language === 'en'
+            ? `The user is responding to a clarification question. Look at the conversation history to understand what they originally asked, then provide ONLY the specific information they originally requested: ${question}\nConversation History: ${conversationContext}\nContext: ${fullContext}\n\nIMPORTANT: Focus only on answering their original question. Do not provide general information about the place.`
+            : `ユーザーは明確化の質問に答えています。会話履歴から元の質問を理解し、最初に要求された特定の情報のみを提供してください: ${question}\n会話履歴: ${conversationContext}\n文脈: ${fullContext}\n\n重要：元の質問に答えることだけに焦点を当ててください。その場所の一般的な情報は提供しないでください。`;
+        }
       } else {
         // Standard memory question handling
         prompt = language === 'en'
@@ -231,8 +275,16 @@ export class EnhancedQAAgent extends Agent {
     
     // Store the Q&A interaction in memory with error handling
     try {
-      await this.simplifiedMemory.addMessage('user', question);
-      await this.simplifiedMemory.addMessage('assistant', cleanedResponse);
+      // Extract request type before storing to memory
+      const requestType = this.extractRequestTypeFromQuestion(question);
+      
+      await this.simplifiedMemory.addMessage('user', question, {
+        requestType: requestType,
+        sessionId: sessionId
+      });
+      await this.simplifiedMemory.addMessage('assistant', cleanedResponse, {
+        sessionId: sessionId
+      });
     } catch (error) {
       console.error('[EnhancedQAAgent] Failed to store conversation in memory:', error);
       // Continue execution even if memory storage fails
@@ -887,6 +939,13 @@ ${context}
       .slice(-3); // Check last 3 user messages
     
     for (const msg of recentUserMessages) {
+      // First check if we stored the request type in metadata
+      if (msg.metadata?.requestType) {
+        console.log('[EnhancedQAAgent] Found stored request type in metadata:', msg.metadata.requestType);
+        return msg.metadata.requestType;
+      }
+      
+      // Fallback to content analysis if no metadata
       const content = msg.content.toLowerCase();
       if (content.includes('営業時間') || content.includes('hours') || content.includes('time') || 
           content.includes('何時') || content.includes('いつまで')) {
@@ -904,6 +963,39 @@ ${context}
       } else if (content.includes('アクセス') || content.includes('access') || content.includes('行き方')) {
         return 'access';
       }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Extract the type of request from a question
+   */
+  private extractRequestTypeFromQuestion(question: string): string | null {
+    const lowerQuestion = question.toLowerCase();
+    
+    if (lowerQuestion.includes('営業時間') || lowerQuestion.includes('hours') || lowerQuestion.includes('time') || 
+        lowerQuestion.includes('何時') || lowerQuestion.includes('いつまで') || lowerQuestion.includes('when') ||
+        lowerQuestion.includes('open') || lowerQuestion.includes('close') || lowerQuestion.includes('開いて') || 
+        lowerQuestion.includes('閉まる')) {
+      return 'hours';
+    } else if (lowerQuestion.includes('料金') || lowerQuestion.includes('price') || lowerQuestion.includes('cost') ||
+               lowerQuestion.includes('値段') || lowerQuestion.includes('無料') || lowerQuestion.includes('有料') ||
+               lowerQuestion.includes('fee') || lowerQuestion.includes('費用')) {
+      return 'price';
+    } else if (lowerQuestion.includes('場所') || lowerQuestion.includes('location') || lowerQuestion.includes('where') ||
+               lowerQuestion.includes('どこ') || lowerQuestion.includes('階') || lowerQuestion.includes('address') ||
+               lowerQuestion.includes('住所')) {
+      return 'location';
+    } else if (lowerQuestion.includes('予約') || lowerQuestion.includes('booking') || lowerQuestion.includes('reservation') ||
+               lowerQuestion.includes('reserve') || lowerQuestion.includes('申し込み') || lowerQuestion.includes('申込')) {
+      return 'booking';
+    } else if (lowerQuestion.includes('設備') || lowerQuestion.includes('facility') || lowerQuestion.includes('equipment') ||
+               lowerQuestion.includes('何がある') || lowerQuestion.includes('what is there') || lowerQuestion.includes('利用できる')) {
+      return 'facility';
+    } else if (lowerQuestion.includes('アクセス') || lowerQuestion.includes('access') || lowerQuestion.includes('行き方') ||
+               lowerQuestion.includes('directions') || lowerQuestion.includes('how to get')) {
+      return 'access';
     }
     
     return null;

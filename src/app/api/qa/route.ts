@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
           await qaAgent.memory.store('language', language);
         }
 
-        const answer = await qaAgent.answerQuestion(question, language);
+        const answer = await qaAgent.answerQuestion(question, language, sessionId);
         const category = await qaAgent.categorizeQuestion(question);
         
         // Convert answer to speech

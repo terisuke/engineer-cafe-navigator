@@ -138,6 +138,9 @@ importers:
       ignore-loader:
         specifier: ^0.1.2
         version: 0.1.2
+      node-fetch:
+        specifier: 3.3.2
+        version: 3.3.2
       node-loader:
         specifier: ^2.1.0
         version: 2.1.0(webpack@5.99.9)

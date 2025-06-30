@@ -34,6 +34,7 @@ export class SimplifiedMemorySystem {
       emotion?: string;
       confidence?: number;
       sessionId?: string;
+      requestType?: string | null;
     }
   ): Promise<void> {
     try {
@@ -45,6 +46,7 @@ export class SimplifiedMemorySystem {
         emotion: metadata?.emotion,
         confidence: metadata?.confidence,
         sessionId: metadata?.sessionId,
+        requestType: metadata?.requestType,
       };
 
       // Store in agent_memory table with TTL
@@ -62,7 +64,13 @@ export class SimplifiedMemorySystem {
       // Update message index for efficient retrieval
       await this.updateMessageIndex(timestamp);
 
-      console.log(`[SimplifiedMemory] Stored ${role} message with 3-minute TTL`);
+      console.log(`[SimplifiedMemory] Stored ${role} message with 3-minute TTL`, {
+        agentName: this.agentName,
+        key: `message_${timestamp}`,
+        requestType: metadata?.requestType,
+        sessionId: metadata?.sessionId,
+        expiresAt
+      });
     } catch (error) {
       console.error('[SimplifiedMemory] Error storing message:', error);
       throw error; // Rethrow to allow caller to handle the error
@@ -91,6 +99,7 @@ export class SimplifiedMemorySystem {
 
       // Get recent messages from agent_memory table (within 3-minute window)
       const recentMessages = await this.getRecentMessages();
+      console.log(`[SimplifiedMemory] Found ${recentMessages.length} recent messages for ${this.agentName}`);
 
       // Search knowledge base using existing RAG system
       let knowledgeResults: KnowledgeSearchResult[] = [];
@@ -259,18 +268,23 @@ export class SimplifiedMemorySystem {
    */
   private async getRecentMessages(): Promise<Array<{ role: string; content: string; metadata?: any }>> {
     try {
+      const currentTime = new Date().toISOString();
+      console.log(`[SimplifiedMemory] Querying messages for agent: ${this.agentName}, current time: ${currentTime}`);
+      
       const { data, error } = await supabaseAdmin
         .from('agent_memory')
         .select('*')
         .eq('agent_name', this.agentName)
         .like('key', 'message_%')
-        .gt('expires_at', new Date().toISOString())
+        .gt('expires_at', currentTime)
         .order('created_at', { ascending: true });
 
       if (error) {
         console.error('[SimplifiedMemory] Error fetching recent messages:', error);
         return [];
       }
+      
+      console.log(`[SimplifiedMemory] Retrieved ${data?.length || 0} messages from database`);
 
       return (data || []).map(item => ({
         role: item.value.role,
@@ -280,6 +294,7 @@ export class SimplifiedMemorySystem {
           confidence: item.value.confidence,
           sessionId: item.value.sessionId,
           timestamp: item.value.timestamp,
+          requestType: item.value.requestType,
         },
       }));
     } catch (error) {

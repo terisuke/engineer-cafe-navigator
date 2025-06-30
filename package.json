@@ -73,6 +73,7 @@
     "eslint": "9.27.0",
     "eslint-config-next": "15.3.3",
     "ignore-loader": "^0.1.2",
+    "node-fetch": "3.3.2",
     "node-loader": "^2.1.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
