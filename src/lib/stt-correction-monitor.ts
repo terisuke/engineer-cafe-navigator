@@ -5,7 +5,7 @@
  * to help identify patterns and improve the correction rules over time.
  */
 
-import { getSupabase } from './supabase';
+import { supabaseAdmin } from './supabase';
 
 interface CorrectionEvent {
   original: string;
@@ -92,10 +92,8 @@ export class SttCorrectionMonitor {
     this.corrections = [];
 
     try {
-      const supabase = getSupabase();
-      
       // Store in a monitoring table (create if doesn't exist)
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from('stt_correction_logs')
         .insert(toFlush.map(event => ({
           original_text: event.original,
@@ -130,11 +128,10 @@ export class SttCorrectionMonitor {
     correctionRate: number;
   }> {
     try {
-      const supabase = getSupabase();
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('stt_correction_logs')
         .select('*')
         .gte('created_at', startDate.toISOString());
