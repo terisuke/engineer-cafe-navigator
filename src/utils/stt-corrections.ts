@@ -117,7 +117,7 @@ export function applySttCorrections(transcript: string, language: string = 'ja',
 
     // Log to monitoring system (lazy import to avoid circular dependencies)
     try {
-      const { SttCorrectionMonitor } = require('@/lib/stt-correction-monitor');
+      const { SttCorrectionMonitor } = require('../lib/stt-correction-monitor');
       SttCorrectionMonitor.logCorrection(transcript, corrected, language, confidence, corrections);
     } catch (error) {
       // Ignore monitoring errors

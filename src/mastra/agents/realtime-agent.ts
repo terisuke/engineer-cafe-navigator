@@ -3,6 +3,7 @@ import { EmotionTagParser } from '@/lib/emotion-tag-parser';
 import { endPerformance, logPerformanceSummary, startPerformance } from '@/lib/performance-monitor';
 import { ConversationManager, SupabaseMemoryAdapter } from '@/lib/supabase-memory';
 import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
+import { SharedMemoryService } from '@/lib/shared-memory-service';
 import { TextChunker } from '@/lib/text-chunker';
 import { ClarificationUtils } from '@/lib/clarification-utils';
 import { getEngineerCafeNavigator } from '@/mastra';
@@ -30,6 +31,9 @@ export class RealtimeAgent extends Agent {
   
   /** New simplified memory system with 3-minute TTL */
   private simplifiedMemory: SimplifiedMemorySystem;
+  
+  /** Shared memory service for cross-agent communication */
+  private sharedMemory: SharedMemoryService;
   
   /** Current active session ID */
   private currentSessionId: string | null = null;
@@ -86,7 +90,9 @@ export class RealtimeAgent extends Agent {
     });
     this.voiceService = voiceService;
     this.supabaseMemory = new SupabaseMemoryAdapter('RealtimeAgent');
-    this.simplifiedMemory = new SimplifiedMemorySystem('RealtimeAgent');
+    // Use 'shared' namespace for unified memory access
+    this.simplifiedMemory = new SimplifiedMemorySystem('shared');
+    this.sharedMemory = config.sharedMemory;
     this.config = config;
   }
 
@@ -118,6 +124,14 @@ export class RealtimeAgent extends Agent {
         };
       }
 
+      // Store user message in shared memory BEFORE generating response
+      // This ensures the message is available for context when QA agent processes it
+      if (this.sharedMemory) {
+        await this.sharedMemory.addMessage('user', text, {
+          agentName: 'RealtimeAgent'
+        });
+      }
+
       // Generate response with emotion tags
       startPerformance('AI Response Generation (Text)');
       const rawResponse = await this.generateResponse(text);
@@ -147,6 +161,21 @@ export class RealtimeAgent extends Agent {
       
       // Primary memory storage using SimplifiedMemorySystem
       try {
+        // Store in shared memory if available
+        if (this.sharedMemory) {
+          await this.sharedMemory.addMessage('user', text, {
+            agentName: 'RealtimeAgent',
+            emotion: emotion?.emotion,
+            confidence: emotion?.confidence
+          });
+          await this.sharedMemory.addMessage('assistant', cleanResponse, {
+            agentName: 'RealtimeAgent',
+            emotion: emotion?.emotion,
+            confidence: emotion?.confidence
+          });
+        }
+        
+        // Also store in local memory for agent-specific operations
         await this.simplifiedMemory.addMessage('user', text, {
           emotion: emotion?.emotion,
           confidence: emotion?.confidence,
@@ -158,8 +187,8 @@ export class RealtimeAgent extends Agent {
           sessionId: this.currentSessionId || undefined,
         });
       } catch (error) {
-        console.error('[RealtimeAgent] Failed to store in SimplifiedMemorySystem:', error);
-        // Fallback to legacy system if SimplifiedMemorySystem fails
+        console.error('[RealtimeAgent] Failed to store in memory:', error);
+        // Fallback to legacy system if memory storage fails
       }
       
       // Generate TTS audio for the response
@@ -323,6 +352,14 @@ export class RealtimeAgent extends Agent {
       }
       
       const transcript = result.transcript;
+
+      // Store user message in shared memory BEFORE generating response
+      // This ensures the message is available for context when QA agent processes it
+      if (this.sharedMemory) {
+        await this.sharedMemory.addMessage('user', transcript, {
+          agentName: 'RealtimeAgent'
+        });
+      }
 
       // Generate response with emotion tags
       startPerformance('AI Response Generation');
@@ -943,6 +980,10 @@ export class RealtimeAgent extends Agent {
     this.currentSessionId = await ConversationManager.createSession(visitorId, language);
     await this.supabaseMemory.store('currentSessionId', this.currentSessionId);
     await this.supabaseMemory.store('language', language);
+    if (this.sharedMemory) {
+      this.sharedMemory.setSessionId(this.currentSessionId);
+      this.sharedMemory.setLanguage(language);
+    }
     return this.currentSessionId;
   }
 
@@ -951,6 +992,9 @@ export class RealtimeAgent extends Agent {
       await ConversationManager.endSession(this.currentSessionId);
       await this.supabaseMemory.delete('currentSessionId');
       this.currentSessionId = null;
+      if (this.sharedMemory) {
+        this.sharedMemory.setSessionId(null);
+      }
     }
   }
 

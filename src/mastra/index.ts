@@ -7,6 +7,7 @@ import { EnhancedQAAgent } from './agents/enhanced-qa-agent';
 import { RealtimeAgent } from './agents/realtime-agent';
 import { SlideNarrator } from './agents/slide-narrator';
 import { SupabaseMemoryAdapter } from '@/lib/supabase-memory';
+import { getSharedMemoryService } from '@/lib/shared-memory-service';
 
 // Import tools
 import { SlideControlTool } from './tools/slide-control';
@@ -53,11 +54,15 @@ export class EngineerCafeNavigator {
     
     const model = google(this.config.gemini.model);
     
+    // Get shared memory service for all agents
+    const sharedMemory = getSharedMemoryService();
+    
     const modelConfig = {
       llm: {
         model,
       },
-      memory: this.mastra.memory,
+      // Removed mastra.memory as it's not used
+      sharedMemory: sharedMemory,
     };
     
     const welcomeAgent = new WelcomeAgent(modelConfig);

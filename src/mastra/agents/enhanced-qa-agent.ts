@@ -4,12 +4,14 @@ import { ragSearchTool } from '../tools/rag-search';
 import { GeneralWebSearchTool } from '../tools/general-web-search';
 import { SupportedLanguage } from '../types/config';
 import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
+import { SharedMemoryService } from '@/lib/shared-memory-service';
 import { ClarificationUtils } from '@/lib/clarification-utils';
 import { applySttCorrections } from '@/utils/stt-corrections';
 
 export class EnhancedQAAgent extends Agent {
   private memory: any;
   private simplifiedMemory: SimplifiedMemorySystem;
+  private sharedMemory: SharedMemoryService;
   private _tools: Map<string, any> = new Map();
 
   constructor(config: any) {
@@ -27,7 +29,9 @@ export class EnhancedQAAgent extends Agent {
     if (!this.memory.has('language')) {
       this.memory.set('language', 'ja');
     }
-    this.simplifiedMemory = new SimplifiedMemorySystem('EnhancedQAAgent');
+    // Use 'shared' namespace for unified memory access
+    this.simplifiedMemory = new SimplifiedMemorySystem('shared');
+    this.sharedMemory = config.sharedMemory;
   }
 
   // Method to add tools to this agent
@@ -54,12 +58,27 @@ export class EnhancedQAAgent extends Agent {
       this.memory.set('language', requestLanguage);
     }
     
-    // Get conversation context first
+    // Get conversation context from shared memory if available, fallback to local memory
     console.log(`[EnhancedQAAgent] Getting memory context for question: "${question}", language: ${language}`);
-    const memoryContext = await this.simplifiedMemory.getContext(question, {
-      includeKnowledgeBase: false, // We'll handle knowledge search separately
-      language: language
-    });
+    
+    let memoryContext;
+    if (this.sharedMemory) {
+      // Use shared memory for better conversation continuity
+      // Get more messages to ensure we have the full conversation context
+      memoryContext = await this.sharedMemory.getContext(question, {
+        includeKnowledgeBase: false,
+        language: language
+      });
+      console.log(`[EnhancedQAAgent] Using shared memory context`);
+    } else {
+      // Fallback to local memory
+      memoryContext = await this.simplifiedMemory.getContext(question, {
+        includeKnowledgeBase: false,
+        language: language
+      });
+      console.log(`[EnhancedQAAgent] Using local memory context (shared memory not available)`);
+    }
+    
     console.log(`[EnhancedQAAgent] Memory context result:`, {
       recentMessagesCount: memoryContext.recentMessages.length,
       hasContext: !!memoryContext.contextString,
@@ -76,8 +95,30 @@ export class EnhancedQAAgent extends Agent {
     console.log('[EnhancedQAAgent] Detected category:', category);
     console.log('[EnhancedQAAgent] Memory context available:', memoryContext.recentMessages.length > 0);
     
+    // First check if this is a contextual response (answering a clarification)
+    const isContextual = await this.isContextualResponse(question);
+    console.log('[EnhancedQAAgent] Is contextual response:', isContextual);
+    
+    // If contextual and we have recent messages, try to understand the context
+    if (isContextual && memoryContext.recentMessages.length > 0) {
+      const lastAssistantMessage = memoryContext.recentMessages
+        .filter(msg => msg.role === 'assistant')
+        .slice(-1)[0];
+        
+      // Check if the last message was a clarification question
+      if (lastAssistantMessage && this.isClarificationMessage(lastAssistantMessage.content)) {
+        console.log('[EnhancedQAAgent] Last message was a clarification, processing contextual response');
+        
+        // Extract the original request from conversation
+        const originalContext = this.extractOriginalContext(memoryContext.recentMessages);
+        if (originalContext) {
+          // Process the response in the context of the original question
+          return await this.processContextualResponse(question, originalContext, language);
+        }
+      }
+    }
+    
     let context = '';
-    let isContextual = false; // Declare at top level
     
     // Use appropriate tool based on category
     if (category === 'calendar' || category === 'events') {
@@ -92,8 +133,6 @@ export class EnhancedQAAgent extends Agent {
         return context;
       }
     } else {
-      // Check if this is a contextual response (answering a clarification)
-      isContextual = await this.isContextualResponse(question);
       
       if (isContextual) {
         console.log('[EnhancedQAAgent] Contextual response detected - combining with knowledge search');
@@ -279,13 +318,25 @@ export class EnhancedQAAgent extends Agent {
       // Extract request type before storing to memory
       const requestType = this.extractRequestTypeFromQuestion(question);
       
-      await this.simplifiedMemory.addMessage('user', question, {
-        requestType: requestType,
-        sessionId: sessionId
-      });
-      await this.simplifiedMemory.addMessage('assistant', cleanedResponse, {
-        sessionId: sessionId
-      });
+      if (this.sharedMemory) {
+        // Store in shared memory for better conversation continuity
+        await this.sharedMemory.addMessage('user', question, {
+          agentName: 'EnhancedQAAgent',
+          requestType: requestType
+        });
+        await this.sharedMemory.addMessage('assistant', cleanedResponse, {
+          agentName: 'EnhancedQAAgent'
+        });
+      } else {
+        // Fallback to local memory
+        await this.simplifiedMemory.addMessage('user', question, {
+          requestType: requestType,
+          sessionId: sessionId
+        });
+        await this.simplifiedMemory.addMessage('assistant', cleanedResponse, {
+          sessionId: sessionId
+        });
+      }
     } catch (error) {
       console.error('[EnhancedQAAgent] Failed to store conversation in memory:', error);
       // Continue execution even if memory storage fails
@@ -783,6 +834,10 @@ ${context}
     return allKeywords.some(keyword => normalizedQuestion.includes(keyword));
   }
 
+  private extractOriginalContext(recentMessages: any[]): string | null {
+    return this.extractOriginalQuestionFromContext(recentMessages, '');
+  }
+
   private extractOriginalQuestionFromContext(recentMessages: any[], currentResponse: string): string | null {
     // Look for the most recent user question that might have triggered a clarification
     const userMessages = recentMessages
@@ -884,10 +939,18 @@ ${context}
     
     // Check recent conversation history for clarification questions
     try {
-      const memoryContext = await this.simplifiedMemory.getContext(question, {
-        includeKnowledgeBase: false, // Only look at conversation history
-        language: this.memory.get('language') || 'ja'
-      });
+      let memoryContext;
+      if (this.sharedMemory) {
+        memoryContext = await this.sharedMemory.getContext(question, {
+          includeKnowledgeBase: false,
+          language: this.memory.get('language') || 'ja'
+        });
+      } else {
+        memoryContext = await this.simplifiedMemory.getContext(question, {
+          includeKnowledgeBase: false,
+          language: this.memory.get('language') || 'ja'
+        });
+      }
       
       const recentMessages = memoryContext.recentMessages;
       
@@ -1096,5 +1159,155 @@ ${context}
     });
     
     return (hasSpecificPattern || isShortFollowUp || inheritsPreviousRequest) && !isGeneralQuestion;
+  }
+
+  /**
+   * Check if a message is a clarification question
+   */
+  private isClarificationMessage(message: string): boolean {
+    const clarificationPatterns = [
+      'どちらについてお聞きでしょうか',
+      'エンジニアカフェのことですか',
+      'サイノカフェのことですか',
+      'sainoカフェのことですか',
+      'which one',
+      'are you asking about',
+      'コワーキングスペース',
+      '併設のカフェ'
+    ];
+    
+    return clarificationPatterns.some(pattern => 
+      message.toLowerCase().includes(pattern.toLowerCase())
+    );
+  }
+
+  /**
+   * Extract the original context from conversation history
+   */
+  private extractOriginalContext(messages: any[]): { originalQuestion: string; requestType: string | null } | null {
+    console.log('[EnhancedQAAgent] Extracting original context from messages:', messages.length);
+    
+    // Look for the pattern: User question -> Assistant clarification -> User answer
+    // We need to find the user's original question before the clarification
+    
+    // First, find the clarification message
+    let clarificationIndex = -1;
+    for (let i = messages.length - 2; i >= 0; i--) {
+      if (messages[i].role === 'assistant' && this.isClarificationMessage(messages[i].content)) {
+        clarificationIndex = i;
+        break;
+      }
+    }
+    
+    if (clarificationIndex === -1) {
+      console.log('[EnhancedQAAgent] No clarification message found in history');
+      return null;
+    }
+    
+    // Look for the user message before the clarification
+    for (let i = clarificationIndex - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        const originalQuestion = messages[i].content;
+        const requestType = this.extractRequestTypeFromQuestion(originalQuestion);
+        
+        console.log('[EnhancedQAAgent] Found original question:', originalQuestion);
+        console.log('[EnhancedQAAgent] Request type:', requestType);
+        
+        return {
+          originalQuestion,
+          requestType
+        };
+      }
+    }
+    
+    console.log('[EnhancedQAAgent] No original user question found before clarification');
+    return null;
+  }
+
+  /**
+   * Process a contextual response (answer to clarification) with the original context
+   */
+  private async processContextualResponse(
+    clarificationAnswer: string,
+    originalContext: { originalQuestion: string; requestType: string | null },
+    language: SupportedLanguage
+  ): Promise<string> {
+    console.log('[EnhancedQAAgent] Processing contextual response:', {
+      clarificationAnswer,
+      originalQuestion: originalContext.originalQuestion,
+      requestType: originalContext.requestType
+    });
+    
+    // Determine what the user is clarifying about
+    const isAboutSaino = clarificationAnswer.toLowerCase().includes('saino') || 
+                        clarificationAnswer.includes('才能') ||
+                        clarificationAnswer.includes('カフェ&バー') ||
+                        clarificationAnswer.includes('併設');
+                        
+    const isAboutEngineerCafe = clarificationAnswer.includes('エンジニアカフェ') ||
+                               clarificationAnswer.includes('engineer cafe') ||
+                               clarificationAnswer.includes('コワーキング');
+    
+    // Build a specific query based on the original request type and clarification
+    let specificQuery = '';
+    
+    if (originalContext.requestType === 'hours') {
+      if (isAboutSaino) {
+        specificQuery = 'saino カフェ 営業時間';
+      } else {
+        specificQuery = 'エンジニアカフェ 営業時間';
+      }
+    } else if (originalContext.requestType === 'price') {
+      if (isAboutSaino) {
+        specificQuery = 'saino カフェ 料金 価格';
+      } else {
+        specificQuery = 'エンジニアカフェ 利用料金';
+      }
+    } else {
+      // General query combining original question and clarification
+      specificQuery = `${originalContext.originalQuestion} ${clarificationAnswer}`;
+    }
+    
+    // Search for the specific information
+    const context = await this.searchKnowledgeBase(specificQuery, language);
+    
+    // Build a focused response
+    const prompt = language === 'ja'
+      ? `ユーザーは「${originalContext.originalQuestion}」について尋ね、「${clarificationAnswer}」と明確にしました。${originalContext.requestType ? `${this.getRequestTypeInJapanese(originalContext.requestType)}のみ` : '質問された情報のみ'}を簡潔に答えてください。\n\n参考情報: ${context}`
+      : `The user asked about "${originalContext.originalQuestion}" and clarified with "${clarificationAnswer}". Provide only the ${originalContext.requestType || 'requested information'} concisely.\n\nContext: ${context}`;
+    
+    const response = await this.generate([
+      { role: 'user', content: prompt }
+    ]);
+    
+    // Store the conversation
+    if (this.sharedMemory) {
+      await this.sharedMemory.addMessage('user', clarificationAnswer, {
+        agentName: 'EnhancedQAAgent',
+        requestType: originalContext.requestType,
+        isContextualResponse: true
+      });
+      await this.sharedMemory.addMessage('assistant', response.text, {
+        agentName: 'EnhancedQAAgent'
+      });
+    }
+    
+    return EmotionTagParser.enhanceAgentResponse(response.text, 'qa', language);
+  }
+  
+  /**
+   * Get Japanese label for request type
+   */
+  private getRequestTypeInJapanese(requestType: string): string {
+    const typeMap: Record<string, string> = {
+      'hours': '営業時間',
+      'price': '料金',
+      'location': '場所',
+      'booking': '予約方法',
+      'facility': '設備情報',
+      'access': 'アクセス方法'
+    };
+    
+    return typeMap[requestType] || '情報';
   }
 }
