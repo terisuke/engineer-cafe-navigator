@@ -224,6 +224,31 @@ const sampleEntries: KnowledgeBaseEntry[] = [
       tags: ['cafe', 'location', 'same-floor']
     }
   },
+  // Saino Cafe Operating Hours and Business Days
+  {
+    content: 'sainoカフェの営業時間は平日10:00〜20:00、土日祝日10:00〜18:00です。定休日は毎週月曜日（月曜日が祝日の場合は翌平日）および年末年始（12/29〜1/3）です。エンジニアカフェと同じフロア（1階）の階段手前に位置しており、コーヒー、軽食、デザートなどを提供しています。',
+    category: '設備',
+    subcategory: 'sainoカフェ',
+    language: 'ja',
+    source: 'official',
+    metadata: { 
+      title: 'sainoカフェの営業時間と定休日',
+      importance: 'high',
+      tags: ['cafe', 'hours', 'business-days', 'saino', '営業時間', '定休日']
+    }
+  },
+  {
+    content: 'saino cafe operating hours are weekdays 10:00-20:00, weekends and holidays 10:00-18:00. Closed every Monday (if Monday is a holiday, closed the following weekday) and during New Year holidays (December 29 - January 3). Located on the same floor (1st floor) as Engineer Cafe near the stairs, offering coffee, light meals, and desserts.',
+    category: 'Facilities',
+    subcategory: 'saino cafe',
+    language: 'en',
+    source: 'official',
+    metadata: { 
+      title: 'saino cafe operating hours and business days',
+      importance: 'high',
+      tags: ['cafe', 'hours', 'business-days', 'saino', 'operating-hours', 'closed-days']
+    }
+  },
   {
     content: 'Tech book library with over 1000 latest technical books. From O\'Reilly classics to the latest publications. Free access for all members.',
     category: 'Facilities',
