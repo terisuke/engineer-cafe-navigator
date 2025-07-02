@@ -24,6 +24,7 @@ import * as path from 'path';
 
 // Load environment variables
 configDotenv({ path: '.env.local' });
+configDotenv({ path: '.env' });
 
 const execAsync = promisify(exec);
 
@@ -79,7 +80,7 @@ async function makeApiRequest(endpoint: string, data: any): Promise<any> {
 }
 
 // Import the improved evaluation system
-import { evaluateResponseImproved } from './tests/utils/test-evaluation';
+import { evaluateResponseImproved } from './utils/test-evaluation';
 
 async function testQuery(
   category: string,
