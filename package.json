@@ -9,7 +9,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "echo \"No tests configured yet\" && exit 0",
     "dev:clean": "rm -rf .next && next dev",
     "install:css": "sh scripts/install-css.sh",
     "seed:knowledge": "tsx -r dotenv/config scripts/seed-knowledge-base.ts",
@@ -17,6 +16,10 @@
     "import:narration": "tsx -r dotenv/config scripts/import-slide-narrations.ts",
     "import:markdown": "tsx -r dotenv/config scripts/import-markdown-knowledge.ts",
     "setup:admin": "tsx -r dotenv/config scripts/setup-admin-knowledge.ts",
+    "test": "cd scripts/tests && tsx run-tests.ts",
+    "test:integrated": "cd scripts/tests && tsx run-tests.ts integrated",
+    "test:router": "cd scripts/tests && tsx run-tests.ts router",
+    "test:calendar": "cd scripts/tests && tsx run-tests.ts calendar",
     "vercel-build": "pnpm build"
   },
   "engines": {

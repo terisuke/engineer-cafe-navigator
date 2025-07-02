@@ -135,7 +135,7 @@ export class FacilityAgent extends Agent {
     }
     // 地下施設の質問の強化
     if (query.includes('地下') || query.includes('basement') || requestType === 'basement') {
-      return `${query} 地下 B1 B1F 地下1階 MTGスペース 集中スペース basement floor`;
+      return `${query} 地下 B1 B1F 地下1階 MTGスペース 集中スペース アンダースペース Makersスペース basement floor underground meeting focus under makers space 地下MTGスペース 地下集中スペース 地下アンダースペース 地下Makersスペース`;
     }
     // 会議室の質問の強化
     if (query.includes('会議室') || query.includes('meeting room')) {

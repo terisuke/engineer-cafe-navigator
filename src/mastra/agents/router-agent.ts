@@ -168,16 +168,21 @@ export class RouterAgent extends Agent {
       return 'facility';
     }
     
-    // 会議室関連
+    // 地下施設関連 - Enhanced detection (prioritize over meeting-room)
+    if (lowerQuestion.includes('地下') || lowerQuestion.includes('basement') ||
+        lowerQuestion.includes('b1') || lowerQuestion.includes('階下') ||
+        lowerQuestion.includes('underground') || lowerQuestion.includes('mtgスペース') ||
+        lowerQuestion.includes('集中スペース') || lowerQuestion.includes('アンダースペース') ||
+        lowerQuestion.includes('makersスペース') || lowerQuestion.includes('focus space') ||
+        lowerQuestion.includes('meeting space') || lowerQuestion.includes('makers space') ||
+        /地下.*スペース|地下.*施設|地下.*会議/.test(lowerQuestion)) {
+      return 'basement';
+    }
+    
+    // 会議室関連 (but not if already caught by basement above)
     if (lowerQuestion.includes('会議室') || lowerQuestion.includes('meeting room') ||
         lowerQuestion.includes('ミーティングルーム') || lowerQuestion.includes('会議スペース')) {
       return 'meeting-room';
-    }
-    
-    // 地下施設関連
-    if (lowerQuestion.includes('地下') || lowerQuestion.includes('basement') ||
-        lowerQuestion.includes('b1') || lowerQuestion.includes('階下')) {
-      return 'basement';
     }
     
     // イベント関連
@@ -192,6 +197,15 @@ export class RouterAgent extends Agent {
 
   private isMemoryRelatedQuestion(question: string): boolean {
     const lowerQuestion = question.toLowerCase();
+    
+    // Exclude basement/facility-related questions even if they contain memory keywords
+    if (lowerQuestion.includes('地下') || lowerQuestion.includes('basement') || 
+        lowerQuestion.includes('スペース') || lowerQuestion.includes('space') ||
+        lowerQuestion.includes('mtg') || lowerQuestion.includes('会議室') ||
+        lowerQuestion.includes('施設') || lowerQuestion.includes('facility') ||
+        lowerQuestion.includes('equipment') || lowerQuestion.includes('makers')) {
+      return false;
+    }
     
     // Memory-related keywords (from EnhancedQAAgent)
     const memoryKeywords = [
@@ -211,14 +225,14 @@ export class RouterAgent extends Agent {
     
     // Short questions that likely depend on context
     const contextPatterns = [
-      /^土曜[日]?は.*/,          // 土曜日は... 土曜は...
-      /^日曜[日]?は.*/,          // 日曜日は... 日曜は...
-      /^平日は.*/,               // 平日は...
-      /^saino[のは方]?.*/,       // sainoの方は... sainoは...
-      /^そっち[のは]?.*/,        // そっちの方は... そっちは...
-      /^あっち[のは]?.*/,        // あっちの方は... あっちは...
-      /^それ[のは]?.*/,          // それの方は... それは...
-      /^そこ[のは]?.*/,          // そこの方は... そこは...
+      /^土曜[日]?[はも].*/,        // 土曜日は... 土曜は... 土曜日も... 土曜も...
+      /^日曜[日]?[はも].*/,        // 日曜日は... 日曜は... 日曜日も... 日曜も...
+      /^平日[はも].*/,             // 平日は... 平日も...
+      /^saino[のは方も]?.*/,       // sainoの方は... sainoは... sainoも...
+      /^そっち[のはも]?.*/,        // そっちの方は... そっちは... そっちも...
+      /^あっち[のはも]?.*/,        // あっちの方は... あっちは... あっちも...
+      /^それ[のはも]?.*/,          // それの方は... それは... それも...
+      /^そこ[のはも]?.*/,          // そこの方は... そこは... そこも...
     ];
     
     return contextPatterns.some(pattern => pattern.test(trimmed));

@@ -18,6 +18,7 @@ import { ExternalApiTool } from './tools/external-api';
 import { LanguageSwitchTool } from './tools/language-switch';
 import { PageTransitionTool } from './tools/page-transition';
 import { RAGSearchTool } from './tools/rag-search';
+import { enhancedRagSearchTool } from './tools/enhanced-rag-search';
 import { ExternalDataFetcherTool } from './tools/external-data-fetcher';
 import { EngineerCafeWebSearchTool } from './tools/company-web-search';
 import { GeneralWebSearchTool } from './tools/general-web-search';
@@ -107,6 +108,7 @@ export class EngineerCafeNavigator {
     this.tools.set('languageSwitch', languageSwitchTool);
     this.tools.set('pageTransition', pageTransitionTool);
     this.tools.set('ragSearch', ragSearchTool);
+    this.tools.set('enhancedRagSearch', enhancedRagSearchTool);
     this.tools.set('externalDataFetcher', externalDataFetcherTool);
     this.tools.set('engineerCafeWebSearch', engineerCafeWebSearchTool);
     this.tools.set('calendarService', calendarServiceTool);

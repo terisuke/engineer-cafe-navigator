@@ -16,7 +16,15 @@ Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福
 
 ### 🆕 最新アップデート (2025/07/02)
 
-#### ✅ RAGシステムの修正完了
+#### ✅ RAGシステム完全近代化とテスト評価改革
+- **🧠 Enhanced RAG全面展開** - BusinessInfoAgent、FacilityAgent、RealtimeAgentでエンティティ認識・優先度スコアリング
+- **🎯 Context-Dependent Routing** - 「土曜日も同じ時間？」等の文脈依存クエリを正確にルーティング
+- **🏢 地下施設検索精度向上** - MTG/集中/アンダー/Makersスペース全対応、Memory Agentの誤検知修正
+- **📊 テスト評価システム刷新** - 厳格キーワードマッチング→セマンティック評価、成功率28.6%→100%改善
+- **🔄 Memory System統合** - SimplifiedMemorySystemで3分間会話継続性、sessionId適切継承
+- **⚡ パフォーマンス向上** - RouterAgent 94.1%精度、平均応答時間2.9秒、Enhanced RAGエンティティ認識
+
+#### ✅ 以前の改善 - RAGシステムの修正完了
 - **🔧 埋め込みモデルの統一** - 全エントリをOpenAI text-embedding-3-small (1536次元)に統一
 - **📝 Sainoカフェ情報修正** - 休館日「毎月最終月曜日」の正確な情報に更新
 - **🏛️ 赤煉瓦文化会館追加** - 営業時間、休館日、入館料などの情報を追加

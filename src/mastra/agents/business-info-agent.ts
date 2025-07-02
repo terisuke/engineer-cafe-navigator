@@ -1,4 +1,5 @@
 import { Agent } from '@mastra/core/agent';
+import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
 import { SupportedLanguage } from '@/types';
 
 export interface BusinessInfoAgentConfig {
@@ -9,6 +10,7 @@ export interface BusinessInfoAgentConfig {
 
 export class BusinessInfoAgent extends Agent {
   private _tools: Map<string, any> = new Map();
+  private memory: SimplifiedMemorySystem;
 
   addTool(name: string, tool: any) {
     this._tools.set(name, tool);
@@ -26,6 +28,7 @@ export class BusinessInfoAgent extends Agent {
         Answer concisely with only the requested information.
         Always respond in the same language as the question.`,
     });
+    this.memory = new SimplifiedMemorySystem('BusinessInfoAgent');
   }
 
   async answerBusinessQuery(
@@ -65,20 +68,38 @@ export class BusinessInfoAgent extends Agent {
       console.log(`[BusinessInfoAgent] Enhanced context query: ${searchQuery}`);
     }
 
-    // RAG検索
+    // Enhanced RAG検索を優先して使用
+    const enhancedRagTool = this._tools.get('enhancedRagSearch');
     const ragTool = this._tools.get('ragSearch');
-    if (!ragTool) {
-      console.error('[BusinessInfoAgent] RAG search tool not available');
+    const searchTool = enhancedRagTool || ragTool;
+    
+    if (!searchTool) {
+      console.error('[BusinessInfoAgent] No RAG search tool available');
       return this.getDefaultResponse(language);
     }
 
     let searchResult;
     try {
-      searchResult = await ragTool.execute({
-        query: searchQuery,
-        language,
-        limit: 10
-      });
+      // Enhanced RAG requires category, standard RAG doesn't
+      if (searchTool === enhancedRagTool) {
+        const category = this.mapRequestTypeToCategory(effectiveRequestType);
+        console.log(`[BusinessInfoAgent] Using Enhanced RAG with category: ${category}`);
+        
+        searchResult = await searchTool.execute({
+          query: searchQuery,
+          category,
+          language,
+          includeAdvice: true,
+          maxResults: 10
+        });
+      } else {
+        console.log('[BusinessInfoAgent] Using standard RAG as fallback');
+        searchResult = await searchTool.execute({
+          query: searchQuery,
+          language,
+          limit: 10
+        });
+      }
     } catch (error) {
       console.error('[BusinessInfoAgent] RAG search error:', error);
       return this.getDefaultResponse(language);
@@ -233,6 +254,21 @@ Answer briefly (1-2 sentences) with only the relevant information.`
 
 関連する情報のみを簡潔に（1-2文）答えてください。`;
     }
+  }
+
+  private mapRequestTypeToCategory(requestType: string | null): string {
+    // Map request types to Enhanced RAG categories for better entity-aware scoring
+    const categoryMapping: Record<string, string> = {
+      'hours': 'hours',
+      'price': 'pricing',
+      'location': 'location', 
+      'access': 'location',
+      'basement': 'facility-info',
+      'facility': 'facility-info',
+      'wifi': 'facility-info'
+    };
+    
+    return categoryMapping[requestType || ''] || 'general';
   }
 
   private getRequestTypePrompt(requestType: string, language: SupportedLanguage): string {

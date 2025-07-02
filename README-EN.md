@@ -14,28 +14,55 @@
 
 Engineer Cafe Navigator is a **multilingual voice AI agent system** that automates customer service for Fukuoka City Engineer Cafe. Built with the Mastra framework, it aims to reduce staff workload and improve customer satisfaction.
 
-### 🆕 Latest Updates (2025/06/30)
+### 🆕 Latest Updates (2025/07/02)
 
-#### ✅ Completed Features
-- **🎯 Production Monitoring** - Real-time performance monitoring and alert system
-- **🔄 Automated Knowledge Base Updates** - Connpass/Google Calendar sync every 6 hours
-- **📊 Metrics Collection** - Detailed tracking of RAG search, cache efficiency, API usage
-- **🔐 Google Embeddings API Support** - text-embedding-004 (768 dimensions) and OpenAI (1536 dimensions) hybrid
-- **OpenAI Embedding Integration** - Unified RAG search system with OpenAI text-embedding-3-small (1536 dimensions)
-- **Multilingual RAG Search** - English questions can retrieve Japanese content and vice versa
-- **Knowledge Base Management UI** - Data management at `/admin/knowledge` with metadata templates
-- **Complete Basement Space Support** - Voice search for 4 types of basement facilities (MTG, Focus, Under, Makers)
-- **Cross-language Search** - Retrieve optimal information from both languages regardless of question language
-- **Service Account Authentication** - Secure authentication without API keys
-- **Supabase Memory Adapter Integration** - Persistent conversation history and session management
-- **Emotion Recognition & VRM Expression Control** - Automatic facial expression changes via text analysis
-- **🚀 Lip-sync Cache System** - Intelligent audio analysis caching for 99% speed improvement (4-8s → 10-50ms)
-- **🧠 SimplifiedMemorySystem** - Unified memory architecture with 3-minute conversation context retention
-- **🎤 STT Correction System** - Japanese speech-to-text misrecognition auto-correction (営業時間/料金/場所 etc.)
-- **🎯 Response Precision System** - Intelligent filtering for specific information requests (1-sentence answers)
-- **🔍 Memory-Aware Conversations** - Natural follow-up questions like "What did I ask earlier?"
+#### ✅ RAG System Complete Modernization & Test Evaluation Reform
+- **🧠 Enhanced RAG Full Deployment** - Entity recognition & priority scoring in BusinessInfoAgent, FacilityAgent, RealtimeAgent
+- **🎯 Context-Dependent Routing** - Accurate routing for context-dependent queries like "Is it the same hours on Saturday?"
+- **🏢 Basement Facility Search Accuracy** - Full support for MTG/Focus/Under/Makers spaces, fixed Memory Agent false detection
+- **📊 Test Evaluation System Overhaul** - Rigid keyword matching → Semantic evaluation, success rate improved from 28.6% → 100%
+- **🔄 Memory System Integration** - SimplifiedMemorySystem with 3-minute conversation continuity, proper sessionId inheritance
+- **⚡ Performance Improvements** - RouterAgent 94.1% accuracy, average response time 2.9s, Enhanced RAG entity recognition
 
-#### ✅ Major Mobile Compatibility Improvements (2025/06/30)
+#### ✅ Previous Improvements - RAG System Fixes Completed
+- **🔧 Embedding Model Unification** - All entries unified to OpenAI text-embedding-3-small (1536 dimensions)
+- **📝 Saino Cafe Information Fix** - Updated closed days to accurate "Last Monday of each month"
+- **🏛️ Akarenga Cultural Center Added** - Added operating hours, closed days, admission fees
+- **✨ Search Accuracy Improved** - Consistent embedding space for accurate search results
+
+### 📚 Previous Updates
+
+#### ✅ Speech Recognition Accuracy Improvements (STT Misrecognition Measures)
+- **🎯 Voice Correction System** - Auto-correction of common misrecognition patterns ("jikatsukishuu space" → "concentration space")
+- **📝 Custom Correction Dictionary** - Accurate recognition of Engineer Cafe-specific terms and facility names
+- **🔄 Context-aware Correction** - Misrecognition correction based on context
+- **📊 Correction Statistics Tracking** - Accumulation and analysis of misrecognition patterns
+
+#### ✅ Conversation Memory System Enhancement
+- **🧠 SimplifiedMemorySystem** - Unified memory architecture for conversation continuity
+- **💬 Natural Memory Dialogue** - Accurate responses to questions like "What did I ask earlier?"
+- **⏱️ 3-Minute Short-term Memory** - Maintains recent conversation history for context
+- **🎭 Emotion Context Retention** - Natural responses by remembering emotional context
+
+#### ✅ Production Monitoring System Implementation
+- **📊 Real-time Dashboard** - Performance monitoring at `/api/monitoring/dashboard`
+- **🚨 Alert System** - Automatic detection of performance degradation and error rate spikes
+- **📈 Metrics Accumulation** - Detailed tracking of RAG search, external APIs, cache efficiency
+- **🔍 Knowledge Base Health Check** - Health verification at `/api/health/knowledge`
+
+#### ✅ Automated Knowledge Base Update System
+- **🔄 CRON Auto-update** - Sync with external data sources every 6 hours
+- **📅 Connpass Event Integration** - Automatic import of Engineer Cafe events
+- **🗓️ Google Calendar Integration** - Schedule sync via OAuth2
+- **🧹 Expired Data Cleanup** - Automatic cleanup of old event information
+
+#### ✅ Response Precision System Improvements
+- **🎯 Specific Request Detection** - Auto-identification of specific questions about hours, pricing, location
+- **📏 Response Length Limiting** - 1-sentence answers for specific questions to eliminate verbosity
+- **🔍 Information Filtering** - Exclude unrelated information, provide only necessary data
+- **🌐 Multi-language Pattern Support** - Support for specific request patterns in both Japanese and English
+
+#### ✅ Complete Audio System Refactoring (HTML Audio → Web Audio API Migration Completed)
 - **🔧 Complete Audio System Refactoring** - Fully migrated from HTML Audio Element to Web Audio API (2024)
 - **📱 Autoplay Policy Compliance** - Audio system that bypasses browser restrictions
 - **🔄 Unified Audio Service** - AudioPlaybackService standardizes all audio operations

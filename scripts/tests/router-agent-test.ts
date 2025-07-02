@@ -1,9 +1,14 @@
 #!/usr/bin/env node
+/**
+ * Router Agent Test
+ * Tests the routing logic for different types of queries
+ */
+
 import 'dotenv/config';
 import { RouterAgent } from '@/mastra/agents/router-agent';
 import { google } from '@ai-sdk/google';
 
-// Test queries from the comprehensive test suite
+// Test queries for router agent
 const testQueries = [
   // 営業時間関連
   { query: 'エンジニアカフェの営業時間は？', expectedAgent: 'BusinessInfoAgent', expectedType: 'hours' },
@@ -39,7 +44,7 @@ const testQueries = [
   { query: '福岡のスタートアップ情報', expectedAgent: 'GeneralKnowledgeAgent', expectedType: null },
 ];
 
-async function testRouterAgent() {
+export async function testRouterAgent() {
   console.log('🚀 Testing RouterAgent...\n');
   
   const model = google('gemini-2.0-flash-exp', {
@@ -91,5 +96,7 @@ async function testRouterAgent() {
   console.log('\n🎯 Target: 95% or higher routing accuracy');
 }
 
-// Run the test
-testRouterAgent().catch(console.error);
+// Run the test if called directly
+if (require.main === module) {
+  testRouterAgent().catch(console.error);
+}
