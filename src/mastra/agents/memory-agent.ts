@@ -1,6 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
-import { SupportedLanguage } from '@/types';
+import { SupportedLanguage } from '@/mastra/types/config';
 
 export interface MemoryAgentConfig {
   llm: {

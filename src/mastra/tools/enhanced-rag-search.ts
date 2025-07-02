@@ -1,4 +1,4 @@
-import { ToolReturn } from '@mastra/core/tools';
+// import { ToolReturn } from '@mastra/core/tools';
 import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 import { RAGPriorityScorer, ScoredSearchResult } from '@/lib/rag-priority-scorer';
@@ -25,7 +25,7 @@ export const enhancedRagSearchTool = {
     language: 'ja' | 'en';
     includeAdvice?: boolean;
     maxResults?: number;
-  }): Promise<ToolReturn> => {
+  }): Promise<any> => {
     try {
       console.log('[EnhancedRAGSearch] Starting search with query:', query);
       console.log('[EnhancedRAGSearch] Category:', category, 'Language:', language);

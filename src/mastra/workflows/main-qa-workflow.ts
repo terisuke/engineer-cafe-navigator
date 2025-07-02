@@ -5,7 +5,7 @@ import { MemoryAgent } from '@/mastra/agents/memory-agent';
 import { EventAgent } from '@/mastra/agents/event-agent';
 import { GeneralKnowledgeAgent } from '@/mastra/agents/general-knowledge-agent';
 import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
-import { SupportedLanguage } from '@/types';
+import { SupportedLanguage } from '@/mastra/types/config';
 import { RAGSearchTool } from '@/mastra/tools/rag-search';
 import { enhancedRagSearchTool } from '@/mastra/tools/enhanced-rag-search';
 import { CalendarServiceTool } from '@/mastra/tools/calendar-service';
@@ -207,14 +207,12 @@ export class MainQAWorkflow {
     try {
       // Store user question
       await this.memorySystem.addMessage('user', question, {
-        sessionId,
-        category
+        sessionId
       });
 
       // Store assistant answer
       await this.memorySystem.addMessage('assistant', answer, {
-        sessionId,
-        category
+        sessionId
       });
 
       console.log('[MainQAWorkflow] Conversation stored in memory');

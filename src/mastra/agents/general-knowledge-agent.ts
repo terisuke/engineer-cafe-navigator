@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core/agent';
-import { SupportedLanguage } from '@/types';
+import { SupportedLanguage } from '@/mastra/types/config';
 
 export interface GeneralKnowledgeAgentConfig {
   llm: {
@@ -42,7 +42,7 @@ export class GeneralKnowledgeAgent extends Agent {
     
     // Always try knowledge base first
     const ragTool = this._tools.get('ragSearch');
-    let knowledgeResult = { success: false, data: null };
+    let knowledgeResult: any = { success: false, data: null };
     if (ragTool) {
       try {
         knowledgeResult = await ragTool.execute({
@@ -61,7 +61,7 @@ export class GeneralKnowledgeAgent extends Agent {
     if (knowledgeResult.success) {
       if (knowledgeResult.results && Array.isArray(knowledgeResult.results)) {
         context = knowledgeResult.results
-          .map(r => r.content)
+          .map((r: any) => r.content)
           .join('\n\n');
         sources.push('knowledge base');
       } else if (knowledgeResult.data && knowledgeResult.data.context) {

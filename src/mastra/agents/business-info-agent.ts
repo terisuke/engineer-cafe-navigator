@@ -1,6 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
-import { SupportedLanguage } from '@/types';
+import { SupportedLanguage } from '@/mastra/types/config';
 
 export interface BusinessInfoAgentConfig {
   llm: {
@@ -114,7 +114,7 @@ export class BusinessInfoAgent extends Agent {
     if (searchResult.results && Array.isArray(searchResult.results)) {
       // 標準RAGツールの結果形式
       context = searchResult.results
-        .map(r => r.content)
+        .map((r: any) => r.content)
         .join('\n\n');
     } else if (searchResult.data && searchResult.data.context) {
       // エンハンスドRAGツールの結果形式

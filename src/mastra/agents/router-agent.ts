@@ -1,7 +1,7 @@
 import { Agent } from '@mastra/core/agent';
 import { QueryClassifier } from '@/lib/query-classifier';
 import { LanguageProcessor } from '@/lib/language-processor';
-import { SupportedLanguage } from '@/types';
+import { SupportedLanguage } from '@/mastra/types/config';
 
 export interface RouterConfig {
   llm: {

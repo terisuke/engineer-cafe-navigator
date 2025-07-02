@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SupportedLanguage } from '@/types';
+import { SupportedLanguage } from '@/mastra/types/config';
 
 const contextFilterSchema = z.object({
   context: z.string().describe('The context to filter'),

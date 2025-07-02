@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core/agent';
-import { SupportedLanguage } from '@/types';
+import { SupportedLanguage } from '@/mastra/types/config';
 
 export interface EventAgentConfig {
   llm: {
@@ -42,7 +42,7 @@ export class EventAgent extends Agent {
     
     // Get calendar events
     const calendarTool = this._tools.get('calendarService');
-    let calendarResult = { success: false, data: null };
+    let calendarResult: any = { success: false, data: null };
     if (calendarTool) {
       try {
         calendarResult = await calendarTool.execute({
@@ -57,7 +57,7 @@ export class EventAgent extends Agent {
     
     // Also search knowledge base for event information
     const ragTool = this._tools.get('ragSearch');
-    let knowledgeResult = { success: false, data: null };
+    let knowledgeResult: any = { success: false, data: null };
     if (ragTool) {
       try {
         knowledgeResult = await ragTool.execute({
@@ -77,7 +77,7 @@ export class EventAgent extends Agent {
     if (knowledgeResult.success) {
       if (knowledgeResult.results && Array.isArray(knowledgeResult.results)) {
         knowledgeContext = knowledgeResult.results
-          .map(r => r.content)
+          .map((r: any) => r.content)
           .join('\n\n');
       } else if (knowledgeResult.data && knowledgeResult.data.context) {
         knowledgeContext = knowledgeResult.data.context;

@@ -155,7 +155,7 @@ export class EnhancedMemorySystem {
       return {
         recentMessages: [],
         knowledgeResults: [],
-        contextString: language === 'en' ? 'No context available.' : 'コンテキストがありません。',
+        contextString: 'No context available.',
         isContextual: false,
       };
     }

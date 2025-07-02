@@ -521,7 +521,7 @@ export class RealtimeAgent extends Agent {
             console.log('[RealtimeAgent] Input normalized from:', input, 'to:', normalizedInput);
           }
         }
-        const qaResult = await qaAgent.processQuestion(normalizedInput, sessionId, language);
+        const qaResult = await qaAgent.processQuestion(normalizedInput, this.currentSessionId || '', language);
         const qaAnswer: string = qaResult.answer;
         if (process.env.NODE_ENV !== 'production') {
           console.log('[RealtimeAgent] QA agent response:', qaAnswer ? qaAnswer.substring(0, 200) + '...' : 'null/empty');

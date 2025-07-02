@@ -188,7 +188,7 @@ export class WebSearchEnhancer {
       };
     }).sort((a, b) => {
       // 関連性と実用価値でソート
-      const relevanceScore = { high: 3, medium: 2, low: 1 };
+      const relevanceScore: Record<string, number> = { high: 3, medium: 2, low: 1 };
       return (relevanceScore[b.relevance] + b.practicalValue) - 
              (relevanceScore[a.relevance] + a.practicalValue);
     });
