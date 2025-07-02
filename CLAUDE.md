@@ -55,8 +55,7 @@ pnpm metrics:dashboard      # View performance metrics
 - **AI Framework**: Mastra 0.10.5 for agent orchestration
 - **AI Models**: 
   - Google Gemini 2.5 Flash Preview (for responses)
-  - Google text-embedding-004 (768 dimensions, padded to 1536 for compatibility)
-  - OpenAI text-embedding-3-small (1536 dimensions as fallback)
+  - OpenAI text-embedding-3-small (1536 dimensions for all embeddings)
 - **Voice**: Google Cloud Speech-to-Text/Text-to-Speech with Web Audio API for mobile compatibility
   - STT Correction System for improved Japanese recognition accuracy
 - **3D Graphics**: Three.js 0.176.0 with @pixiv/three-vrm 3.4.1
@@ -241,9 +240,8 @@ The application uses a sophisticated multi-language RAG (Retrieval-Augmented Gen
 
 - **Multi-language Knowledge Base**: Supports both Japanese and English content
 - **Cross-language Search**: English questions can retrieve Japanese content and vice versa
-- **Hybrid Embeddings**: 
-  - Primary: Google text-embedding-004 (768 dimensions, padded to 1536)
-  - Fallback: OpenAI text-embedding-3-small (1536 dimensions)
+- **Embeddings**: 
+  - OpenAI text-embedding-3-small (1536 dimensions)
 - **Duplicate Detection**: Automatic duplicate checking on knowledge base insert
 - **Batch Import**: Efficient batch processing with duplicate tracking
 - **Vector Database**: PostgreSQL with pgvector for similarity search
@@ -586,13 +584,23 @@ The `EnhancedQAAgent` now includes intelligent response filtering to prevent ove
 - **Precision Over Completeness**: Prioritizes answering exactly what was asked vs. providing comprehensive information
 - **User Experience**: Eliminates 3000+ character responses when users only want basic facts
 
+#### **Context Inheritance for Conversational Flow (2025-07-02)**
+- **Effective Request Type**: Combines current and previous requestType for context-aware responses
+- **filterContextByRequestType()**: Filters RAG results based on inherited request type (hours, price, location)
+- **Generic Entity Handling**: Universal prompt template that works for any entity (Engineer Cafe, Saino, 会議室, etc.)
+- **Short Response Context**: Handles clarification responses like "エンジニアカフェの方", "saino", "2階" with previous context
+- **Helper Methods**: 
+  - `getRequestTypePrompt()`: Localized prompts for any request type
+  - `extractEntityFromQuestion()`: Entity extraction from user questions
+- **Debug Logging**: Comprehensive logging to trace context filtering and request type inheritance
+
 ### Knowledge Base Enhancements
 
-#### **Google Embeddings Integration**
-- Uses text-embedding-004 (768 dimensions)
-- Automatic padding to 1536 dimensions for compatibility
-- Faster embedding generation
-- Lower API costs
+#### **OpenAI Embeddings Integration**
+- Uses text-embedding-3-small (1536 dimensions)
+- Native 1536 dimensions (no padding needed)
+- Better performance for Japanese text
+- Consistent with search implementation
 
 #### **Admin Features**
 - Metadata template management
@@ -661,6 +669,17 @@ The system now intelligently extracts specific request types from user queries:
 - **Question Reference**: Users can ask about "さっき聞いた質問" and get accurate history
 - **Context Preservation**: Emotional states and metadata preserved across interactions
 - **Smart TTL Management**: Automatic cleanup with configurable expiration windows
+
+## Recent Fixes and Improvements (2024-2025)
+
+### Contextual Query Handling (2025-07-02)
+- **Issue**: Single entity queries like "エンジニアカフェ" didn't inherit previous context
+- **Solution**: Implemented request type tracking and inheritance
+- **Features**:
+  - SimplifiedMemorySystem.extractRequestType() auto-detects request types
+  - EnhancedQAAgent.isEntityNameOnly() identifies single entity queries
+  - Queries like "エンジニアカフェ" after asking about hours inherit "hours" context
+- **Result**: Natural conversation flow without repeating full questions
 
 ## Recent Fixes and Improvements (2024)
 

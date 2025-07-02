@@ -25,6 +25,45 @@ export class SimplifiedMemorySystem {
   }
 
   /**
+   * Extract request type from user query
+   */
+  private extractRequestType(content: string): string | null {
+    const lowerContent = content.toLowerCase();
+    
+    // Time/hours requests
+    if (/営業時間|hours|time|何時|いつまで|when|open|close|開いて|閉まる|時間|休業日|休館日|定休日|休み|closed|holiday|day off/.test(lowerContent)) {
+      return 'hours';
+    }
+    
+    // Price/cost requests
+    if (/料金|cost|price|値段|金額|fee|費用|有料|無料|いくら|how much/.test(lowerContent)) {
+      return 'price';
+    }
+    
+    // Location requests
+    if (/どこ|where|場所|location|住所|address|アクセス|access|階/.test(lowerContent)) {
+      return 'location';
+    }
+    
+    // Booking/reservation requests
+    if (/予約|booking|reservation|reserve|申し込み|申込/.test(lowerContent)) {
+      return 'booking';
+    }
+    
+    // Facility/equipment requests
+    if (/設備|facility|equipment|何がある|what is there|利用できる/.test(lowerContent)) {
+      return 'facility';
+    }
+    
+    // Event requests
+    if (/イベント|event|勉強会|セミナー|workshop/.test(lowerContent)) {
+      return 'events';
+    }
+    
+    return null;
+  }
+
+  /**
    * Store a conversation turn in short-term memory using existing agent_memory table
    */
   async addMessage(
@@ -39,6 +78,13 @@ export class SimplifiedMemorySystem {
   ): Promise<void> {
     try {
       const timestamp = Date.now();
+      
+      // Auto-extract request type for user messages if not provided
+      let requestType = metadata?.requestType;
+      if (role === 'user' && !requestType) {
+        requestType = this.extractRequestType(content);
+      }
+      
       const messageData = {
         role,
         content,
@@ -46,7 +92,7 @@ export class SimplifiedMemorySystem {
         emotion: metadata?.emotion,
         confidence: metadata?.confidence,
         sessionId: metadata?.sessionId,
-        requestType: metadata?.requestType,
+        requestType,
       };
 
       // Store in agent_memory table with TTL
@@ -78,6 +124,29 @@ export class SimplifiedMemorySystem {
   }
 
   /**
+   * Extract request type from the last conversation for context inheritance
+   */
+  async getLastRequestType(): Promise<string | null> {
+    try {
+      const recentMessages = await this.getRecentMessages();
+      
+      // Find the most recent assistant message with metadata
+      for (let i = recentMessages.length - 1; i >= 0; i--) {
+        const message = recentMessages[i];
+        if (message.role === 'assistant' && message.metadata?.requestType) {
+          console.log(`[SimplifiedMemory] Found last request type: ${message.metadata.requestType}`);
+          return message.metadata.requestType;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('[SimplifiedMemory] Error getting last request type:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get comprehensive context combining conversation history and knowledge base
    */
   async getContext(
@@ -85,21 +154,30 @@ export class SimplifiedMemorySystem {
     options?: {
       includeKnowledgeBase?: boolean;
       language?: 'ja' | 'en';
+      inheritContext?: boolean;
     }
   ): Promise<{
     recentMessages: Array<{ role: string; content: string; metadata?: any }>;
     knowledgeResults: KnowledgeSearchResult[];
     contextString: string;
+    inheritedRequestType?: string | null;
   }> {
     try {
       const { 
         includeKnowledgeBase = true,
-        language = 'ja' 
+        language = 'ja',
+        inheritContext = true 
       } = options || {};
 
       // Get recent messages from agent_memory table (within 3-minute window)
       const recentMessages = await this.getRecentMessages();
       console.log(`[SimplifiedMemory] Found ${recentMessages.length} recent messages for ${this.agentName}`);
+
+      // Check for context inheritance needs
+      let inheritedRequestType: string | null = null;
+      if (inheritContext) {
+        inheritedRequestType = await this.getLastRequestType();
+      }
 
       // Search knowledge base using existing RAG system
       let knowledgeResults: KnowledgeSearchResult[] = [];
@@ -131,6 +209,7 @@ export class SimplifiedMemorySystem {
         recentMessages,
         knowledgeResults,
         contextString,
+        inheritedRequestType,
       };
     } catch (error) {
       console.error('[SimplifiedMemory] Error getting context:', error);
@@ -139,6 +218,7 @@ export class SimplifiedMemorySystem {
         recentMessages: [],
         knowledgeResults: [],
         contextString: language === 'en' ? 'No conversation context available.' : '会話履歴がありません。',
+        inheritedRequestType: null,
       };
     }
   }
@@ -452,6 +532,29 @@ export class SimplifiedMemorySystem {
 
     return lines.length > 0 ? lines.join('\n') : 
       (language === 'en' ? 'No conversation context.' : '会話履歴がありません。');
+  }
+
+  /**
+   * Get the most recent request type from user messages
+   */
+  async getPreviousRequestType(): Promise<string | null> {
+    try {
+      const recentMessages = await this.getRecentMessages();
+      
+      // Find the most recent user message with a request type
+      for (let i = recentMessages.length - 1; i >= 0; i--) {
+        const msg = recentMessages[i];
+        if (msg.role === 'user' && msg.metadata?.requestType) {
+          console.log(`[SimplifiedMemory] Found previous request type: ${msg.metadata.requestType}`);
+          return msg.metadata.requestType;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('[SimplifiedMemory] Error getting previous request type:', error);
+      return null;
+    }
   }
 
 }

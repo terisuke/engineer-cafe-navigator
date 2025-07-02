@@ -1,0 +1,144 @@
+import { contextFilterTool } from '../context-filter';
+
+describe('ContextFilterTool', () => {
+  describe('営業時間のフィルタリング', () => {
+    test('営業時間情報のみを抽出（日本語）', async () => {
+      const context = `エンジニアカフェは福岡市の天神にあります。
+        営業時間は9:00〜22:00です。
+        Wi-Fiは無料で利用できます。
+        料金は無料です。`;
+      
+      const result = await contextFilterTool.execute({
+        context,
+        requestType: 'hours',
+        language: 'ja'
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.data.filteredContext).toContain('営業時間は9:00〜22:00');
+      expect(result.data.filteredContext).not.toContain('Wi-Fi');
+      expect(result.data.filteredContext).not.toContain('料金');
+    });
+
+    test('営業時間情報のみを抽出（英語）', async () => {
+      const context = `Engineer Cafe is located in Tenjin, Fukuoka.
+        Open hours are from 9:00 AM to 10:00 PM.
+        Free Wi-Fi is available.
+        Admission is free.`;
+      
+      const result = await contextFilterTool.execute({
+        context,
+        requestType: 'hours',
+        language: 'en'
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.data.filteredContext).toContain('Open hours');
+      expect(result.data.filteredContext).not.toContain('Wi-Fi');
+      expect(result.data.filteredContext).not.toContain('Admission');
+    });
+  });
+
+  describe('料金のフィルタリング', () => {
+    test('料金情報のみを抽出し、会議室料金は除外', async () => {
+      const context = `エンジニアカフェの利用料金は無料です。
+        2階の有料会議室は1時間990円です。
+        営業時間は9:00〜22:00です。`;
+      
+      const result = await contextFilterTool.execute({
+        context,
+        requestType: 'price',
+        language: 'ja'
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.data.filteredContext).toContain('利用料金は無料');
+      expect(result.data.filteredContext).not.toContain('有料会議室');
+      expect(result.data.filteredContext).not.toContain('990円');
+      expect(result.data.filteredContext).not.toContain('営業時間');
+    });
+  });
+
+  describe('Wi-Fiのフィルタリング', () => {
+    test('Wi-Fi情報のみを抽出', async () => {
+      const context = `エンジニアカフェでは無料Wi-Fiを提供しています。
+        営業時間は9:00〜22:00です。
+        場所は福岡市中央区天神です。
+        高速インターネット接続が可能です。`;
+      
+      const result = await contextFilterTool.execute({
+        context,
+        requestType: 'wifi',
+        language: 'ja'
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.data.filteredContext).toContain('無料Wi-Fi');
+      expect(result.data.filteredContext).toContain('インターネット接続');
+      expect(result.data.filteredContext).not.toContain('営業時間');
+      expect(result.data.filteredContext).not.toContain('場所は');
+    });
+  });
+
+  describe('場所のフィルタリング', () => {
+    test('場所情報のみを抽出', async () => {
+      const context = `エンジニアカフェは福岡市中央区天神1-15-30にあります。
+        赤レンガ文化館の2階です。
+        営業時間は9:00〜22:00です。
+        料金は無料です。`;
+      
+      const result = await contextFilterTool.execute({
+        context,
+        requestType: 'location',
+        language: 'ja'
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.data.filteredContext).toContain('福岡市中央区天神');
+      expect(result.data.filteredContext).toContain('赤レンガ文化館の2階');
+      expect(result.data.filteredContext).not.toContain('営業時間');
+      expect(result.data.filteredContext).not.toContain('料金');
+    });
+  });
+
+  describe('エッジケース', () => {
+    test('空のコンテキストを処理', async () => {
+      const result = await contextFilterTool.execute({
+        context: '',
+        requestType: 'hours',
+        language: 'ja'
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.data.filteredContext).toBe('');
+    });
+
+    test('未定義のrequestTypeを処理', async () => {
+      const context = 'エンジニアカフェの情報です。';
+      
+      const result = await contextFilterTool.execute({
+        context,
+        requestType: 'unknown',
+        language: 'ja'
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.data.filteredContext).toBe(context);
+    });
+
+    test('マッチする情報がない場合', async () => {
+      const context = `エンジニアカフェは素晴らしい場所です。
+        多くの人が利用しています。`;
+      
+      const result = await contextFilterTool.execute({
+        context,
+        requestType: 'hours',
+        language: 'ja'
+      });
+      
+      expect(result.success).toBe(true);
+      // 何もマッチしない場合は最初のセクションを返す
+      expect(result.data.filteredContext).toBeTruthy();
+    });
+  });
+});

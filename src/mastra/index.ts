@@ -3,9 +3,9 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { Config } from './types/config';
 import { GoogleCloudVoiceSimple } from './voice/google-cloud-voice-simple';
 import { WelcomeAgent } from './agents/welcome-agent';
-import { EnhancedQAAgent } from './agents/enhanced-qa-agent';
 import { RealtimeAgent } from './agents/realtime-agent';
 import { SlideNarrator } from './agents/slide-narrator';
+import { MainQAWorkflow } from './workflows/main-qa-workflow';
 import { SupabaseMemoryAdapter } from '@/lib/supabase-memory';
 import { getSharedMemoryService } from '@/lib/shared-memory-service';
 
@@ -66,12 +66,12 @@ export class EngineerCafeNavigator {
     };
     
     const welcomeAgent = new WelcomeAgent(modelConfig);
-    const qaAgent = new EnhancedQAAgent(modelConfig);
     const realtimeAgent = new RealtimeAgent(modelConfig, this.voiceService);
     const slideNarrator = new SlideNarrator(modelConfig);
+    const mainQAWorkflow = new MainQAWorkflow(modelConfig);
 
     this.agents.set('welcome', welcomeAgent);
-    this.agents.set('qa', qaAgent);
+    this.agents.set('qa', mainQAWorkflow); // New architecture as primary QA
     this.agents.set('realtime', realtimeAgent);
     this.agents.set('narrator', slideNarrator);
   }

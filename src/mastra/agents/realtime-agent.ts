@@ -9,7 +9,7 @@ import { ClarificationUtils } from '@/lib/clarification-utils';
 import { getEngineerCafeNavigator } from '@/mastra';
 import { Agent } from '@mastra/core/agent';
 import { SupportedLanguage } from '../types/config';
-import { EnhancedQAAgent } from './enhanced-qa-agent';
+import { MainQAWorkflow } from '../workflows/main-qa-workflow';
 import { applySttCorrections } from '@/utils/stt-corrections';
 
 /**
@@ -506,17 +506,12 @@ export class RealtimeAgent extends Agent {
     // Try RAG via existing QA-agent first
     try {
       const navigator = getEngineerCafeNavigator(this.config);
-      const qaAgent = navigator.getAgent('qa') as EnhancedQAAgent | undefined;
+      const qaAgent = navigator.getAgent('qa') as MainQAWorkflow | undefined;
       if (process.env.NODE_ENV !== 'production') {
         console.log('[RealtimeAgent] QA agent available:', !!qaAgent);
       }
       
-      if (qaAgent?.answerQuestion) {
-        // Ensure QA agent uses the same language as RealtimeAgent
-        if (qaAgent?.setLanguage) {
-          await qaAgent.setLanguage(language);
-        }
-        
+      if (qaAgent?.processQuestion) {
         // Normalize input for common speech recognition errors
         const normalizedInput = this.normalizeInput(input);
         
@@ -526,7 +521,8 @@ export class RealtimeAgent extends Agent {
             console.log('[RealtimeAgent] Input normalized from:', input, 'to:', normalizedInput);
           }
         }
-        const qaAnswer: string = await qaAgent.answerQuestion(normalizedInput, language);
+        const qaResult = await qaAgent.processQuestion(normalizedInput, sessionId, language);
+        const qaAnswer: string = qaResult.answer;
         if (process.env.NODE_ENV !== 'production') {
           console.log('[RealtimeAgent] QA agent response:', qaAnswer ? qaAnswer.substring(0, 200) + '...' : 'null/empty');
         }

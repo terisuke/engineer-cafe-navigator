@@ -262,8 +262,15 @@ export class KnowledgeBaseUpdater {
    * Format Connpass event for knowledge base
    */
   private formatConnpassEvent(event: any): string {
+    const currentJST = this.getCurrentJSTTime();
+    const eventStatus = this.getEventStatusForKnowledge({
+      start: event.started_at,
+      end: event.ended_at
+    });
+    
     const parts = [
       `イベント名: ${event.title}`,
+      eventStatus ? `状態: ${eventStatus}` : '',
       `キャッチコピー: ${event.catch}`,
       `開催日時: ${this.formatDateTime(event.started_at)} - ${this.formatDateTime(event.ended_at)}`,
       `場所: ${event.place}`,
@@ -273,6 +280,7 @@ export class KnowledgeBaseUpdater {
       event.waiting > 0 ? `キャンセル待ち: ${event.waiting}名` : '',
       `詳細: ${event.description.substring(0, 500)}...`,
       `URL: ${event.event_url}`,
+      `情報取得時刻: ${currentJST}`,
     ].filter(Boolean);
     
     return parts.join('\n');
@@ -282,13 +290,18 @@ export class KnowledgeBaseUpdater {
    * Format Google Calendar event for knowledge base
    */
   private formatGoogleCalendarEvent(event: any): string {
+    const currentJST = this.getCurrentJSTTime();
+    const eventStatus = this.getEventStatusForKnowledge(event);
+    
     const parts = [
       `イベント名: ${event.summary}`,
+      eventStatus ? `状態: ${eventStatus}` : '',
       `開催日時: ${this.formatDateTime(event.start)} - ${this.formatDateTime(event.end)}`,
       event.location ? `場所: ${event.location}` : '',
       event.description ? `詳細: ${event.description.substring(0, 500)}...` : '',
       `ステータス: ${event.status}`,
       event.htmlLink ? `カレンダーリンク: ${event.htmlLink}` : '',
+      `情報取得時刻: ${currentJST}`,
     ].filter(Boolean);
     
     return parts.join('\n');
@@ -355,6 +368,73 @@ export class KnowledgeBaseUpdater {
     } catch (error) {
       console.error('[trackUpdateMetrics] Error:', error);
     }
+  }
+  
+  /**
+   * Get current JST time string
+   */
+  private getCurrentJSTTime(): string {
+    const now = new Date();
+    // Convert to JST (UTC+9)
+    const jstOffset = 9 * 60; // JST is UTC+9
+    const localOffset = now.getTimezoneOffset();
+    const jstTime = new Date(now.getTime() + (jstOffset + localOffset) * 60 * 1000);
+    
+    const year = jstTime.getFullYear();
+    const month = jstTime.getMonth() + 1;
+    const day = jstTime.getDate();
+    const hour = jstTime.getHours();
+    const minute = jstTime.getMinutes();
+    
+    const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][jstTime.getDay()];
+    
+    return `${year}年${month}月${day}日(${dayOfWeek}) ${hour}:${minute.toString().padStart(2, '0')} JST`;
+  }
+  
+  /**
+   * Get event status for knowledge base
+   */
+  private getEventStatusForKnowledge(event: any): string | null {
+    const now = new Date();
+    const start = new Date(event.start);
+    const end = new Date(event.end);
+    
+    // Check if event is happening now
+    if (start <= now && now <= end) {
+      return '現在開催中';
+    }
+    
+    // Check if event is today
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+    
+    if (start >= todayStart && start < todayEnd) {
+      if (start > now) {
+        return '本日開催予定';
+      }
+    }
+    
+    // Check if event is tomorrow
+    const tomorrowStart = new Date(todayEnd);
+    const tomorrowEnd = new Date(tomorrowStart);
+    tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
+    
+    if (start >= tomorrowStart && start < tomorrowEnd) {
+      return '明日開催予定';
+    }
+    
+    // Check if event is this week
+    const weekEnd = new Date(now);
+    weekEnd.setDate(weekEnd.getDate() + (7 - weekEnd.getDay())); // End of week (Saturday)
+    weekEnd.setHours(23, 59, 59, 999);
+    
+    if (start <= weekEnd) {
+      return '今週開催予定';
+    }
+    
+    return null;
   }
 }
 

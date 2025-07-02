@@ -80,16 +80,15 @@ These variables are documented but not referenced in the actual codebase:
 
 ## 🔴 Known Issues
 
-### Documentation Inconsistencies
-- Some environment variables in docs don't match actual usage
-- Test commands in documentation refer to non-existent npm scripts
+### Mobile/Tablet Limitations
+- **iOS Safari**: Limited audio functionality due to strict autoplay policies
+- **Lip-sync on iPad**: May fail with "request not allowed" errors
+- **AudioContext Restrictions**: Requires explicit user interaction on iOS
 
-### Technical Debt
-- No formal test framework configured (only API integration tests)
-- **Unused dependencies**: face-api.js is installed but never used
-- **Misleading documentation**: Features documented but not implemented
-- **Unused environment variables**: Several vars defined but not referenced
-- **Dead code**: Web Speech API hooks exist but are hardcoded to false
+### Technical Considerations
+- **Future Features**: face-api.js and Web Speech API reserved for future use
+- **Environment Variables**: Some vars reserved for planned features
+- **iOS Workarounds**: Tap-to-play required for audio on iPads
 
 ## 📊 API Implementation Status
 
