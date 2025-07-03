@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ImageIcon, Palette, Check } from 'lucide-react';
 
 export interface BackgroundOption {
@@ -72,19 +72,7 @@ export default function BackgroundSelector({
   );
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load background images from public folder
-  useEffect(() => {
-    loadBackgroundImages();
-  }, []);
-
-  // Update selected background when prop changes
-  useEffect(() => {
-    if (currentBackground && currentBackground.id !== selectedBg.id) {
-      setSelectedBg(currentBackground);
-    }
-  }, [currentBackground]);
-
-  const loadBackgroundImages = async () => {
+  const loadBackgroundImages = useCallback(async () => {
     try {
       setIsLoading(true);
       
@@ -140,7 +128,19 @@ export default function BackgroundSelector({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  // Load background images from public folder
+  useEffect(() => {
+    loadBackgroundImages();
+  }, [loadBackgroundImages]);
+
+  // Update selected background when prop changes
+  useEffect(() => {
+    if (currentBackground && currentBackground.id !== selectedBg.id) {
+      setSelectedBg(currentBackground);
+    }
+  }, [currentBackground, selectedBg.id]);
 
   const formatImageName = (filename: string) => {
     return filename

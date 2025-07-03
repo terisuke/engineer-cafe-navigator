@@ -17,7 +17,10 @@ export class ClarificationUtils {
       'どちらを',
       'どれを',
       'どちらか',
-      'どれか'
+      'どれか',
+      'どちらについて',
+      'お聞かせください',
+      'お知りになりたいですか'
     ],
     english: [
       'are you asking about',

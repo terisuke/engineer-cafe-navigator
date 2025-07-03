@@ -74,14 +74,14 @@ The application follows a modernized multi-layered architecture with advanced RA
    - API routes handle voice, slides, character control, and Q&A
 
 2. **Advanced AI Agent Layer** (`/src/mastra/`): Multi-agent system with Enhanced RAG
-   - **New Architecture (2024)**: 7 specialized agents replacing legacy EnhancedQAAgent
+   - **New Architecture (2024-2025)**: 8 specialized agents replacing legacy EnhancedQAAgent
      - RouterAgent: Context-dependent query routing with memory integration
      - BusinessInfoAgent: Hours, pricing, location queries with Enhanced RAG
      - FacilityAgent: Equipment, basement facilities, Wi-Fi with Enhanced RAG
      - MemoryAgent: Conversation history and context retrieval
      - EventAgent: Calendar and event information
      - GeneralKnowledgeAgent: Out-of-scope queries with web search
-     - ClarificationAgent: Ambiguous query handling
+     - ClarificationAgent: Ambiguous query handling (cafe/meeting room disambiguation)
    - **Enhanced RAG Integration**: Entity-aware search with priority scoring
    - **Memory System**: SimplifiedMemorySystem with 3-minute conversational continuity
    - Voice service integration with Google Cloud

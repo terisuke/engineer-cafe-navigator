@@ -7,7 +7,7 @@ import { VRMBlendShapeController, VRMUtils } from '@/lib/vrm-utils';
 import { VRM, VRMLoaderPlugin } from '@pixiv/three-vrm';
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
 import { Settings } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
@@ -608,6 +608,19 @@ useEffect(() => {
       // Log available expressions
       const availableExpressions = blendShapeControllerRef.current.getAvailableExpressions();
       console.log('Available VRM expressions:', availableExpressions);
+      
+      // Debug: Check expression map directly
+      if (vrm.expressionManager?.expressionMap) {
+        console.log('Expression map keys:', Object.keys(vrm.expressionManager.expressionMap));
+        console.log('Full expression map:', vrm.expressionManager.expressionMap);
+      }
+      
+      // Check if surprised exists
+      const hasSurprised = availableExpressions.includes('surprised');
+      if (!hasSurprised) {
+        console.warn('⚠️ "surprised" expression not found in VRM model!');
+        console.log('Available expressions for mapping:', availableExpressions);
+      }
 
       // Start automatic blinking
       if (autoBlinkCleanupRef.current) {
@@ -655,6 +668,15 @@ useEffect(() => {
           expressionTimeoutRef.current = null;
         }
         
+        // Map expressions to available ones if VRM doesn't support them
+        // Fallback to expressions that are guaranteed to exist in the VRM model
+        const expressionFallbackMap: Record<string, string> = {
+          'curious': 'neutral',     // curious doesn't exist in VRM
+          'surprised': 'happy',     // surprised might not exist in some VRM models, use happy as fallback
+        };
+        
+        const mappedExpression = expressionFallbackMap[expression] || expression;
+        
         if (blendShapeControllerRef.current) {
           // Use the VRM expression manager to set expressions
           const expressionManager = vrm.expressionManager;
@@ -682,18 +704,21 @@ useEffect(() => {
             }
             
             // Set the target expression
-            if (expressionManager.expressionMap[expression]) {
-              const oldValue = expressionManager.getValue(expression);
-              expressionManager.setValue(expression, weight);
-              console.log(`[CharacterAvatar] Set ${expression}: ${oldValue} -> ${weight}`);
-              console.log(`[CharacterAvatar] Verified ${expression} value:`, expressionManager.getValue(expression));
+            if (expressionManager.expressionMap[mappedExpression]) {
+              const oldValue = expressionManager.getValue(mappedExpression);
+              expressionManager.setValue(mappedExpression, weight);
+              console.log(`[CharacterAvatar] Set ${mappedExpression}: ${oldValue} -> ${weight}`);
+              if (mappedExpression !== expression) {
+                console.log(`[CharacterAvatar] (Mapped from ${expression} to ${mappedExpression})`);
+              }
+              console.log(`[CharacterAvatar] Verified ${mappedExpression} value:`, expressionManager.getValue(mappedExpression));
               
               // Store current expression for restoration after lip-sync
-              currentExpressionRef.current = { expression, weight };
+              currentExpressionRef.current = { expression: mappedExpression, weight };
               console.log(`[CharacterAvatar] Stored current expression:`, currentExpressionRef.current);
               
               // Set timer to return to neutral after 5 seconds (only for non-neutral expressions)
-              if (expression !== 'neutral' && weight > 0.1) {
+              if (mappedExpression !== 'neutral' && weight > 0.1) {
                 console.log(`[CharacterAvatar] Setting timer to return to neutral in 5 seconds`);
                 expressionTimeoutRef.current = setTimeout(() => {
                   console.log(`[CharacterAvatar] Timer triggered: returning to neutral`);
@@ -709,12 +734,12 @@ useEffect(() => {
                 }, 5000);
               }
             } else {
-              console.warn(`[CharacterAvatar] Expression ${expression} not found in VRM model. Available:`, availableExpressions);
+              console.warn(`[CharacterAvatar] Expression ${mappedExpression} not found in VRM model. Available:`, availableExpressions);
               
               // Try to find a similar expression
               const similarExpression = availableExpressions.find(name => 
-                name.toLowerCase().includes(expression.toLowerCase()) ||
-                expression.toLowerCase().includes(name.toLowerCase())
+                name.toLowerCase().includes(mappedExpression.toLowerCase()) ||
+                mappedExpression.toLowerCase().includes(name.toLowerCase())
               );
               
               if (similarExpression) {
@@ -742,7 +767,12 @@ useEffect(() => {
                   }, 5000);
                 }
               } else {
-                console.error(`[CharacterAvatar] No similar expression found for: ${expression}`);
+                console.warn(`[CharacterAvatar] No similar expression found for: ${mappedExpression} (original: ${expression}). Using neutral as fallback.`);
+                // Fallback to neutral expression which should always exist
+                const neutralValue = expressionManager.getValue('neutral');
+                expressionManager.setValue('neutral', 1.0);
+                console.log(`[CharacterAvatar] Set neutral: ${neutralValue} -> 1.0 (fallback from ${expression})`);
+                currentExpressionRef.current = { expression: 'neutral', weight: 1.0 };
               }
             }
           } else {
@@ -824,7 +854,7 @@ useEffect(() => {
             'happy': 'happy',
             'sad': 'sad',
             'angry': 'angry',
-            'surprised': 'surprised',
+            'surprised': 'curious',  // VRMモデルがsurprisedをサポートしていない場合はcuriousにマッピング
             'relaxed': 'relaxed',
             // Additional mappings for character actions
             'thinking': 'relaxed',

@@ -537,15 +537,20 @@ export class SimplifiedMemorySystem {
   /**
    * Get the most recent request type from user messages
    */
-  async getPreviousRequestType(): Promise<string | null> {
+  async getPreviousRequestType(sessionId?: string): Promise<string | null> {
     try {
       const recentMessages = await this.getRecentMessages();
       
       // Find the most recent user message with a request type
+      // If sessionId is provided, filter by that session
       for (let i = recentMessages.length - 1; i >= 0; i--) {
         const msg = recentMessages[i];
         if (msg.role === 'user' && msg.metadata?.requestType) {
-          console.log(`[SimplifiedMemory] Found previous request type: ${msg.metadata.requestType}`);
+          // Filter by sessionId if provided
+          if (sessionId && msg.metadata?.sessionId !== sessionId) {
+            continue;
+          }
+          console.log(`[SimplifiedMemory] Found previous request type: ${msg.metadata.requestType} for session: ${sessionId || 'any'}`);
           return msg.metadata.requestType;
         }
       }

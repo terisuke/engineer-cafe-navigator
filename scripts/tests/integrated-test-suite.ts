@@ -23,15 +23,18 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 // Load environment variables
-configDotenv({ path: '.env.local' });
-configDotenv({ path: '.env' });
+const rootDir = path.join(__dirname, '../..');
+configDotenv({ path: path.join(rootDir, '.env.local') });
+configDotenv({ path: path.join(rootDir, '.env') });
 
 const execAsync = promisify(exec);
 
 // Supabase configuration
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Create Supabase client only if credentials are available
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 // Test configuration
 const API_BASE_URL = 'http://localhost:3000/api';
@@ -512,6 +515,149 @@ async function runSTTCorrectionTests() {
   }
 }
 
+async function runClarificationTests() {
+  console.log('\n🤔 Category: Clarification System');
+  
+  const tests = [
+    {
+      scenario: 'Ambiguous cafe query - Japanese',
+      query: 'カフェの営業時間について教えてください',
+      patterns: ['エンジニアカフェ', 'サイノカフェ', 'どちら'],
+      conceptHint: 'clarification'
+    },
+    {
+      scenario: 'Ambiguous cafe query - English',
+      query: 'What are the cafe hours?',
+      patterns: ['Engineer Cafe', 'Saino Cafe', 'which one'],
+      language: 'en' as const,
+      conceptHint: 'clarification'
+    },
+    {
+      scenario: 'Ambiguous meeting room query - Japanese',
+      query: '会議室について教えてください',
+      patterns: ['有料会議室', '地下MTGスペース', 'どちら'],
+      conceptHint: 'clarification'
+    },
+    {
+      scenario: 'Ambiguous meeting room query - English',
+      query: 'Tell me about the meeting rooms',
+      patterns: ['Paid Meeting Rooms', 'Basement Meeting Spaces', 'Which one'],
+      language: 'en' as const,
+      conceptHint: 'clarification'
+    },
+    {
+      scenario: 'Specific cafe query - NO clarification needed',
+      query: 'エンジニアカフェの営業時間は？',
+      patterns: ['9:00', '22:00'],
+      conceptHint: 'engineer_cafe_hours'
+    },
+    {
+      scenario: 'Specific basement query - NO clarification needed',
+      query: '地下の会議室について教えて',
+      patterns: ['地下', 'MTG', '予約'],
+      conceptHint: 'basement_facilities'
+    },
+  ];
+
+  for (const test of tests) {
+    const result = await testQuery(
+      'Clarification',
+      test.scenario,
+      test.query,
+      test.patterns,
+      test.language || 'ja',
+      undefined,
+      test.conceptHint
+    );
+    testResults.push(result);
+  }
+}
+
+async function runClarificationWithMemoryTests() {
+  console.log('\n🧠🤔 Category: Clarification with Memory');
+  
+  const sessionId = `clarification-memory-test-${Date.now()}`;
+  
+  // Test 1: Cafe clarification flow
+  console.log('\n--- Testing Cafe Clarification Flow ---');
+  
+  // Step 1: Ask ambiguous cafe question
+  const cafeQ1 = await testQuery(
+    'Clarification Memory',
+    'Ambiguous cafe query',
+    'カフェの営業時間は？',
+    ['エンジニアカフェ', 'サイノカフェ', 'どちら'],
+    'ja',
+    sessionId,
+    'clarification'
+  );
+  testResults.push(cafeQ1);
+  
+  // Step 2: Answer with specific cafe name
+  const cafeQ2 = await testQuery(
+    'Clarification Memory',
+    'Specify Engineer Cafe',
+    'エンジニアカフェ',
+    ['9:00', '22:00'],
+    'ja',
+    sessionId,
+    'engineer_cafe_hours'
+  );
+  testResults.push(cafeQ2);
+  
+  // Step 3: Ask about the other cafe
+  const cafeQ3 = await testQuery(
+    'Clarification Memory',
+    'Ask about the other cafe',
+    'じゃあもう一つの方は？',
+    ['saino', '11:00', '20:30'],
+    'ja',
+    sessionId,
+    'saino_hours'
+  );
+  testResults.push(cafeQ3);
+  
+  // Test 2: Meeting room clarification flow
+  console.log('\n--- Testing Meeting Room Clarification Flow ---');
+  
+  const meetingSessionId = `meeting-clarification-${Date.now()}`;
+  
+  // Step 1: Ask ambiguous meeting room question
+  const meetingQ1 = await testQuery(
+    'Clarification Memory',
+    'Ambiguous meeting room query',
+    '会議室の予約方法を教えて',
+    ['有料会議室', '地下MTGスペース', 'どちら'],
+    'ja',
+    meetingSessionId,
+    'clarification'
+  );
+  testResults.push(meetingQ1);
+  
+  // Step 2: Answer with specific type
+  const meetingQ2 = await testQuery(
+    'Clarification Memory',
+    'Specify basement meeting space',
+    '地下のMTGスペース',
+    ['地下', '予約不要', '無料'],
+    'ja',
+    meetingSessionId,
+    'basement_facilities'
+  );
+  testResults.push(meetingQ2);
+  
+  // Step 3: Ask about the other type
+  const meetingQ3 = await testQuery(
+    'Clarification Memory',
+    'Ask about paid meeting rooms',
+    'じゃあ有料の方は？',
+    ['2階', '有料', '予約'],
+    'ja',
+    meetingSessionId
+  );
+  testResults.push(meetingQ3);
+}
+
 // Report generation
 async function generateReport() {
   console.log('\n📊 Generating Test Report...\n');
@@ -620,14 +766,8 @@ async function main() {
   console.log('=' .repeat(50));
   
   try {
-    // Check if server is running
-    try {
-      await fetch(`${API_BASE_URL}/health`);
-    } catch (error) {
-      console.error('❌ Server is not running. Please start the development server first.');
-      console.log('Run: pnpm dev');
-      process.exit(1);
-    }
+    // Skip server check - assume it's running
+    console.log('Assuming server is running at', API_BASE_URL);
     
     // Run all test categories
     await runBasicInformationTests();
@@ -638,6 +778,8 @@ async function main() {
     await runCalendarEventTests();
     await runWebSearchTests();
     await runSTTCorrectionTests();
+    await runClarificationTests();
+    await runClarificationWithMemoryTests();
     await runPerformanceTests();
     
     // Generate report

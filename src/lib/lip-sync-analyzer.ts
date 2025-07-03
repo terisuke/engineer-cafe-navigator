@@ -32,6 +32,11 @@ export class LipSyncAnalyzer {
       return;
     }
 
+    // Check if we're in a server environment
+    if (typeof window === 'undefined') {
+      throw new Error('AudioContext not available in server environment');
+    }
+
     try {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       

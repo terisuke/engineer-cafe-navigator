@@ -9,6 +9,8 @@ export class SlideNarrator extends Agent {
   private narrationData: any = null;
   private memory: any;
   private _tools: Map<string, any> = new Map();
+  private voiceOutputAgent: any = null;
+  private characterControlAgent: any = null;
 
   constructor(config: any) {
     super({
@@ -24,7 +26,15 @@ export class SlideNarrator extends Agent {
         
         Deliver narrations in a clear, engaging manner.
         Respond to navigation commands promptly.
-        Provide informative answers to content questions.`,
+        Provide informative answers to content questions.
+        
+        IMPORTANT: When answering questions about slides, always start your response with an emotion tag.
+        Available emotions: [happy], [sad], [angry], [relaxed], [surprised]
+        
+        Use [relaxed] for informational answers about slide content
+        Use [happy] when explaining exciting features or benefits
+        Use [surprised] when the user asks unexpected questions
+        Use [sad] when unable to find information in the current slide`,
     });
     
     // Initialize memory
@@ -34,6 +44,15 @@ export class SlideNarrator extends Agent {
   // Method to add tools to this agent
   addTool(name: string, tool: any) {
     this._tools.set(name, tool);
+  }
+
+  // Set unified presentation agents
+  setVoiceOutputAgent(agent: any) {
+    this.voiceOutputAgent = agent;
+  }
+
+  setCharacterControlAgent(agent: any) {
+    this.characterControlAgent = agent;
   }
 
   async loadNarration(slideFile: string, language: SupportedLanguage): Promise<void> {
@@ -76,6 +95,8 @@ export class SlideNarrator extends Agent {
     slideNumber: number;
     audioBuffer: ArrayBuffer;
     characterAction: string;
+    characterControlData?: any;
+    emotion?: string;
   }> {
     const targetSlide = slideNumber || this.currentSlide;
     
@@ -90,8 +111,6 @@ export class SlideNarrator extends Agent {
 
     const narration = slideData.narration.auto;
     
-    // Convert narration to speech
-    const voiceService = this._tools.get('voiceService');
     // Get language from memory
     let language: SupportedLanguage = 'ja';
     if (this.memory && typeof this.memory.get === 'function') {
@@ -99,15 +118,61 @@ export class SlideNarrator extends Agent {
     } else if (this.memory instanceof Map) {
       language = this.memory.get('language') as SupportedLanguage || 'ja';
     }
-    const ttsResult = await voiceService.textToSpeech(narration, language);
     
-    if (!ttsResult.success || !ttsResult.audioBase64) {
-      throw new Error(`Text-to-Speech failed: ${ttsResult.error}`);
+    // Determine character action and emotion
+    const characterAction = this.determineCharacterAction(slideData);
+    const emotion = this.extractEmotionFromSlideContent(slideData);
+    
+    let audioBuffer: ArrayBuffer;
+    let characterControlData: any = null;
+    
+    // Use unified presentation agents if available
+    if (this.voiceOutputAgent && this.characterControlAgent) {
+      // Process voice output and character control in parallel
+      const [voiceResult, characterResult] = await Promise.all([
+        this.voiceOutputAgent.convertTextToSpeech({
+          text: narration,
+          language,
+          emotion,
+          agentName: 'SlideNarrator'
+        }),
+        this.characterControlAgent.processCharacterControl({
+          emotion,
+          text: narration,
+          agentName: 'SlideNarrator'
+        })
+      ]);
+      
+      if (!voiceResult.success) {
+        throw new Error(`Voice output failed: ${voiceResult.error}`);
+      }
+      
+      audioBuffer = voiceResult.audioData;
+      characterControlData = characterResult.success ? characterResult : null;
+      
+      // Add audio data to character control for lip sync
+      if (characterControlData && audioBuffer) {
+        const lipSyncResult = await this.characterControlAgent.processCharacterControl({
+          audioData: audioBuffer,
+          agentName: 'SlideNarrator'
+        });
+        if (lipSyncResult.success && lipSyncResult.lipSyncData) {
+          characterControlData.lipSyncData = lipSyncResult.lipSyncData;
+        }
+      }
+    } else {
+      // Fallback to direct voice service
+      const voiceService = this._tools.get('voiceService');
+      const ttsResult = await voiceService.textToSpeech(narration, language);
+      
+      if (!ttsResult.success || !ttsResult.audioBase64) {
+        throw new Error(`Text-to-Speech failed: ${ttsResult.error}`);
+      }
+      
+      // Convert base64 to ArrayBuffer
+      const buffer = Buffer.from(ttsResult.audioBase64, 'base64');
+      audioBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
     }
-    
-    // Convert base64 to ArrayBuffer
-    const buffer = Buffer.from(ttsResult.audioBase64, 'base64');
-    const audioBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
     
     // Update current slide
     this.currentSlide = targetSlide;
@@ -118,14 +183,13 @@ export class SlideNarrator extends Agent {
       this.memory.set('currentSlide', this.currentSlide);
     }
     
-    // Determine character action based on slide content
-    const characterAction = this.determineCharacterAction(slideData);
-    
     return {
       narration,
       slideNumber: targetSlide,
       audioBuffer,
       characterAction,
+      characterControlData,
+      emotion
     };
   }
 
@@ -135,6 +199,8 @@ export class SlideNarrator extends Agent {
     slideNumber?: number;
     audioBuffer?: ArrayBuffer;
     characterAction?: string;
+    characterControlData?: any;
+    emotion?: string;
     transitionMessage?: string;
   }> {
     if (this.currentSlide >= this.totalSlides) {
@@ -168,6 +234,8 @@ export class SlideNarrator extends Agent {
       slideNumber: result.slideNumber,
       audioBuffer: result.audioBuffer,
       characterAction: result.characterAction,
+      characterControlData: result.characterControlData,
+      emotion: result.emotion,
       transitionMessage,
     };
   }
@@ -178,6 +246,8 @@ export class SlideNarrator extends Agent {
     slideNumber?: number;
     audioBuffer?: ArrayBuffer;
     characterAction?: string;
+    characterControlData?: any;
+    emotion?: string;
     transitionMessage?: string;
   }> {
     if (this.currentSlide <= 1) {
@@ -211,6 +281,8 @@ export class SlideNarrator extends Agent {
       slideNumber: result.slideNumber,
       audioBuffer: result.audioBuffer,
       characterAction: result.characterAction,
+      characterControlData: result.characterControlData,
+      emotion: result.emotion,
       transitionMessage,
     };
   }
@@ -221,6 +293,8 @@ export class SlideNarrator extends Agent {
     slideNumber?: number;
     audioBuffer?: ArrayBuffer;
     characterAction?: string;
+    characterControlData?: any;
+    emotion?: string;
   }> {
     if (slideNumber < 1 || slideNumber > this.totalSlides) {
       return { success: false };
@@ -233,6 +307,8 @@ export class SlideNarrator extends Agent {
       slideNumber: result.slideNumber,
       audioBuffer: result.audioBuffer,
       characterAction: result.characterAction,
+      characterControlData: result.characterControlData,
+      emotion: result.emotion,
     };
   }
 
@@ -286,6 +362,25 @@ export class SlideNarrator extends Agent {
       return 'explaining';
     } else if (narration.includes('thank') || narration.includes('ありがとう')) {
       return 'bowing';
+    } else {
+      return 'neutral';
+    }
+  }
+
+  private extractEmotionFromSlideContent(slideData: any): string {
+    // Extract emotion from slide content for character control
+    const narration = slideData.narration.auto.toLowerCase();
+    
+    if (narration.includes('welcome') || narration.includes('ようこそ') || narration.includes('hello')) {
+      return 'happy';
+    } else if (narration.includes('price') || narration.includes('料金') || narration.includes('cost')) {
+      return 'explaining';
+    } else if (narration.includes('service') || narration.includes('サービス') || narration.includes('feature')) {
+      return 'confident';
+    } else if (narration.includes('thank') || narration.includes('ありがとう') || narration.includes('appreciate')) {
+      return 'grateful';
+    } else if (narration.includes('question') || narration.includes('質問') || narration.includes('help')) {
+      return 'curious';
     } else {
       return 'neutral';
     }

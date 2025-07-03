@@ -1,5 +1,13 @@
 # メモリシステムとRAGの統合リファクタリング
 
+> ⚠️ **注意**: このドキュメントは古いアーキテクチャ（EnhancedQAAgent）に関するものです。  
+> 現在のシステムは8エージェント体制（MainQAWorkflow）を使用しています。  
+> 最新の実装については、[README.md](../README.md)を参照してください。
+
+---
+
+# [ARCHIVED] メモリシステムとRAGの統合リファクタリング
+
 ## 実装内容
 
 ### 1. EnhancedMemorySystem の新機能

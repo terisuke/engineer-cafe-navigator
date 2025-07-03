@@ -1,5 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 import { SupportedLanguage } from '@/mastra/types/config';
+import { UnifiedAgentResponse, createUnifiedResponse } from '@/mastra/types/unified-response';
 
 export interface EventAgentConfig {
   llm: {
@@ -24,14 +25,22 @@ export class EventAgent extends Agent {
         - Upcoming workshops and seminars
         - Study groups and meetups
         Format event information clearly with dates, times, and descriptions.
-        Always respond in the same language as the question.`,
+        Always respond in the same language as the question.
+        
+        IMPORTANT: Always start your response with an emotion tag.
+        Available emotions: [happy], [sad], [angry], [relaxed], [surprised]
+        
+        Use [happy] when announcing exciting events or multiple activities
+        Use [sad] when there are no events or limited activities
+        Use [relaxed] for general event information
+        Use [surprised] for unexpected event updates or special announcements`,
     });
   }
 
   async answerEventQuery(
     query: string,
     language: SupportedLanguage
-  ): Promise<string> {
+  ): Promise<UnifiedAgentResponse> {
     console.log('[EventAgent] Processing event query:', {
       query,
       language
@@ -102,7 +111,37 @@ export class EventAgent extends Agent {
       { role: 'user', content: prompt }
     ]);
     
-    return response.text;
+    // Determine sources used
+    const sources = [];
+    if (hasCalendarEvents) {
+      sources.push('calendar');
+    }
+    if (hasKnowledgeEvents) {
+      sources.push('knowledge_base');
+    }
+    
+    // Determine emotion based on events found
+    let emotion = 'helpful';
+    if (hasCalendarEvents && calendarResult.data?.events?.length > 0) {
+      emotion = 'excited';
+    } else if (!hasCalendarEvents && !hasKnowledgeEvents) {
+      emotion = 'apologetic';
+    }
+    
+    return createUnifiedResponse(
+      response.text,
+      emotion,
+      'EventAgent',
+      language,
+      {
+        confidence: 0.8,
+        category: 'events',
+        sources,
+        processingInfo: {
+          enhancedRag: false
+        }
+      }
+    );
   }
 
   private extractTimeRange(query: string): 'today' | 'thisWeek' | 'nextWeek' | 'thisMonth' {
@@ -189,11 +228,23 @@ ${knowledgeContext || '追加情報はありません'}
     return translations[timeRange] || timeRange;
   }
 
-  private getNoEventsResponse(timeRange: string, language: SupportedLanguage): string {
+  private getNoEventsResponse(timeRange: string, language: SupportedLanguage): UnifiedAgentResponse {
     const timeRangeText = language === 'ja' ? this.translateTimeRange(timeRange) : timeRange;
     
-    return language === 'en'
-      ? `I couldn't find any scheduled events for ${timeRange} at Engineer Cafe. Please check the official website or contact the staff for the most up-to-date event information.`
-      : `${timeRangeText}のエンジニアカフェでの予定されたイベントが見つかりませんでした。最新のイベント情報については、公式ウェブサイトをご確認いただくか、スタッフにお問い合わせください。`;
+    const text = language === 'en'
+      ? `[sad]I couldn't find any scheduled events for ${timeRange} at Engineer Cafe. Please check the official website or contact the staff for the most up-to-date event information.`
+      : `[sad]${timeRangeText}のエンジニアカフェでの予定されたイベントが見つかりませんでした。最新のイベント情報については、公式ウェブサイトをご確認いただくか、スタッフにお問い合わせください。`;
+    
+    return createUnifiedResponse(
+      text,
+      'apologetic',
+      'EventAgent',
+      language,
+      {
+        confidence: 0.7,
+        category: 'events',
+        sources: ['calendar', 'knowledge_base']
+      }
+    );
   }
 }

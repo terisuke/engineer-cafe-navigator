@@ -12,11 +12,21 @@ Engineer Cafe Navigator is a multilingual AI navigation system for the Engineer 
 - **3D Avatar**: Three.js with VRM support
 - **Audio**: Web Audio API with mobile compatibility
 
-### 2. AI Agent Layer
+### 2. AI Agent Layer (8-Agent Architecture)
 - **Framework**: Mastra 0.10.5
 - **Response Model**: Google Gemini 2.5 Flash Preview
 - **Embedding Model**: OpenAI text-embedding-3-small (1536 dims)
-- **Agents**: WelcomeAgent, QAAgent, RealtimeAgent
+- **Coordinator**: MainQAWorkflow
+- **Specialized Agents**:
+  - RouterAgent: Query classification and routing
+  - BusinessInfoAgent: Hours, pricing, location
+  - FacilityAgent: Equipment, facilities, basement spaces
+  - MemoryAgent: Conversation history management
+  - EventAgent: Calendar and events
+  - GeneralKnowledgeAgent: General queries via web search
+  - ClarificationAgent: Ambiguity resolution
+  - RealtimeAgent: Voice interaction processing
+- **Supporting Agents**: WelcomeAgent, SlideNarrator
 
 ### 3. Data Layer
 - **Database**: PostgreSQL with pgvector
@@ -52,18 +62,32 @@ Engineer Cafe Navigator is a multilingual AI navigation system for the Engineer 
 ## 📊 Data Flow
 
 ```
-User Query → STT → Query Processing → RAG Search → 
-Agent Response → TTS → Audio Playback → Avatar Animation
+User Query → STT → RealtimeAgent → MainQAWorkflow → RouterAgent
+                                            ↓
+                        [Route to Appropriate Specialized Agent]
+                                            ↓
+                    Agent Processing (with Enhanced RAG if needed)
+                                            ↓
+                    Response Generation → TTS → Audio Playback → Avatar Animation
 ```
 
 ### Query Processing Pipeline
-1. Speech recognition with corrections
+1. Speech recognition with STT corrections
 2. Language detection (JA/EN)
-3. Request type extraction
-4. Memory context retrieval
-5. RAG knowledge search
-6. Response generation
-7. Audio synthesis
+3. RouterAgent classification:
+   - Ambiguity detection (clarification needed?)
+   - Request type extraction (hours, pricing, etc.)
+   - Context-dependent routing
+   - Memory-aware classification
+4. Specialized agent processing:
+   - Memory context retrieval (MemoryAgent)
+   - Enhanced RAG search (BusinessInfo/FacilityAgent)
+   - External data fetch (EventAgent)
+   - Web search (GeneralKnowledgeAgent)
+   - Clarification dialog (ClarificationAgent)
+5. Response generation with Gemini
+6. Audio synthesis with Google TTS
+7. Character animation sync
 
 ## 🎯 Critical Features
 
@@ -76,6 +100,24 @@ Agent Response → TTS → Audio Playback → Avatar Animation
 - Single entity query inheritance
 - Memory-aware responses
 - Request type tracking
+- Ambiguity resolution with clarification
+
+### 8-Agent Architecture Details
+
+#### MainQAWorkflow (Coordinator)
+- Central orchestration of all specialized agents
+- Session management and context propagation
+- Unified error handling and fallback strategies
+
+#### Specialized Agent Responsibilities
+1. **RouterAgent**: First-line query analysis and routing decisions
+2. **BusinessInfoAgent**: Engineer Cafe operational information with Enhanced RAG
+3. **FacilityAgent**: Physical facilities and equipment queries with basement focus
+4. **MemoryAgent**: Conversation history, "What did I ask?" queries
+5. **EventAgent**: Real-time calendar integration and event listings
+6. **GeneralKnowledgeAgent**: Fallback for out-of-scope queries using web search
+7. **ClarificationAgent**: Disambiguates cafe/meeting room queries
+8. **RealtimeAgent**: Voice interaction and emotion detection
 
 ### Integration Features
 - Real-time calendar events

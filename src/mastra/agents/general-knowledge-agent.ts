@@ -1,5 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 import { SupportedLanguage } from '@/mastra/types/config';
+import { UnifiedAgentResponse, createUnifiedResponse } from '@/mastra/types/unified-response';
 
 export interface GeneralKnowledgeAgentConfig {
   llm: {
@@ -24,14 +25,22 @@ export class GeneralKnowledgeAgent extends Agent {
         - Fukuoka tech scene and startup information
         - Questions that don't fit specific categories
         Use both knowledge base and web search when appropriate.
-        Always respond in the same language as the question.`,
+        Always respond in the same language as the question.
+        
+        IMPORTANT: Always start your response with an emotion tag.
+        Available emotions: [happy], [sad], [angry], [relaxed], [surprised]
+        
+        Use [relaxed] for informational responses about general topics
+        Use [happy] when sharing exciting tech news or positive information
+        Use [surprised] for unexpected or innovative topics
+        Use [sad] when unable to find information or discussing challenges`,
     });
   }
 
   async answerGeneralQuery(
     query: string,
     language: SupportedLanguage
-  ): Promise<string> {
+  ): Promise<UnifiedAgentResponse> {
     console.log('[GeneralKnowledgeAgent] Processing general query:', {
       query,
       language
@@ -109,7 +118,30 @@ export class GeneralKnowledgeAgent extends Agent {
       { role: 'user', content: prompt }
     ]);
     
-    return response.text;
+    // Determine confidence based on sources
+    let confidence = 0.7;
+    if (sources.includes('knowledge_base') && sources.includes('web_search')) {
+      confidence = 0.9;
+    } else if (sources.includes('knowledge_base')) {
+      confidence = 0.8;
+    } else if (sources.includes('web_search')) {
+      confidence = 0.6;
+    }
+    
+    return createUnifiedResponse(
+      response.text,
+      'helpful',
+      'GeneralKnowledgeAgent',
+      language,
+      {
+        confidence,
+        category: 'general_knowledge',
+        sources,
+        processingInfo: {
+          enhancedRag: false
+        }
+      }
+    );
   }
 
   private shouldUseWebSearch(query: string): boolean {
@@ -157,9 +189,21 @@ ${context}
     }
   }
 
-  private getDefaultGeneralResponse(language: SupportedLanguage): string {
-    return language === 'en'
-      ? "I'm sorry, I couldn't find specific information to answer your question. Please try rephrasing your question or ask about something else."
-      : "申し訳ございません。ご質問に答えるための具体的な情報が見つかりませんでした。質問を言い換えていただくか、別のことについてお尋ねください。";
+  private getDefaultGeneralResponse(language: SupportedLanguage): UnifiedAgentResponse {
+    const text = language === 'en'
+      ? "[sad]I'm sorry, I couldn't find specific information to answer your question. Please try rephrasing your question or ask about something else."
+      : "[sad]申し訳ございません。ご質問に答えるための具体的な情報が見つかりませんでした。質問を言い換えていただくか、別のことについてお尋ねください。";
+    
+    return createUnifiedResponse(
+      text,
+      'apologetic',
+      'GeneralKnowledgeAgent',
+      language,
+      {
+        confidence: 0.3,
+        category: 'general_knowledge',
+        sources: ['fallback']
+      }
+    );
   }
 }

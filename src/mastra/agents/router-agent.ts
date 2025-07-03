@@ -63,7 +63,22 @@ export class RouterAgent extends Agent {
     const classification = await this.queryClassifier.classifyWithDetails(query);
     
     // 特定リクエストタイプの抽出
-    const requestType = this.extractRequestType(query);
+    let requestType = this.extractRequestType(query);
+    
+    // 文脈依存クエリの場合、前回のrequestTypeを継承
+    if (this.isContextDependentQuery(query) && !requestType) {
+      try {
+        const { SimplifiedMemorySystem } = await import('@/lib/simplified-memory');
+        const memory = new SimplifiedMemorySystem('shared');
+        const previousRequestType = await memory.getPreviousRequestType(sessionId);
+        if (previousRequestType) {
+          requestType = previousRequestType;
+          console.log(`[RouterAgent] Context inheritance: ${query} -> ${requestType}`);
+        }
+      } catch (error) {
+        console.error('[RouterAgent] Failed to get previous request type:', error);
+      }
+    }
     
     // エージェント選択
     const selectedAgent = this.selectAgent(classification.category, requestType, query);
@@ -96,6 +111,11 @@ export class RouterAgent extends Agent {
       if (lowerQuery.includes('土曜') || lowerQuery.includes('日曜') || lowerQuery.includes('平日')) {
         return 'BusinessInfoAgent'; // hours-related queries
       }
+    }
+    
+    // Check if clarification is needed first
+    if (category === 'cafe-clarification-needed' || category === 'meeting-room-clarification-needed') {
+      return 'ClarificationAgent';
     }
     
     // requestTypeに基づく特別なルーティング
@@ -171,11 +191,12 @@ export class RouterAgent extends Agent {
     // 地下施設関連 - Enhanced detection (prioritize over meeting-room)
     if (lowerQuestion.includes('地下') || lowerQuestion.includes('basement') ||
         lowerQuestion.includes('b1') || lowerQuestion.includes('階下') ||
+        lowerQuestion.includes('ちか') || lowerQuestion.includes('チカ') ||  // Add speech recognition variations
         lowerQuestion.includes('underground') || lowerQuestion.includes('mtgスペース') ||
         lowerQuestion.includes('集中スペース') || lowerQuestion.includes('アンダースペース') ||
         lowerQuestion.includes('makersスペース') || lowerQuestion.includes('focus space') ||
         lowerQuestion.includes('meeting space') || lowerQuestion.includes('makers space') ||
-        /地下.*スペース|地下.*施設|地下.*会議/.test(lowerQuestion)) {
+        /地下.*スペース|地下.*施設|地下.*会議|ちか.*ミーティング|ちか.*スペース/.test(lowerQuestion)) {
       return 'basement';
     }
     
@@ -198,6 +219,18 @@ export class RouterAgent extends Agent {
   private isMemoryRelatedQuestion(question: string): boolean {
     const lowerQuestion = question.toLowerCase();
     
+    // Exclude business-related questions even if they contain memory keywords like "どんな"
+    if (lowerQuestion.includes('メニュー') || lowerQuestion.includes('menu') ||
+        lowerQuestion.includes('料金') || lowerQuestion.includes('price') || lowerQuestion.includes('pricing') ||
+        lowerQuestion.includes('営業時間') || lowerQuestion.includes('hours') ||
+        lowerQuestion.includes('場所') || lowerQuestion.includes('location') ||
+        lowerQuestion.includes('アクセス') || lowerQuestion.includes('access') ||
+        lowerQuestion.includes('設備') || lowerQuestion.includes('facility') ||
+        lowerQuestion.includes('サイノカフェ') || lowerQuestion.includes('saino') ||
+        lowerQuestion.includes('エンジニアカフェ') || lowerQuestion.includes('engineer')) {
+      return false;
+    }
+    
     // Exclude basement/facility-related questions even if they contain memory keywords
     if (lowerQuestion.includes('地下') || lowerQuestion.includes('basement') || 
         lowerQuestion.includes('スペース') || lowerQuestion.includes('space') ||
@@ -205,6 +238,19 @@ export class RouterAgent extends Agent {
         lowerQuestion.includes('施設') || lowerQuestion.includes('facility') ||
         lowerQuestion.includes('equipment') || lowerQuestion.includes('makers')) {
       return false;
+    }
+    
+    // Check for "other one" patterns that refer to clarification options
+    const otherOnePatterns = [
+      // Japanese
+      'もう一つ', 'もうひとつ', 'もう1つ', 'もう一方', 'もう片方',
+      '他の方', 'ほかの方', '別の方', 'そっち', 'あっち',
+      // English
+      'the other', 'other one', 'other option', 'the alternative'
+    ];
+    
+    if (otherOnePatterns.some(pattern => lowerQuestion.includes(pattern))) {
+      return true;
     }
     
     // Memory-related keywords (from EnhancedQAAgent)
@@ -233,6 +279,10 @@ export class RouterAgent extends Agent {
       /^あっち[のはも]?.*/,        // あっちの方は... あっちは... あっちも...
       /^それ[のはも]?.*/,          // それの方は... それは... それも...
       /^そこ[のはも]?.*/,          // そこの方は... そこは... そこも...
+      /^(じゃあ|それでは|では).*(エンジニア|engineer).*(カフェ|cafe)/i, // じゃあエンジニアカフェ！
+      /^エンジニア.*(カフェ|cafe)[!！]?$/i,   // エンジニアカフェ！
+      /^(エンジニア|engineer).*(の方|にして|で)[!！]?$/i, // エンジニアの方で！
+      /^(じゃあ|それでは|では).*(saino|サイノ).*(カフェ|cafe|の方|方は)/i, // じゃあsainoカフェの方は？
     ];
     
     return contextPatterns.some(pattern => pattern.test(trimmed));

@@ -10,7 +10,7 @@ import { getEngineerCafeNavigator } from '@/mastra';
 import { Agent } from '@mastra/core/agent';
 import { SupportedLanguage } from '../types/config';
 import { MainQAWorkflow } from '../workflows/main-qa-workflow';
-import { applySttCorrections } from '@/utils/stt-corrections';
+import { STTCorrection } from '@/lib/stt-correction';
 
 /**
  * RealtimeAgent handles real-time voice interactions with contextual memory
@@ -43,6 +43,12 @@ export class RealtimeAgent extends Agent {
   
   /** Agent configuration */
   private config: any;
+  
+  /** Voice output agent for centralized TTS handling */
+  private voiceOutputAgent: any;
+  
+  /** Character control agent for animations and lip sync */
+  private characterControlAgent: any;
 
   /**
    * Normalize input for common speech recognition errors
@@ -50,7 +56,7 @@ export class RealtimeAgent extends Agent {
    * This is kept as a secondary fallback for any missed corrections
    */
   private normalizeInput(input: string): string {
-    return applySttCorrections(input);
+    return STTCorrection.correct(input);
   }
 
   constructor(config: any, voiceService?: any) {
@@ -69,13 +75,12 @@ export class RealtimeAgent extends Agent {
         You must include emotion tags in your responses to control the VRM character's facial expressions.
         Use emotion tags at the beginning of sentences or phrases to indicate the character's emotion.
         
-        Available emotion tags (VRM compatible):
-        [neutral] - for calm, normal, explaining responses
-        [happy] - for joyful, excited, cheerful, greeting responses
-        [sad] - for disappointed, melancholy, apologetic responses  
-        [angry] - for frustrated, annoyed responses
-        [relaxed] - for thinking, pondering, listening responses
-        Note: Use [curious] instead of [surprised] for questioning or amazed responses
+        Available emotion tags (5 unified emotions):
+        [happy] - for joyful, excited, cheerful, greeting, positive responses
+        [sad] - for disappointed, melancholy, apologetic, unavailable responses  
+        [angry] - for frustrated, annoyed, prohibited responses (use sparingly)
+        [relaxed] - for calm, informational, explaining, thinking responses
+        [surprised] - for questioning, amazed, clarification responses
         
         You can also specify intensity: [happy:0.8] (0.0-1.0)
         
@@ -94,11 +99,23 @@ export class RealtimeAgent extends Agent {
     this.simplifiedMemory = new SimplifiedMemorySystem('shared');
     this.sharedMemory = config.sharedMemory;
     this.config = config;
+    this.voiceOutputAgent = null; // Will be set later
+    this.characterControlAgent = null; // Will be set later
   }
 
   // Method to add tools to this agent
   addTool(name: string, tool: any) {
     this._tools.set(name, tool);
+  }
+  
+  // Method to set the voice output agent
+  setVoiceOutputAgent(agent: any) {
+    this.voiceOutputAgent = agent;
+  }
+  
+  // Method to set the character control agent
+  setCharacterControlAgent(agent: any) {
+    this.characterControlAgent = agent;
   }
 
   async processTextInput(text: string): Promise<{
@@ -110,6 +127,7 @@ export class RealtimeAgent extends Agent {
     emotion?: EmotionData;
     emotionTags?: any[];
     primaryEmotion?: string;
+    characterControlData?: any;
   }> {
     const performanceSteps: Record<string, number> = {};
     
@@ -123,18 +141,27 @@ export class RealtimeAgent extends Agent {
           shouldUpdateCharacter: false,
         };
       }
+      
+      // Apply STT corrections to text input
+      const correctedText = this.normalizeInput(text);
+      if (correctedText !== text) {
+        console.log('[RealtimeAgent] STT correction applied to text input:', {
+          original: text,
+          corrected: correctedText
+        });
+      }
 
       // Store user message in shared memory BEFORE generating response
       // This ensures the message is available for context when QA agent processes it
       if (this.sharedMemory) {
-        await this.sharedMemory.addMessage('user', text, {
+        await this.sharedMemory.addMessage('user', correctedText, {
           agentName: 'RealtimeAgent'
         });
       }
 
       // Generate response with emotion tags
       startPerformance('AI Response Generation (Text)');
-      const rawResponse = await this.generateResponse(text);
+      const rawResponse = await this.generateResponse(correctedText);
       performanceSteps['AI Response Generation'] = endPerformance('AI Response Generation (Text)');
       
       // Parse emotion tags from response
@@ -191,30 +218,99 @@ export class RealtimeAgent extends Agent {
         // Fallback to legacy system if memory storage fails
       }
       
-      // Generate TTS audio for the response
+      // Generate TTS audio and character control data in parallel
       startPerformance('Text-to-Speech');
+      startPerformance('Character Control');
       const language = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
-      const cleanedForTTS = this.cleanTextForTTS(cleanResponse);
       
-      // Set voice parameters based on emotion
-      if (emotion && this.voiceService.setSpeakerByEmotion) {
-        this.voiceService.setSpeakerByEmotion(emotion.emotion);
-      }
+      let audioResponse: ArrayBuffer | undefined = undefined;
+      let characterControlData: any = undefined;
       
-      let audioResponse: ArrayBuffer | undefined;
       try {
-        const ttsResult = await this.voiceService.textToSpeech(cleanedForTTS, language, emotion?.emotion);
+        // Process voice output and character control in parallel
+        const [voiceResult, characterResult] = await Promise.all([
+          // Voice output processing
+          this.voiceOutputAgent ? 
+            this.voiceOutputAgent.convertTextToSpeech({
+              text: rawResponse, // Send raw response with emotion tags
+              language,
+              emotion: emotion?.emotion,
+              sessionId: this.currentSessionId || undefined,
+              agentName: 'RealtimeAgent'
+            }) : Promise.resolve(null),
+          
+          // Character control processing
+          this.characterControlAgent ? 
+            this.characterControlAgent.processCharacterControl({
+              emotion: emotion?.emotion,
+              text: cleanResponse,
+              intensity: emotion?.intensity || 0.8,
+              agentName: 'RealtimeAgent'
+            }) : Promise.resolve(null)
+        ]);
         
-        if (ttsResult.success && ttsResult.audioBase64) {
-          // Convert base64 to ArrayBuffer
-          const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
-          audioResponse = audioData.buffer;
+        // Handle voice output result
+        if (voiceResult?.success && voiceResult.audioData) {
+          audioResponse = voiceResult.audioData;
+          
+          // Update character control with audio data for lip sync
+          if (this.characterControlAgent && audioResponse) {
+            const lipSyncResult = await this.characterControlAgent.processCharacterControl({
+              emotion: emotion?.emotion,
+              text: cleanResponse,
+              audioData: audioResponse,
+              intensity: emotion?.intensity || 0.8,
+              agentName: 'RealtimeAgent'
+            });
+            
+            if (lipSyncResult.success) {
+              characterControlData = lipSyncResult;
+            }
+          }
+        } else if (voiceResult?.error) {
+          console.error('VoiceOutputAgent error:', voiceResult.error);
+        }
+        
+        // Handle character control result
+        if (characterResult?.success && !characterControlData) {
+          characterControlData = characterResult;
+        }
+        
+        // Fallback to direct TTS if VoiceOutputAgent is not available or failed
+        if (!audioResponse) {
+          console.warn('VoiceOutputAgent not available or failed, falling back to direct TTS');
+          const cleanedForTTS = this.cleanTextForTTS(cleanResponse);
+          if (emotion && this.voiceService.setSpeakerByEmotion) {
+            this.voiceService.setSpeakerByEmotion(emotion.emotion);
+          }
+          const ttsResult = await this.voiceService.textToSpeech(cleanedForTTS, language, emotion?.emotion);
+          if (ttsResult.success && ttsResult.audioBase64) {
+            const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
+            audioResponse = audioData.buffer;
+            
+            // Generate lip sync for fallback audio
+            if (this.characterControlAgent && audioResponse) {
+              const lipSyncResult = await this.characterControlAgent.processCharacterControl({
+                emotion: emotion?.emotion,
+                text: cleanResponse,
+                audioData: audioResponse,
+                intensity: emotion?.intensity || 0.8,
+                agentName: 'RealtimeAgent'
+              });
+              
+              if (lipSyncResult.success) {
+                characterControlData = lipSyncResult;
+              }
+            }
+          }
         }
       } catch (ttsError) {
         console.error('TTS generation failed:', ttsError);
         // Continue without audio
       }
+      
       performanceSteps['Text-to-Speech'] = endPerformance('Text-to-Speech');
+      performanceSteps['Character Control'] = endPerformance('Character Control');
       
       this.conversationState = 'speaking';
       
@@ -231,7 +327,8 @@ export class RealtimeAgent extends Agent {
         characterAction,
         emotion,
         emotionTags: parsedResponse.emotions,
-        primaryEmotion: parsedResponse.primaryEmotion
+        primaryEmotion: parsedResponse.primaryEmotion,
+        characterControlData
       };
     } catch (error) {
       this.conversationState = 'idle';
@@ -266,6 +363,7 @@ export class RealtimeAgent extends Agent {
     primaryEmotion?: string;
     responseText?: string;
     error?: string;
+    characterControlData?: any;
   }> {
     const performanceSteps: Record<string, number> = {};
     
@@ -292,6 +390,19 @@ export class RealtimeAgent extends Agent {
       const result = await this.voiceService.speechToText(audioBase64, currentLang);
       performanceSteps['Speech-to-Text'] = endPerformance('Speech-to-Text');
       
+      // Apply STT corrections
+      if (result.success && result.transcript) {
+        const originalTranscript = result.transcript;
+        result.transcript = STTCorrection.correct(result.transcript);
+        
+        if (originalTranscript !== result.transcript) {
+          console.log('[RealtimeAgent] STT correction applied:', {
+            original: originalTranscript,
+            corrected: result.transcript
+          });
+        }
+      }
+      
       if (process.env.NODE_ENV !== 'production') {
         console.log('[RealtimeAgent] STT result:', {
           success: result.success,
@@ -315,20 +426,87 @@ export class RealtimeAgent extends Agent {
         // Generate clarification request based on the issue
         const clarificationResponse = await this.generateClarificationRequest(qualityCheck, currentLang);
         
-        // Convert clarification to speech
+        // Convert clarification to speech and generate character control data
         let clarificationAudio: ArrayBuffer;
+        let clarificationCharacterData: any = undefined;
+        
         try {
-          const ttsResult = await this.voiceService.textToSpeech(clarificationResponse, currentLang);
-          if (ttsResult.success && ttsResult.audioBuffer && ttsResult.audioBuffer instanceof ArrayBuffer) {
-            clarificationAudio = ttsResult.audioBuffer;
-          } else if (ttsResult.success && ttsResult.audioBase64) {
-            // Convert base64 to ArrayBuffer if available
-            const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
-            clarificationAudio = audioData.buffer;
+          // Process voice output and character control in parallel
+          const [voiceResult, characterResult] = await Promise.all([
+            // Voice output processing
+            this.voiceOutputAgent ? 
+              this.voiceOutputAgent.convertTextToSpeech({
+                text: `[curious]${clarificationResponse}[/curious]`,
+                language: currentLang,
+                emotion: 'curious',
+                sessionId: this.currentSessionId || undefined,
+                agentName: 'RealtimeAgent'
+              }) : Promise.resolve(null),
+            
+            // Character control processing
+            this.characterControlAgent ? 
+              this.characterControlAgent.processCharacterControl({
+                emotion: 'curious',
+                text: clarificationResponse,
+                intensity: 0.8,
+                agentName: 'RealtimeAgent'
+              }) : Promise.resolve(null)
+          ]);
+          
+          // Handle voice output result
+          if (voiceResult?.success && voiceResult.audioData) {
+            clarificationAudio = voiceResult.audioData;
+            
+            // Update character control with audio data for lip sync
+            if (this.characterControlAgent) {
+              const lipSyncResult = await this.characterControlAgent.processCharacterControl({
+                emotion: 'curious',
+                text: clarificationResponse,
+                audioData: clarificationAudio,
+                intensity: 0.8,
+                agentName: 'RealtimeAgent'
+              });
+              
+              if (lipSyncResult.success) {
+                clarificationCharacterData = lipSyncResult;
+              }
+            }
           } else {
-            console.warn('[RealtimeAgent] TTS for clarification succeeded but no valid audio data:', ttsResult);
-            clarificationAudio = new ArrayBuffer(0);
+            console.warn('[RealtimeAgent] VoiceOutputAgent failed for clarification:', voiceResult?.error);
+            
+            // Fallback to direct TTS
+            const ttsResult = await this.voiceService.textToSpeech(clarificationResponse, currentLang);
+            if (ttsResult.success && ttsResult.audioBuffer && ttsResult.audioBuffer instanceof ArrayBuffer) {
+              clarificationAudio = ttsResult.audioBuffer;
+            } else if (ttsResult.success && ttsResult.audioBase64) {
+              const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
+              clarificationAudio = audioData.buffer;
+            } else {
+              console.warn('[RealtimeAgent] TTS for clarification succeeded but no valid audio data:', ttsResult);
+              clarificationAudio = new ArrayBuffer(0);
+            }
+            
+            // Generate lip sync for fallback audio
+            if (this.characterControlAgent && clarificationAudio.byteLength > 0) {
+              const lipSyncResult = await this.characterControlAgent.processCharacterControl({
+                emotion: 'curious',
+                text: clarificationResponse,
+                audioData: clarificationAudio,
+                intensity: 0.8,
+                agentName: 'RealtimeAgent'
+              });
+              
+              if (lipSyncResult.success) {
+                clarificationCharacterData = lipSyncResult;
+              }
+            }
           }
+          
+          // Handle character control result
+          if (characterResult?.success && !clarificationCharacterData) {
+            clarificationCharacterData = characterResult;
+          }
+          
         } catch (error) {
           console.error('[RealtimeAgent] TTS failed for clarification:', error);
           clarificationAudio = new ArrayBuffer(0);
@@ -348,6 +526,7 @@ export class RealtimeAgent extends Agent {
             duration: 3000
           },
           primaryEmotion: 'curious',
+          characterControlData: clarificationCharacterData
         };
       }
       
@@ -420,50 +599,133 @@ export class RealtimeAgent extends Agent {
         console.error('[RealtimeAgent] Failed to store assistant message in SimplifiedMemorySystem:', error);
       });
       
-      // Convert CLEAN response to speech (without emotion tags and markdown)
+      // Convert response to speech and generate character control data in parallel
       startPerformance('Text-to-Speech');
-      let cleanedForTTS = this.cleanTextForTTS(cleanResponse);
+      startPerformance('Character Control');
       
-      // Check if text is too long for TTS (5000 bytes limit)
-      const textByteLength = new TextEncoder().encode(cleanedForTTS).length;
-      if (textByteLength > 4500) { // Leave some margin for safety
-        console.warn(`[RealtimeAgent] Text too long for TTS: ${textByteLength} bytes. Truncating...`);
+      let audioResponse: ArrayBuffer | undefined = undefined;
+      let characterControlData: any = undefined;
+      
+      try {
+        // Process voice output and character control in parallel
+        const [voiceResult, characterResult] = await Promise.all([
+          // Voice output processing
+          this.voiceOutputAgent ? 
+            this.voiceOutputAgent.convertTextToSpeech({
+              text: rawResponse, // Send raw response with emotion tags
+              language: currentLang,
+              emotion: emotion?.emotion,
+              sessionId: this.currentSessionId || undefined,
+              agentName: 'RealtimeAgent'
+            }) : Promise.resolve(null),
+          
+          // Character control processing
+          this.characterControlAgent ? 
+            this.characterControlAgent.processCharacterControl({
+              emotion: emotion?.emotion,
+              text: cleanResponse,
+              intensity: emotion?.intensity || 0.8,
+              agentName: 'RealtimeAgent'
+            }) : Promise.resolve(null)
+        ]);
         
-        // Truncate intelligently at sentence boundaries
-        const sentences = cleanedForTTS.split(/[。．！？\n]/);
-        let truncatedText = '';
-        let currentByteLength = 0;
-        
-        for (const sentence of sentences) {
-          const sentenceBytes = new TextEncoder().encode(sentence + '。').length;
-          if (currentByteLength + sentenceBytes > 4000) { // Leave margin
-            break;
+        // Handle voice output result
+        if (voiceResult?.success && voiceResult.audioData) {
+          audioResponse = voiceResult.audioData;
+          
+          // Update character control with audio data for lip sync
+          if (this.characterControlAgent) {
+            const lipSyncResult = await this.characterControlAgent.processCharacterControl({
+              emotion: emotion?.emotion,
+              text: cleanResponse,
+              audioData: audioResponse,
+              intensity: emotion?.intensity || 0.8,
+              agentName: 'RealtimeAgent'
+            });
+            
+            if (lipSyncResult.success) {
+              characterControlData = lipSyncResult;
+            }
           }
-          truncatedText += sentence + '。';
-          currentByteLength += sentenceBytes;
+        } else if (voiceResult?.error) {
+          throw new Error(voiceResult.error || 'VoiceOutputAgent failed to generate audio');
+        } else if (!this.voiceOutputAgent) {
+          // No voice output agent, will use fallback below
+        } else {
+          throw new Error('VoiceOutputAgent failed to generate audio');
         }
         
-        // Add ellipsis to indicate truncation
-        cleanedForTTS = truncatedText + '...' + (currentLang === 'ja' ? '（詳細は省略されました）' : '(details omitted)');
+        // Handle character control result
+        if (characterResult?.success && !characterControlData) {
+          characterControlData = characterResult;
+        }
+        
+        // Fallback to direct TTS if VoiceOutputAgent is not available
+        if (!audioResponse && !this.voiceOutputAgent) {
+          console.warn('[RealtimeAgent] VoiceOutputAgent not available, using direct TTS');
+          let cleanedForTTS = this.cleanTextForTTS(cleanResponse);
+          
+          // Check if text is too long for TTS (5000 bytes limit)
+          const textByteLength = new TextEncoder().encode(cleanedForTTS).length;
+          if (textByteLength > 4500) {
+            console.warn(`[RealtimeAgent] Text too long for TTS: ${textByteLength} bytes. Truncating...`);
+            
+            const sentences = cleanedForTTS.split(/[。．！？\n]/);
+            let truncatedText = '';
+            let currentByteLength = 0;
+            
+            for (const sentence of sentences) {
+              const sentenceBytes = new TextEncoder().encode(sentence + '。').length;
+              if (currentByteLength + sentenceBytes > 4000) {
+                break;
+              }
+              truncatedText += sentence + '。';
+              currentByteLength += sentenceBytes;
+            }
+            
+            cleanedForTTS = truncatedText + '...' + (currentLang === 'ja' ? '（詳細は省略されました）' : '(details omitted)');
+          }
+          
+          if (emotion && this.voiceService.setSpeakerByEmotion) {
+            this.voiceService.setSpeakerByEmotion(emotion.emotion);
+          }
+          
+          const ttsResult = await this.voiceService.textToSpeech(cleanedForTTS, currentLang, emotion?.emotion);
+          
+          if (!ttsResult.success || !ttsResult.audioBase64) {
+            throw new Error(ttsResult.error || 'TTS generation failed');
+          }
+          
+          const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
+          audioResponse = audioData.buffer;
+          
+          // Generate lip sync for fallback audio
+          if (this.characterControlAgent) {
+            const lipSyncResult = await this.characterControlAgent.processCharacterControl({
+              emotion: emotion?.emotion,
+              text: cleanResponse,
+              audioData: audioResponse,
+              intensity: emotion?.intensity || 0.8,
+              agentName: 'RealtimeAgent'
+            });
+            
+            if (lipSyncResult.success) {
+              characterControlData = lipSyncResult;
+            }
+          }
+        }
+        
+        // Ensure we have audio data before proceeding
+        if (!audioResponse) {
+          throw new Error('Failed to generate audio response');
+        }
+      } catch (ttsError) {
+        console.error('[RealtimeAgent] TTS generation failed:', ttsError);
+        throw ttsError;
       }
-      
-      // Set voice parameters based on emotion
-      if (emotion && this.voiceService.setSpeakerByEmotion) {
-        this.voiceService.setSpeakerByEmotion(emotion.emotion);
-      }
-      
-      // Always process the full text for better user experience
-      const ttsResult = await this.voiceService.textToSpeech(cleanedForTTS, currentLang, emotion?.emotion);
-      
-      if (!ttsResult.success || !ttsResult.audioBase64) {
-        throw new Error(ttsResult.error || 'TTS generation failed');
-      }
-      
-      // Convert base64 to ArrayBuffer
-      const audioData = Uint8Array.from(atob(ttsResult.audioBase64), c => c.charCodeAt(0));
-      const audioResponse = audioData.buffer;
       
       performanceSteps['Text-to-Speech'] = endPerformance('Text-to-Speech');
+      performanceSteps['Character Control'] = endPerformance('Character Control');
       
       // Determine character action based on response content and emotion (simple default)
       const characterAction = 'speaking';
@@ -484,6 +746,7 @@ export class RealtimeAgent extends Agent {
         emotionTags: parsedResponse.emotions,
         primaryEmotion: parsedResponse.primaryEmotion,
         responseText: cleanResponse,
+        characterControlData
       };
     } catch (error) {
       console.error('Voice processing error:', error);
@@ -532,9 +795,23 @@ export class RealtimeAgent extends Agent {
             console.log('[RealtimeAgent] Using QA agent response');
           }
           
-          // Check if this is a clarification message and add appropriate emotion tag
-          if (ClarificationUtils.isClarificationMessage(qaAnswer)) {
-            return `[curious]${qaAnswer}[/curious]`;
+          // Ensure emotion tag is present using EmotionTagger
+          const { EmotionTagger } = await import('@/lib/emotion-tagger');
+          
+          // Check if emotion tag already exists
+          const hasEmotionTag = /^\[[a-zA-Z_]+(?::\d*\.?\d+)?\]/.test(qaAnswer.trim());
+          
+          if (!hasEmotionTag) {
+            // Determine appropriate emotion
+            let emotion: 'happy' | 'angry' | 'sad' | 'relaxed' | 'surprised';
+            
+            if (ClarificationUtils.isClarificationMessage(qaAnswer)) {
+              emotion = 'surprised';
+            } else {
+              emotion = EmotionTagger.detectEmotion(qaAnswer);
+            }
+            
+            return EmotionTagger.addEmotionTag(qaAnswer, emotion);
           }
           
           return qaAnswer;
@@ -755,10 +1032,10 @@ export class RealtimeAgent extends Agent {
     
     let systemPrompt = language === 'en'
       ? `You're an Engineer Cafe assistant. Use the provided conversation history and knowledge base to give contextual responses. 
-         Respond briefly in English with emotion tags: [happy], [neutral], [excited], [relaxed]. 
+         Respond briefly in English with emotion tags: [happy], [sad], [angry], [relaxed], [surprised]. 
          Example: "[happy] How can I help?" Keep responses short and natural.`
       : `エンジニアカフェのアシスタントです。提供された会話履歴と知識ベースを使用して文脈のある回答をしてください。
-         感情タグ付きで簡潔に日本語で応答: [happy], [neutral], [excited], [relaxed]
+         感情タグ付きで簡潔に日本語で応答: [happy], [sad], [angry], [relaxed], [surprised]
          例: "[happy] いかがお手伝いしましょうか？" 短く自然に答えてください。`;
 
     // Add specific context for history questions
@@ -1018,31 +1295,46 @@ export class RealtimeAgent extends Agent {
   }
 
   async generateTTSAudio(text: string): Promise<ArrayBuffer> {
-    if (!this.voiceService) {
-      throw new Error('Voice service not available');
-    }
-
     try {
-      // Clean markdown formatting before TTS
-      const cleanedText = this.cleanTextForTTS(text);
       const currentLang = await this.supabaseMemory.get('language') as SupportedLanguage || 'ja';
-      const result = await this.voiceService.textToSpeech(cleanedText, currentLang);
       
-      if (!result.success || !result.audioBase64) {
-        throw new Error(result.error || 'TTS generation failed');
+      if (this.voiceOutputAgent) {
+        // Use VoiceOutputAgent for TTS
+        const voiceResult = await this.voiceOutputAgent.convertTextToSpeech({
+          text, // Let VoiceOutputAgent handle cleaning
+          language: currentLang,
+          sessionId: this.currentSessionId || undefined,
+          agentName: 'RealtimeAgent'
+        });
+        
+        if (voiceResult.success && voiceResult.audioData) {
+          return voiceResult.audioData;
+        } else {
+          throw new Error(voiceResult.error || 'VoiceOutputAgent failed to generate audio');
+        }
+      } else if (this.voiceService) {
+        // Fallback to direct voice service
+        console.warn('[RealtimeAgent] VoiceOutputAgent not available, using direct TTS');
+        const cleanedText = this.cleanTextForTTS(text);
+        const result = await this.voiceService.textToSpeech(cleanedText, currentLang);
+        
+        if (!result.success || !result.audioBase64) {
+          throw new Error(result.error || 'TTS generation failed');
+        }
+        
+        const audioData = Uint8Array.from(atob(result.audioBase64), c => c.charCodeAt(0));
+        return audioData.buffer;
+      } else {
+        throw new Error('No voice service available');
       }
-      
-      // Convert base64 to ArrayBuffer
-      const audioData = Uint8Array.from(atob(result.audioBase64), c => c.charCodeAt(0));
-      return audioData.buffer;
     } catch (error) {
       console.error('Error generating TTS audio:', error);
       throw error;
     }
   }
 
-  // Generate streaming audio response (returns chunks for immediate playback)
-  async *generateStreamingTTSAudio(
+  // Generate streaming audio response with character control (returns chunks for immediate playback)
+  async *generateStreamingTTSAudioWithCharacterControl(
     text: string, 
     language: SupportedLanguage = 'ja',
     emotion?: EmotionData
@@ -1052,35 +1344,70 @@ export class RealtimeAgent extends Agent {
     index: number;
     isLast: boolean;
     emotion?: string;
+    characterControlData?: any;
   }> {
-    if (!this.voiceService) {
-      throw new Error('Voice service not initialized');
-    }
-
-    // Set voice parameters based on emotion
-    if (emotion && this.voiceService.setSpeakerByEmotion) {
-      console.log(`[RealtimeAgent] Setting streaming voice emotion: ${emotion.emotion}`);
-      this.voiceService.setSpeakerByEmotion(emotion.emotion);
-    }
-
     // Check if text needs chunking
     if (!TextChunker.needsChunking(text)) {
       // For short text, just return single chunk
-      const result = await this.voiceService.textToSpeech(text, language);
+      let audioData: ArrayBuffer;
       
-      if (!result.success || !result.audioBase64) {
-        throw new Error(result.error || 'TTS generation failed');
+      if (this.voiceOutputAgent) {
+        const voiceResult = await this.voiceOutputAgent.convertTextToSpeech({
+          text,
+          language,
+          emotion: emotion?.emotion,
+          sessionId: this.currentSessionId || undefined,
+          agentName: 'RealtimeAgent'
+        });
+        
+        if (voiceResult.success && voiceResult.audioData) {
+          audioData = voiceResult.audioData;
+        } else {
+          throw new Error(voiceResult.error || 'VoiceOutputAgent failed to generate audio');
+        }
+      } else if (this.voiceService) {
+        // Fallback to direct voice service
+        console.warn('[RealtimeAgent] VoiceOutputAgent not available for streaming, using direct TTS');
+        if (emotion && this.voiceService.setSpeakerByEmotion) {
+          this.voiceService.setSpeakerByEmotion(emotion.emotion);
+        }
+        const result = await this.voiceService.textToSpeech(text, language);
+        if (!result.success || !result.audioBase64) {
+          throw new Error(result.error || 'TTS generation failed');
+        }
+        const audioArray = Uint8Array.from(atob(result.audioBase64), c => c.charCodeAt(0));
+        audioData = audioArray.buffer;
+      } else {
+        throw new Error('No voice service available');
       }
       
-      // Convert base64 to ArrayBuffer
-      const audioData = Uint8Array.from(atob(result.audioBase64), c => c.charCodeAt(0));
+      // Generate character control data for single chunk
+      let characterControlData: any = undefined;
+      if (this.characterControlAgent) {
+        try {
+          const characterResult = await this.characterControlAgent.processCharacterControl({
+            emotion: emotion?.emotion,
+            text,
+            audioData,
+            intensity: emotion?.intensity || 0.8,
+            agentName: 'RealtimeAgent'
+          });
+          
+          if (characterResult.success) {
+            characterControlData = characterResult;
+          }
+        } catch (error) {
+          console.error('[RealtimeAgent] Character control failed for single chunk:', error);
+        }
+      }
       
       yield {
-        chunk: audioData.buffer,
+        chunk: audioData,
         text,
         index: 0,
         isLast: true,
-        emotion: emotion?.emotion
+        emotion: emotion?.emotion,
+        characterControlData
       };
       return;
     }
@@ -1101,27 +1428,70 @@ export class RealtimeAgent extends Agent {
         
         // Use chunk-specific emotion if available, otherwise use the overall emotion
         const chunkEmotion = chunk.emotion || emotion?.emotion;
-        if (chunkEmotion && this.voiceService.setSpeakerByEmotion) {
-          this.voiceService.setSpeakerByEmotion(chunkEmotion);
+        
+        let audioData: ArrayBuffer;
+        
+        if (this.voiceOutputAgent) {
+          const voiceResult = await this.voiceOutputAgent.convertTextToSpeech({
+            text: chunk.text,
+            language,
+            emotion: chunkEmotion,
+            sessionId: this.currentSessionId || undefined,
+            agentName: 'RealtimeAgent'
+          });
+          
+          if (voiceResult.success && voiceResult.audioData) {
+            audioData = voiceResult.audioData;
+          } else {
+            throw new Error(voiceResult.error || `VoiceOutputAgent failed for chunk ${chunk.index}`);
+          }
+        } else if (this.voiceService) {
+          // Fallback to direct voice service
+          if (chunkEmotion && this.voiceService.setSpeakerByEmotion) {
+            this.voiceService.setSpeakerByEmotion(chunkEmotion);
+          }
+          
+          const result = await this.voiceService.textToSpeech(chunk.text, language, chunkEmotion);
+          if (!result.success || !result.audioBase64) {
+            throw new Error(result.error || `TTS generation failed for chunk ${chunk.index}`);
+          }
+          
+          const audioArray = new Uint8Array(Buffer.from(result.audioBase64, 'base64'));
+          audioData = audioArray.buffer;
+        } else {
+          throw new Error('No voice service available');
         }
         
-        const result = await this.voiceService.textToSpeech(chunk.text, language, chunkEmotion);
         const duration = Date.now() - start;
         console.log(`[Streaming TTS] Chunk ${chunk.index} generated in ${duration}ms with emotion: ${chunkEmotion}`);
         
-        if (!result.success || !result.audioBase64) {
-          throw new Error(result.error || `TTS generation failed for chunk ${chunk.index}`);
+        // Generate character control data for this chunk
+        let characterControlData: any = undefined;
+        if (this.characterControlAgent) {
+          try {
+            const characterResult = await this.characterControlAgent.processCharacterControl({
+              emotion: chunkEmotion,
+              text: chunk.text,
+              audioData,
+              intensity: emotion?.intensity || 0.8,
+              agentName: 'RealtimeAgent'
+            });
+            
+            if (characterResult.success) {
+              characterControlData = characterResult;
+            }
+          } catch (error) {
+            console.error(`[RealtimeAgent] Character control failed for chunk ${chunk.index}:`, error);
+          }
         }
         
-        // Convert base64 to ArrayBuffer using Buffer to avoid stack overflow
-        const audioData = new Uint8Array(Buffer.from(result.audioBase64, 'base64'));
-        
         return {
-          chunk: audioData.buffer,
+          chunk: audioData,
           text: chunk.text,
           index: chunk.index,
           isLast: chunk.isLast,
-          emotion: chunkEmotion
+          emotion: chunkEmotion,
+          characterControlData
         };
       });
 
@@ -1130,6 +1500,30 @@ export class RealtimeAgent extends Agent {
       for (const result of results) {
         yield result;
       }
+    }
+  }
+
+  // Generate streaming audio response (returns chunks for immediate playback) - for backwards compatibility
+  async *generateStreamingTTSAudio(
+    text: string, 
+    language: SupportedLanguage = 'ja',
+    emotion?: EmotionData
+  ): AsyncGenerator<{
+    chunk: ArrayBuffer;
+    text: string;
+    index: number;
+    isLast: boolean;
+    emotion?: string;
+  }> {
+    // Delegate to the enhanced version and strip out character control data
+    for await (const chunk of this.generateStreamingTTSAudioWithCharacterControl(text, language, emotion)) {
+      yield {
+        chunk: chunk.chunk,
+        text: chunk.text,
+        index: chunk.index,
+        isLast: chunk.isLast,
+        emotion: chunk.emotion
+      };
     }
   }
 
@@ -1144,12 +1538,14 @@ export class RealtimeAgent extends Agent {
       index: number;
       isLast: boolean;
       emotion?: string;
+      characterControlData?: any;
     }>;
     shouldUpdateCharacter: boolean;
     characterAction?: string;
     emotion?: EmotionData;
     emotionTags?: any[];
     primaryEmotion?: string;
+    characterControlData?: any;
   }> {
     const performanceSteps: Record<string, number> = {};
     
@@ -1197,8 +1593,8 @@ export class RealtimeAgent extends Agent {
       
       this.conversationState = 'speaking';
       
-      // Create streaming audio generator
-      const audioChunks = this.generateStreamingTTSAudio(
+      // Create streaming audio generator with character control
+      const audioChunks = this.generateStreamingTTSAudioWithCharacterControl(
         this.cleanTextForTTS(cleanResponse),
         language,
         emotion
@@ -1216,7 +1612,8 @@ export class RealtimeAgent extends Agent {
         characterAction,
         emotion,
         emotionTags: parsedResponse.emotions,
-        primaryEmotion: parsedResponse.primaryEmotion
+        primaryEmotion: parsedResponse.primaryEmotion,
+        characterControlData: undefined // Will be provided in streaming chunks
       };
     } catch (error) {
       this.conversationState = 'idle';
@@ -1245,6 +1642,19 @@ export class RealtimeAgent extends Agent {
       const audioBase64 = Buffer.from(uint8Array).toString('base64');
       
       const result = await this.voiceService.speechToText(audioBase64, language);
+      
+      // Apply STT corrections
+      if (result.success && result.transcript) {
+        const originalTranscript = result.transcript;
+        result.transcript = STTCorrection.correct(result.transcript);
+        
+        if (originalTranscript !== result.transcript) {
+          console.log('[RealtimeAgent] STT correction applied:', {
+            original: originalTranscript,
+            corrected: result.transcript
+          });
+        }
+      }
       
       return {
         success: result.success,

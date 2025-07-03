@@ -14,9 +14,25 @@
 
 Engineer Cafe Navigator is a **multilingual voice AI agent system** that automates customer service for Fukuoka City Engineer Cafe. Built with the Mastra framework, it aims to reduce staff workload and improve customer satisfaction.
 
-### 🆕 Latest Updates (2025/07/02)
+### 🆕 Latest Updates (2025/07/03)
 
-#### ✅ RAG System Complete Modernization & Test Evaluation Reform
+#### ✅ Complete Migration to 8-Agent Architecture
+- **🤖 New Multi-Agent Architecture** - MainQAWorkflow integrates 8 specialized agents
+  - **RouterAgent**: Context-dependent query routing with memory integration
+  - **BusinessInfoAgent**: Hours, pricing, location information (with Enhanced RAG)
+  - **FacilityAgent**: Equipment, basement facilities, Wi-Fi info (with Enhanced RAG)
+  - **MemoryAgent**: Conversation history and context retrieval
+  - **EventAgent**: Calendar and event information
+  - **GeneralKnowledgeAgent**: Out-of-scope queries with web search
+  - **ClarificationAgent**: Ambiguous query clarification (cafe/meeting room distinction)
+  - **MainQAWorkflow**: Integration and coordination of all agents
+- **🎯 Ambiguity Resolution Feature** - "Cafe hours?" → "Engineer Cafe or Saino Cafe?"
+- **💬 Memory-based Follow-ups** - Supports "What about the other one?" queries
+- **🧹 Legacy Code Removal** - Completely removed old EnhancedQAAgent (2,342 lines)
+
+### 📚 Previous Updates
+
+#### ✅ RAG System Complete Modernization & Test Evaluation Reform (2025/07/02)
 - **🧠 Enhanced RAG Full Deployment** - Entity recognition & priority scoring in BusinessInfoAgent, FacilityAgent, RealtimeAgent
 - **🎯 Context-Dependent Routing** - Accurate routing for context-dependent queries like "Is it the same hours on Saturday?"
 - **🏢 Basement Facility Search Accuracy** - Full support for MTG/Focus/Under/Makers spaces, fixed Memory Agent false detection
@@ -117,26 +133,48 @@ graph TB
         Char[3D Character]
     end
     
-    subgraph "Backend (Mastra + API Routes)"
-        Agent[Mastra Agents]
-        Tools[Mastra Tools]
-        Memory[Agent Memory]
+    subgraph "8-Agent Architecture (Mastra Framework)"
+        MainQA[MainQAWorkflow<br/>Coordinator]
+        Router[RouterAgent<br/>Query Routing]
+        Business[BusinessInfoAgent<br/>Hours/Pricing]
+        Facility[FacilityAgent<br/>Equipment/Facilities]
+        Memory[MemoryAgent<br/>Context Management]
+        Event[EventAgent<br/>Calendar/Events]
+        General[GeneralKnowledgeAgent<br/>Web Search]
+        Clarify[ClarificationAgent<br/>Ambiguity Resolution]
+        
+        MainQA --> Router
+        Router --> Business
+        Router --> Facility
+        Router --> Memory
+        Router --> Event
+        Router --> General
+        Router --> Clarify
     end
     
     subgraph "External Services"
         GCP[Google Cloud<br/>Speech/TTS]
         Gemini[Gemini 2.5<br/>Flash Preview]
+        OpenAI[OpenAI<br/>Embeddings]
         DB[(PostgreSQL<br/>+ pgvector)]
     end
     
     UI --> Voice
-    Voice --> Agent
-    Slide --> Tools
-    Char --> Tools
-    Agent --> GCP
-    Agent --> Gemini
+    Voice --> MainQA
+    Slide --> MainQA
+    Char --> MainQA
+    MainQA --> GCP
+    Business --> Gemini
+    Facility --> Gemini
+    Memory --> Gemini
+    Event --> Gemini
+    General --> Gemini
+    Clarify --> Gemini
+    Business --> DB
+    Facility --> DB
     Memory --> DB
-    Tools --> DB
+    Business --> OpenAI
+    Facility --> OpenAI
 ```
 
 ### 🛠️ Technology Stack
@@ -392,11 +430,19 @@ engineer-cafe-navigator/
 │   │   ├── globals.css               # Global styles
 │   │   └── page.tsx                  # Main page
 │   ├── mastra/                       # Mastra configuration
-│   │   ├── agents/                   # AI Agents
-│   │   │   ├── qa-agent.ts           # Q&A agent
-│   │   │   ├── realtime-agent.ts     # Real-time agent
-│   │   │   ├── slide-narrator.ts     # Slide narrator
-│   │   │   └── welcome-agent.ts      # Welcome agent
+│   │   ├── agents/                   # AI Agents (8-Agent Architecture)
+│   │   │   ├── router-agent.ts       # Query routing and classification
+│   │   │   ├── business-info-agent.ts # Hours, pricing, location info
+│   │   │   ├── facility-agent.ts     # Equipment and facility info
+│   │   │   ├── memory-agent.ts       # Conversation context management
+│   │   │   ├── event-agent.ts        # Calendar and event queries
+│   │   │   ├── general-knowledge-agent.ts # General queries via web search
+│   │   │   ├── clarification-agent.ts # Ambiguity resolution
+│   │   │   ├── realtime-agent.ts     # Real-time voice interactions
+│   │   │   ├── slide-narrator.ts     # Slide narration
+│   │   │   └── welcome-agent.ts      # Welcome messages
+│   │   ├── workflows/                # Workflow orchestration
+│   │   │   └── main-qa-workflow.ts   # Main workflow coordinating 8 agents
 │   │   ├── tools/                    # Mastra Tools
 │   │   │   ├── character-control.ts  # Character control
 │   │   │   ├── external-api.ts       # External API integration
@@ -457,6 +503,92 @@ engineer-cafe-navigator/
 ├── postcss.config.js
 ├── next.config.js
 └── tsconfig.json
+```
+
+## 🤖 8-Agent Architecture Details
+
+### MainQAWorkflow (Coordinator)
+The central orchestrator that manages all specialized agents and routes queries appropriately.
+
+- **Responsibility**: Coordinates query processing across 8 specialized agents
+- **Key Features**: 
+  - Unified entry point for all Q&A requests
+  - Manages conversation context and session state
+  - Handles agent selection based on RouterAgent decisions
+
+### Specialized Agents
+
+#### 1. RouterAgent
+- **Purpose**: Analyzes queries and routes them to appropriate agents
+- **Features**:
+  - Context-dependent routing ("Is it the same on Saturday?")
+  - Memory-aware classification
+  - Request type extraction (hours, pricing, location)
+  - Ambiguity detection for clarification needs
+
+#### 2. BusinessInfoAgent
+- **Handles**: Operating hours, pricing, location, access information
+- **Enhanced RAG**: Entity-aware search with priority scoring
+- **Examples**: 
+  - "What are the Engineer Cafe hours?"
+  - "How much does it cost?"
+  - "Where is it located?"
+
+#### 3. FacilityAgent  
+- **Handles**: Equipment, facilities, basement spaces, Wi-Fi
+- **Special Focus**: Basement facility detection and categorization
+- **Examples**:
+  - "Tell me about the basement meeting spaces"
+  - "What equipment is available?"
+  - "How do I connect to Wi-Fi?"
+
+#### 4. MemoryAgent
+- **Purpose**: Manages conversation history and context
+- **Features**:
+  - 3-minute conversation window
+  - Handles "What did I ask earlier?" queries
+  - Emotion context preservation
+  - Session continuity management
+
+#### 5. EventAgent
+- **Handles**: Calendar events, workshops, schedules
+- **Integration**: Google Calendar API and Connpass events
+- **Examples**:
+  - "What events are happening today?"
+  - "Are there any workshops this week?"
+
+#### 6. GeneralKnowledgeAgent
+- **Purpose**: Handles out-of-scope queries via web search
+- **Features**: 
+  - Gemini with grounding for real-time information
+  - General knowledge queries
+  - Current events and news
+
+#### 7. ClarificationAgent
+- **Purpose**: Resolves ambiguous queries
+- **Key Clarifications**:
+  - Cafe distinction (Engineer Cafe vs Saino Cafe)
+  - Meeting room types (Paid 2F rooms vs Free basement spaces)
+- **Memory Integration**: Supports follow-up queries like "What about the other one?"
+
+#### 8. RealtimeAgent
+- **Purpose**: Voice interaction processing
+- **Features**:
+  - Real-time speech processing
+  - Emotion detection
+  - Character animation control
+  - Memory-aware responses
+
+### Integration Flow
+
+```
+User Query → RealtimeAgent → MainQAWorkflow → RouterAgent
+                                  ↓
+                    [Route to Appropriate Agent]
+                                  ↓
+                    Agent Processing (with Enhanced RAG)
+                                  ↓
+                    Response Generation → TTS → User
 ```
 
 ## 🎯 Hybrid Voice Recognition Approach
@@ -742,6 +874,42 @@ ls src/slides/assets/images/
 
 # 3. Check theme files
 ls src/slides/themes/
+```
+
+#### 🎯 Clarification Not Working
+
+**Symptoms**: Questions about "cafe" or "meeting rooms" return direct answers instead of asking for clarification
+
+**Solutions**:
+```bash
+# 1. Verify ClarificationAgent is registered
+grep -n "ClarificationAgent" src/mastra/workflows/main-qa-workflow.ts
+
+# 2. Check RouterAgent clarification detection
+grep -n "cafe-clarification-needed" src/mastra/agents/router-agent.ts
+
+# 3. Test clarification directly
+curl -X POST http://localhost:3000/api/qa \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What are the cafe hours?", "language": "en"}'
+
+# Expected response should ask: "Engineer Cafe or Saino Cafe?"
+```
+
+#### 💬 Memory Follow-up Not Working
+
+**Symptoms**: "What about the other one?" returns generic response instead of remembering previous clarification
+
+**Solutions**:
+```bash
+# 1. Check memory system sessionId propagation
+# Verify sessionId is passed between agents
+
+# 2. Test memory retrieval
+curl http://localhost:3000/api/memory/recent?sessionId=test_session
+
+# 3. Verify SimplifiedMemorySystem is storing clarification context
+# Check agent_memory table in Supabase
 ```
 
 ### Debug Commands

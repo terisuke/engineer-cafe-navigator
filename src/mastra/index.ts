@@ -8,6 +8,8 @@ import { SlideNarrator } from './agents/slide-narrator';
 import { MainQAWorkflow } from './workflows/main-qa-workflow';
 import { SupabaseMemoryAdapter } from '@/lib/supabase-memory';
 import { getSharedMemoryService } from '@/lib/shared-memory-service';
+import { VoiceOutputAgent } from './agents/voice-output-agent';
+import { CharacterControlAgent } from './agents/character-control-agent';
 
 // Import tools
 import { SlideControlTool } from './tools/slide-control';
@@ -70,11 +72,32 @@ export class EngineerCafeNavigator {
     const realtimeAgent = new RealtimeAgent(modelConfig, this.voiceService);
     const slideNarrator = new SlideNarrator(modelConfig);
     const mainQAWorkflow = new MainQAWorkflow(modelConfig);
+    
+    // Voice output agent with voice service
+    const voiceOutputAgent = new VoiceOutputAgent({
+      ...modelConfig,
+      tools: {
+        voice: this.voiceService
+      }
+    });
+    
+    // Character control agent
+    const characterControlAgent = new CharacterControlAgent(modelConfig);
 
     this.agents.set('welcome', welcomeAgent);
     this.agents.set('qa', mainQAWorkflow); // New architecture as primary QA
     this.agents.set('realtime', realtimeAgent);
     this.agents.set('narrator', slideNarrator);
+    this.agents.set('voiceOutput', voiceOutputAgent); // Centralized voice output
+    this.agents.set('characterControl', characterControlAgent); // Centralized character control
+    
+    // Connect agents for unified presentation layer
+    realtimeAgent.setVoiceOutputAgent(voiceOutputAgent);
+    realtimeAgent.setCharacterControlAgent(characterControlAgent);
+    
+    // Connect SlideNarrator to unified presentation layer
+    slideNarrator.setVoiceOutputAgent(voiceOutputAgent);
+    slideNarrator.setCharacterControlAgent(characterControlAgent);
   }
 
   private initializeTools() {

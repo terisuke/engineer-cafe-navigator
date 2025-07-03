@@ -14,23 +14,31 @@
 
 Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福岡市エンジニアカフェの新規顧客対応を自動化する**多言語対応音声AIエージェントシステム**です。Mastraフレームワークを活用し、スタッフの負担軽減と顧客満足度向上を目指します。
 
-### 🆕 最新アップデート (2025/07/02)
+### 🆕 最新アップデート (2025/07/03)
 
-#### ✅ RAGシステム完全近代化とテスト評価改革
+#### ✅ 8エージェント体制への完全移行
+- **🤖 新マルチエージェントアーキテクチャ** - MainQAWorkflowが8つの専門エージェントを統合
+  - **RouterAgent**: 文脈依存型クエリルーティング、メモリ統合
+  - **BusinessInfoAgent**: 営業時間・料金・場所情報（Enhanced RAG搭載）
+  - **FacilityAgent**: 設備・地下施設・Wi-Fi情報（Enhanced RAG搭載）
+  - **MemoryAgent**: 会話履歴と文脈検索
+  - **EventAgent**: カレンダーとイベント情報
+  - **GeneralKnowledgeAgent**: 範囲外クエリのWeb検索対応
+  - **ClarificationAgent**: 曖昧なクエリの明確化（カフェ/会議室の区別）
+  - **MainQAWorkflow**: 全エージェントの統合と調整
+- **🎯 あいまいさ解消機能** - 「カフェの営業時間」→「エンジニアカフェ？サイノカフェ？」
+- **💬 メモリベースのフォローアップ** - 「じゃあもう一つの方は？」に対応
+- **🧹 レガシーコード削除** - 古いEnhancedQAAgent（2,342行）を完全削除
+
+### 📚 以前のアップデート
+
+#### ✅ RAGシステム完全近代化とテスト評価改革 (2025/07/02)
 - **🧠 Enhanced RAG全面展開** - BusinessInfoAgent、FacilityAgent、RealtimeAgentでエンティティ認識・優先度スコアリング
 - **🎯 Context-Dependent Routing** - 「土曜日も同じ時間？」等の文脈依存クエリを正確にルーティング
 - **🏢 地下施設検索精度向上** - MTG/集中/アンダー/Makersスペース全対応、Memory Agentの誤検知修正
 - **📊 テスト評価システム刷新** - 厳格キーワードマッチング→セマンティック評価、成功率28.6%→100%改善
 - **🔄 Memory System統合** - SimplifiedMemorySystemで3分間会話継続性、sessionId適切継承
 - **⚡ パフォーマンス向上** - RouterAgent 94.1%精度、平均応答時間2.9秒、Enhanced RAGエンティティ認識
-
-#### ✅ 以前の改善 - RAGシステムの修正完了
-- **🔧 埋め込みモデルの統一** - 全エントリをOpenAI text-embedding-3-small (1536次元)に統一
-- **📝 Sainoカフェ情報修正** - 休館日「毎月最終月曜日」の正確な情報に更新
-- **🏛️ 赤煉瓦文化会館追加** - 営業時間、休館日、入館料などの情報を追加
-- **✨ 検索精度向上** - 埋め込み空間の一貫性により正確な検索結果を実現
-
-### 📚 以前のアップデート
 
 #### ✅ 音声認識精度の向上（STT誤認識対策）
 - **🎯 音声補正システム** - よくある誤認識パターンの自動修正（「じかつきしゅうスペース」→「集中スペース」）
@@ -56,12 +64,6 @@ Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福
 - **🗓️ Google Calendar統合** - OAuth2によるスケジュール同期
 - **🧹 期限切れデータ削除** - 古いイベント情報の自動クリーンアップ
 
-#### ✅ 応答精度システムの改善
-- **🎯 特定リクエスト検出** - 営業時間、料金、場所などの具体的質問を自動識別
-- **📏 応答長制限** - 具体的質問には1文回答で冗長性を排除
-- **🔍 情報フィルタリング** - 関連のない情報を除外して必要な情報のみ提供
-- **🌐 多言語パターン対応** - 日英両言語の特定リクエストパターンをサポート
-
 #### ✅ 音声システムの完全リファクタリング（HTML Audio → Web Audio API移行完了）
 - **🎵 AudioPlaybackService統一** - 全ての音声再生を統一する新しいサービスアーキテクチャ
 - **🔧 Web Audio API完全移行** - HTMLAudioElement依存を完全削除、Web Audio API専用に統一
@@ -69,35 +71,12 @@ Engineer Cafe Navigator（エンジニアカフェナビゲーター）は、福
 - **♻️ レガシーコード削除** - 非推奨ファイル削除とアーキテクチャ簡素化
 - **⚡ パフォーマンス最適化** - リップシンクキャッシュとフォールバック機構の改善
 
-#### ✅ 実装完了 (2025/06/23)
-- **OpenAI エンベディング統合** - RAG検索システムをOpenAI text-embedding-3-small (1536次元)に統一
-- **多言語RAG検索** - 英語で質問しても日本語コンテンツから回答、逆も可能
-- **知識ベース管理UI** - `/admin/knowledge`でのデータ管理、メタデータテンプレート対応
-- **地下スペース情報の完全対応** - 4種類の地下施設（MTG、集中、アンダー、Makers）の音声検索対応
-- **Service Account認証** - APIキー不要でより安全な認証方式
-- **Supabaseメモリアダプタ統合** - 永続的な会話履歴とセッション管理
-- **感情認識・VRM表情制御** - テキスト解析による自動表情変化
-- **🚀 リップシンク最適化** - O(n²)→O(n)アルゴリズム、タイムアウト保護、モバイル対応
-- **📱 モバイル互換性改善** - 適切なエラーハンドリングと音声専用モードの実装
-
-#### ✅ モバイル互換性の大幅改善 (2025/06/23)
-- **🔧 Web Audio API統合** - iPadなどのタブレットでの音声再生エラーを解決
-- **📱 自動再生ポリシー対応** - ブラウザ制限を回避する音声システム
-- **🔄 フォールバック機能** - Web Audio API失敗時のHTMLAudio自動切り替え
-- **👆 ユーザーインタラクション管理** - 初回タップで音声機能完全有効化
-
 #### 📱 デバイス互換性情報
 | デバイス | 音声再生 | リップシンク | 推奨度 |
 |---------|---------|------------|-------|
 | **PC/Mac ブラウザ** | ✅ 完全対応 | ✅ 完全対応 | 🟢 推奨 |
 | **iPad/iOS Safari** | ✅ **改善済み** | ⚠️ 制限あり | 🟢 **使用推奨** |
 | **Android タブレット** | ✅ 完全対応 | ⚠️ 制限あり | 🟢 使用推奨 |
-
-**iPad/iOS での改善点：**
-- ✅ 音声再生エラーを完全解決（Web Audio API導入）
-- ✅ 初回画面タップで音声機能が自動的に有効化
-- ✅ 自動再生ポリシーに準拠した適切なエラーハンドリング
-- ⚠️ リップシンク機能は引き続きブラウザ制限により制限あり
 
 ### 🎯 主な目的
 
@@ -135,24 +114,39 @@ graph TB
     end
     
     subgraph "バックエンド (Mastra + API Routes)"
-        Agent[Mastra Agents]
-        Tools[Mastra Tools]
-        Memory[Agent Memory]
+        Workflow[MainQAWorkflow]
+        subgraph "8 Specialized Agents"
+            Router[RouterAgent]
+            Business[BusinessInfoAgent]
+            Facility[FacilityAgent]
+            Memory[MemoryAgent]
+            Event[EventAgent]
+            General[GeneralKnowledgeAgent]
+            Clarify[ClarificationAgent]
+        end
+        Tools[Enhanced RAG & Tools]
     end
     
     subgraph "外部サービス"
         GCP[Google Cloud<br/>Speech/TTS]
         Gemini[Gemini 2.5<br/>Flash Preview]
+        OpenAI[OpenAI<br/>Embeddings]
         DB[(PostgreSQL<br/>+ pgvector)]
     end
     
     UI --> Voice
-    Voice --> Agent
-    Slide --> Tools
-    Char --> Tools
-    Agent --> GCP
-    Agent --> Gemini
-    Memory --> DB
+    Voice --> Workflow
+    Workflow --> Router
+    Router --> Business
+    Router --> Facility
+    Router --> Memory
+    Router --> Event
+    Router --> General
+    Router --> Clarify
+    Workflow --> Tools
+    Tools --> GCP
+    Tools --> Gemini
+    Tools --> OpenAI
     Tools --> DB
 ```
 
@@ -163,8 +157,7 @@ graph TB
 - **Frontend**: [Next.js 15.3.2](https://nextjs.org/) + [TypeScript 5.8.3](https://www.typescriptlang.org/) + [React 19.1.0](https://reactjs.org/)
 - **AI/ML**: 
   - [Google Gemini 2.5 Flash Preview](https://ai.google.dev/) - 応答生成
-  - [Google text-embedding-004](https://cloud.google.com/vertex-ai/docs/generative-ai/embeddings/get-text-embeddings) - 768次元（1536次元にパディング）
-  - [OpenAI text-embedding-3-small](https://platform.openai.com/docs/guides/embeddings) - 1536次元（フォールバック）
+  - [OpenAI text-embedding-3-small](https://platform.openai.com/docs/guides/embeddings) - 1536次元埋め込み（全エントリ統一）
 - **音声処理**: [Google Cloud Speech-to-Text/Text-to-Speech](https://cloud.google.com/speech-to-text) + Web Audio API
 
 #### 専門技術
@@ -269,10 +262,6 @@ CRON_SECRET=your-cron-secret-key
 # 📅 Google Calendar (オプション)
 GOOGLE_CALENDAR_CLIENT_ID=your-calendar-client-id
 GOOGLE_CALENDAR_CLIENT_SECRET=your-calendar-client-secret
-
-# 🎛️ Feature Toggles (計画中)
-# NEXT_PUBLIC_ENABLE_FACIAL_EXPRESSION=false
-# NEXT_PUBLIC_USE_WEB_SPEECH_API=false
 ```
 
 #### Service Account 設定
@@ -362,7 +351,8 @@ engineer-cafe-navigator/
 │   │   │   ├── character/route.ts    # キャラクターAPI
 │   │   │   ├── slides/route.ts       # スライド操作API
 │   │   │   ├── external/route.ts     # 外部API連携
-│   │   │   └── qa/route.ts           # Q&A API
+│   │   │   ├── qa/route.ts           # Q&A API
+│   │   │   └── monitoring/           # 監視・ヘルスチェックAPI
 │   │   ├── components/               # React Components
 │   │   │   ├── AudioControls.tsx     # 音声制御コンポーネント
 │   │   │   ├── BackgroundSelector.tsx # 背景選択コンポーネント
@@ -374,12 +364,25 @@ engineer-cafe-navigator/
 │   │   ├── globals.css               # グローバルスタイル
 │   │   └── page.tsx                  # メインページ
 │   ├── mastra/                       # Mastra設定
-│   │   ├── agents/                   # AIエージェント
-│   │   │   ├── qa-agent.ts           # Q&Aエージェント
-│   │   │   ├── realtime-agent.ts     # リアルタイムエージェント
-│   │   │   ├── slide-narrator.ts     # スライドナレーター
-│   │   │   └── welcome-agent.ts      # ウェルカムエージェント
+│   │   ├── agents/                   # AIエージェント (11エージェント)
+│   │   │   ├── router-agent.ts       # クエリルーティング
+│   │   │   ├── business-info-agent.ts # 営業時間・料金・場所
+│   │   │   ├── facility-agent.ts     # 施設・設備情報
+│   │   │   ├── memory-agent.ts       # 会話履歴管理
+│   │   │   ├── event-agent.ts        # イベント・カレンダー
+│   │   │   ├── general-knowledge-agent.ts # 一般知識・Web検索
+│   │   │   ├── clarification-agent.ts # あいまいさ解消
+│   │   │   ├── realtime-agent.ts     # リアルタイム音声対話
+│   │   │   ├── slide-narrator.ts     # スライドナレーション
+│   │   │   └── welcome-agent.ts      # ウェルカムメッセージ
+│   │   ├── workflows/                # ワークフロー
+│   │   │   └── main-qa-workflow.ts   # 8エージェント統合ワークフロー
 │   │   ├── tools/                    # Mastra Tools
+│   │   │   ├── enhanced-rag-search.ts # Enhanced RAGツール
+│   │   │   ├── rag-search.ts         # 基本RAG検索
+│   │   │   ├── calendar-service.ts   # カレンダー連携
+│   │   │   ├── general-web-search.ts # Web検索
+│   │   │   ├── context-filter.ts     # コンテキストフィルター
 │   │   │   ├── character-control.ts  # キャラクター制御
 │   │   │   ├── external-api.ts       # 外部API連携
 │   │   │   ├── language-switch.ts    # 言語切り替え
@@ -388,7 +391,7 @@ engineer-cafe-navigator/
 │   │   │   ├── page-transition.ts    # ページ遷移
 │   │   │   └── slide-control.ts      # スライド制御
 │   │   ├── voice/                    # 音声サービス
-│   │   │   └── google-cloud-voice.ts # Google Cloud音声API
+│   │   │   └── google-cloud-voice-simple.ts # Google Cloud音声API
 │   │   ├── types/                    # Mastra型定義
 │   │   └── index.ts                  # Mastra設定ファイル
 │   ├── slides/                       # スライドコンテンツ
@@ -418,6 +421,9 @@ engineer-cafe-navigator/
 │   │   ├── lip-sync-cache.ts         # リップシンクキャッシュシステム
 │   │   ├── marp-processor.ts         # Marp処理
 │   │   ├── simplified-memory.ts      # 統一メモリシステム
+│   │   ├── query-classifier.ts       # クエリ分類器
+│   │   ├── language-processor.ts     # 言語処理
+│   │   ├── stt-correction.ts         # STT誤認識補正
 │   │   ├── supabase.ts              # Supabase設定
 │   │   ├── supabase-memory.ts       # Supabaseメモリ管理
 │   │   ├── voice-recorder.ts         # 音声録音
@@ -434,6 +440,10 @@ engineer-cafe-navigator/
 │   ├── config.toml                   # Supabase設定ファイル
 │   └── migrations/                   # データベースマイグレーション
 ├── config/                           # 設定ファイル
+├── scripts/                          # 管理スクリプト
+│   └── tests/                        # テストスクリプト
+│       └── integrated-test-suite.ts  # 統合テストスイート
+├── docs/                             # ドキュメント
 ├── .env                              # 環境変数
 ├── package.json
 ├── pnpm-lock.yaml
@@ -443,33 +453,63 @@ engineer-cafe-navigator/
 └── tsconfig.json
 ```
 
-## 🎯 ハイブリッド音声認識アプローチ
+## 🎯 8エージェント体制の詳細
 
-### 概要
-Engineer Cafe NavigatorはGoogle Cloud STTとWeb Speech APIのハイブリッドアプローチを採用し、コスト削減と品質向上を実現しています。
+### 1. RouterAgent（ルーティングエージェント）
+- **役割**: ユーザークエリを適切なエージェントにルーティング
+- **特徴**: 
+  - 文脈依存クエリの検出（「土曜日も同じ時間？」）
+  - メモリ関連質問の識別
+  - あいまいさの検出とClarificationAgentへの振り分け
 
-### 音声認識の実装
-- **Google Cloud STT（Service Account認証）**: 高精度な音声認識を提供（実装済み）
-- **MediaRecorder API**: WebM/Opus形式での高品質音声録音（実装済み）
+### 2. BusinessInfoAgent（ビジネス情報エージェント）
+- **役割**: 営業時間、料金、場所に関する質問に回答
+- **特徴**:
+  - Enhanced RAGによるエンティティ認識
+  - Saino Cafeとエンジニアカフェの区別
+  - 特定リクエストへの簡潔な回答
 
-### テキストベースの感情認識 (実装済み)
-- **EmotionManager**: 日本語・英語のキーワード分析による感情検出
-- **VRM表情制御**: 6種類の感情表現（neutral, happy, sad, angry, relaxed, surprised）
-- **コンテキスト連動**: 会話履歴を考慮した感情判定
+### 3. FacilityAgent（施設エージェント）
+- **役割**: 設備、地下施設、Wi-Fiに関する質問に回答
+- **特徴**:
+  - 地下4施設（MTG/集中/アンダー/Makers）の完全対応
+  - Wi-Fi情報と実用的なアドバイス
+  - Enhanced RAGによる高精度検索
 
-### 将来の拡張予定
-以下の機能は将来のバージョンで実装予定です：
+### 4. MemoryAgent（メモリエージェント）
+- **役割**: 会話履歴の管理と記憶関連質問への回答
+- **特徴**:
+  - 「さっき何を聞いた？」への対応
+  - 「じゃあもう一つの方は？」などの文脈依存回答
+  - SimplifiedMemorySystemとの統合
 
-- **Web Speech API**: ブラウザネイティブ音声認識（現在はGoogle Cloud STTを使用）
-- **表情認識**: face-api.jsを使ったカメラベースの表情検出
-- **Enhanced Voice API**: `/api/voice/enhanced`エンドポイント
+### 5. EventAgent（イベントエージェント）
+- **役割**: イベントとカレンダー情報の提供
+- **特徴**:
+  - Google Calendar統合
+  - Connpassイベント情報
+  - 今日/今週のイベント検索
 
-### ブラウザ互換性
-- **Google Cloud STT**: すべてのモダンブラウザで動作
-- **Web Audio API**: 全モダンブラウザ対応（Safari/iOS含む）
-- **MediaRecorder API**: Chrome, Firefox, Edgeで完全対応、Safariで部分対応
-- **Three.js VRM**: 全モダンブラウザ対応
-- **自動再生ポリシー対応**: 全モバイルブラウザで適切に動作
+### 6. GeneralKnowledgeAgent（一般知識エージェント）
+- **役割**: エンジニアカフェ範囲外の一般的な質問に回答
+- **特徴**:
+  - Web検索統合
+  - 最新のAI・技術情報
+  - 福岡のスタートアップ情報
+
+### 7. ClarificationAgent（明確化エージェント）
+- **役割**: あいまいな質問の明確化
+- **特徴**:
+  - カフェの区別（エンジニアカフェ vs サイノカフェ）
+  - 会議室の区別（有料2階 vs 無料地下）
+  - ユーザーフレンドリーな選択肢提示
+
+### 8. MainQAWorkflow（メインワークフロー）
+- **役割**: 全エージェントの統合と調整
+- **特徴**:
+  - エージェント間の連携
+  - 会話履歴の一元管理
+  - パフォーマンス最適化
 
 ## 🎮 使用方法
 
@@ -490,6 +530,7 @@ Engineer Cafe NavigatorはGoogle Cloud STTとWeb Speech APIのハイブリッド
 | "最初から"       | "Start over"            | 最初のスライドへ    |
 | "質問があります"    | "I have a question"     | Q&Aモードへ切り替え |
 | "料金について詳しく" | "Tell me about pricing" | 詳細情報提供  |
+| "カフェの営業時間は？" | "What are the cafe hours?" | あいまいさ解消後に回答 |
 
 ## 🔌 API仕様
 
@@ -517,6 +558,35 @@ Engineer Cafe NavigatorはGoogle Cloud STTとWeb Speech APIのハイブリッド
   "audioResponse": "base64-encoded-audio",
   "shouldUpdateCharacter": true,
   "characterAction": "greeting"
+}
+```
+
+### Q&A API
+
+#### POST /api/qa
+
+質問応答処理（8エージェント体制）
+
+**リクエスト:**
+```json
+{
+  "action": "ask_question",
+  "question": "カフェの営業時間は？",
+  "sessionId": "session_xxx",
+  "language": "ja"
+}
+```
+
+**レスポンス:**
+```json
+{
+  "success": true,
+  "answer": "お手伝いさせていただきます！どちらについてお聞きでしょうか：...",
+  "category": "cafe-clarification-needed",
+  "metadata": {
+    "routedTo": "ClarificationAgent",
+    "processingTime": 450
+  }
 }
 ```
 
@@ -589,6 +659,12 @@ Marpスライドのレンダリングと表示
 - **知識ベース検索**: < 500ms（1536次元ベクトル検索）
 - **メモリクリーンアップ**: 自動TTLベース（Supabase）
 
+#### 8エージェント体制のパフォーマンス
+- **RouterAgent精度**: 94.1%（正確なエージェント選択）
+- **平均応答時間**: 2.9秒（全エージェント含む）
+- **Enhanced RAG検索**: < 400ms
+- **あいまいさ解消**: < 300ms
+
 ### 同時利用者数
 
 - **想定**: 最大10名
@@ -631,10 +707,12 @@ Vercelダッシュボードで以下を設定：
 GOOGLE_CLOUD_PROJECT_ID=prod-project-id
 GOOGLE_CLOUD_CREDENTIALS=./config/service-account-key.json
 GOOGLE_GENERATIVE_AI_API_KEY=prod-gemini-key
+OPENAI_API_KEY=prod-openai-key
 NEXT_PUBLIC_SUPABASE_URL=https://project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 NEXTAUTH_SECRET=secure-production-secret
+CRON_SECRET=your-cron-secret
 ```
 
 ### 推奨本番データベース
@@ -646,6 +724,17 @@ NEXTAUTH_SECRET=secure-production-secret
 > 💡 すべてのサービスでpgvector拡張が利用可能
 
 ## 🔍 監視・ログ
+
+### 本番監視ダッシュボード
+
+```bash
+# リアルタイム監視
+curl https://your-app.vercel.app/api/monitoring/dashboard
+
+# ヘルスチェック
+curl https://your-app.vercel.app/api/health
+curl https://your-app.vercel.app/api/health/knowledge
+```
 
 ### Mastra Observability
 
@@ -665,6 +754,7 @@ const mastra = new Mastra({
 - **Vercel Analytics**: アクセス解析
 - **Mastra Metrics**: AI応答時間
 - **Custom Logging**: 音声処理ログ
+- **エージェント別メトリクス**: 各エージェントの利用率と応答時間
 
 ## 🛠️ トラブルシューティング
 
@@ -713,6 +803,24 @@ gcloud services list --enabled --filter="name:(speech|texttospeech)"
 }
 ```
 
+#### 🤔 あいまいな質問が明確化されない
+
+**症状**: 「カフェの営業時間は？」で直接回答される
+
+**確認ポイント**:
+1. QueryClassifierが正しく `cafe-clarification-needed` を返しているか
+2. RouterAgentがClarificationAgentにルーティングしているか
+3. ClarificationAgentが正しく実装されているか
+
+**デバッグ方法**:
+```bash
+# 統合テストの実行
+pnpm test
+
+# 特定のテストケースの確認
+cd scripts/tests && npx tsx integrated-test-suite.ts
+```
+
 #### 🔐 Service Account認証エラー
 
 **症状**: "Could not refresh access token" エラー
@@ -741,7 +849,7 @@ cat .env | grep GOOGLE_CLOUD
 **解決方法**:
 ```bash
 # 1. VRMファイルの配置確認
-ls src/characters/models/
+ls public/characters/models/
 
 # 2. ブラウザのWebGL対応確認
 # about:config で webgl.disabled を確認
@@ -770,18 +878,18 @@ ls src/slides/themes/
 
 ```bash
 # 全体的なヘルスチェック
-curl http://localhost:3000/api/voice?action=status
-curl http://localhost:3000/api/character?action=health
-curl http://localhost:3000/api/marp?action=health
+curl http://localhost:3000/api/health
+
+# 知識ベースのヘルスチェック
+curl http://localhost:3000/api/health/knowledge
 
 # ログの確認
 # 現在利用可能なコマンド
 pnpm run dev         # 開発サーバー起動
 pnpm run build       # ビルド
 pnpm run lint        # ESLintチェック
-pnpm run test:api    # APIテスト
-pnpm run test:rag    # RAG検索テスト
-pnpm run test:external-apis # 外部APIテスト
+pnpm run typecheck   # TypeScriptチェック
+pnpm run test        # 統合テスト実行
 ```
 
 ## 🔐 セキュリティ
@@ -789,7 +897,7 @@ pnpm run test:external-apis # 外部APIテスト
 ### データ保護
 
 - **音声データ**: 処理後即座に削除
-- **会話ログ**: 暗号化保存（Mastra Memory）
+- **会話ログ**: 暗号化保存（SimplifiedMemorySystem）
 - **個人情報**: GDPR・個人情報保護法準拠
 
 ### セキュリティ対策
@@ -872,7 +980,8 @@ const ratelimit = new Ratelimit({
 ### 品質指標
 
 - ✅ **ユーザー満足度**: 4.0/5.0以上
-- ✅ **音声認識精度**: 95%以上
+- ✅ **音声認識精度**: 95%以上（STT補正込み）
+- ✅ **エージェント精度**: 94%以上
 - ✅ **システム障害時間**: 月間1時間以内
 
 ### ビジネス指標
@@ -880,6 +989,7 @@ const ratelimit = new Ratelimit({
 - ✅ **スタッフ負荷削減**: 50%
 - ✅ **新規登録完了率**: +10%向上
 - ✅ **多言語対応効率**: 80%短縮
+- ✅ **あいまいさ解消成功率**: 90%以上
 
 ## 🗺️ ロードマップ
 
@@ -889,19 +999,19 @@ const ratelimit = new Ratelimit({
 - [x] 3Dキャラクター統合
 - [x] 多言語対応（日英）
 
-### 📅 Phase 2 (計画中): 高度な対話
-- [ ] 会話の文脈理解向上
-- [ ] 感情認識・表現
-- [ ] カスタマイズ可能なキャラクター
-- [ ] さらなる言語対応
+### 📅 Phase 2 (完了): 高度な対話
+- [x] 会話の文脈理解向上（8エージェント体制）
+- [x] 感情認識・表現（テキストベース）
+- [x] あいまいさ解消機能
+- [x] メモリベースのフォローアップ
 
-### 📅 Phase 3 (将来): 拡張機能
+### 📅 Phase 3 (計画中): 拡張機能
 - [ ] 予約システム統合
 - [ ] QRコード読み取り
 - [ ] AR/VR体験
 - [ ] モバイルアプリ
 
-### 📅 Phase 4 (発展): AI強化
+### 📅 Phase 4 (将来): AI強化
 - [ ] 個人化対応
 - [ ] 学習型対話システム
 - [ ] 予測型案内
@@ -924,10 +1034,11 @@ const ratelimit = new Ratelimit({
 pnpm run lint
 pnpm run format
 
-# 利用可能なテストコマンド:
-pnpm run test:api           # APIエンドポイントテスト
-pnpm run test:rag           # RAG検索機能テスト
-pnpm run test:external-apis # 外部API連携テスト
+# TypeScriptチェック
+pnpm run typecheck
+
+# 統合テスト実行
+pnpm run test
 ```
 
 ### 問題報告
@@ -966,6 +1077,7 @@ pnpm start                  # プロダクションサーバー起動
 
 # コード品質
 pnpm lint                   # Next.js linting実行
+pnpm typecheck              # TypeScriptチェック
 
 # CSS依存関係
 pnpm install:css            # Tailwind CSS v3の正しい依存関係をインストール
@@ -975,32 +1087,46 @@ pnpm seed:knowledge         # 初期データで知識ベースをシード
 pnpm migrate:embeddings     # 既存知識をOpenAI埋め込みに移行
 pnpm import:knowledge       # Markdownファイルから知識をインポート
 pnpm import:narrations      # スライドナレーションをインポート
+pnpm update:embeddings      # 既存知識の埋め込みを更新
 
 # データベース管理
 pnpm db:migrate             # データベースマイグレーション実行
 pnpm db:setup-admin         # 管理者知識インターフェースのセットアップ
+pnpm db:reset               # データベースリセット（開発環境のみ）
 
 # CRONジョブ (本番環境)
 pnpm cron:update-knowledge  # 知識ベース更新を手動でトリガー
 pnpm cron:update-slides     # スライド更新を手動でトリガー
+
+# 監視 & ヘルス
+pnpm health:check           # システムヘルスチェック実行
+pnpm metrics:dashboard      # パフォーマンスメトリクス表示
+
+# テスト
+pnpm test                   # 統合テストスイート実行
 ```
 
-### 知識ベースシステム
+### Enhanced RAGシステムの特徴
 
-#### RAG検索システムの特徴
+#### RAGPriorityScorer
+- **エンティティ認識**: エンジニアカフェとSainoの自動区別
+- **優先度スコアリング**: クエリとの関連性に基づく結果順位付け
+- **カテゴリ別最適化**: 営業時間、料金、施設情報ごとの特化検索
+
+#### 知識ベースシステム
 - **多言語対応**: 日本語・英語のクロスランゲージ検索
-- **ハイブリッド埋め込み**: 
-  - Google text-embedding-004 (768次元→1536次元パディング)
-  - OpenAI text-embedding-3-small (1536次元フォールバック)
+- **統一埋め込み**: OpenAI text-embedding-3-small (1536次元)
 - **重複検知**: 自動重複チェックとマージ
 - **バッチインポート**: 効率的な一括処理
 - **管理UI**: `/admin/knowledge`での完全な知識管理
-
-#### 知識ベース構造
-- **84件以上のエントリー**: 設備、基本情報、料金など
-- **カテゴリー階層**: メイン・サブカテゴリーによる整理
-- **メタデータ管理**: 重要度、タグ、更新日時
 - **自動更新**: 6時間ごとの外部データソース同期
+
+#### SimplifiedMemorySystemの特徴
+- **3分間の短期記憶**: 会話コンテキストの保持
+- **メモリ認識クエリ**: 「さっき何を聞いた？」の自動検出
+- **エージェント分離**: エージェントごとの独立メモリ空間
+- **TTLベース管理**: Supabaseによる自動クリーンアップ
+- **バッチ処理**: 効率的なメモリ操作
 
 ### 技術ドキュメント
 - **[📚 ドキュメント一覧](docs/README.md)** - 全ドキュメントのインデックス
@@ -1008,6 +1134,7 @@ pnpm cron:update-slides     # スライド更新を手動でトリガー
 - **[🔒 セキュリティガイド](docs/SECURITY.md)** - セキュリティ対策・脅威分析
 - **[🛠️ 開発ガイド](docs/DEVELOPMENT.md)** - 開発者向け技術仕様
 - **[🚀 デプロイガイド](docs/DEPLOYMENT.md)** - 本番環境デプロイ手順
+- **[🏛️ システムアーキテクチャ](docs/SYSTEM-ARCHITECTURE.md)** - 8エージェント体制の詳細
 
 ### セキュリティハイライト
 - ✅ **XSS対策**: HTMLサニタイゼーション実装済み

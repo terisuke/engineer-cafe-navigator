@@ -213,6 +213,18 @@ export class QueryClassifier {
           confidence: 1.0
         };
       }
+      
+      // Sainoカフェと明示されている場合
+      if (normalizedQuestion.includes('saino') || normalizedQuestion.includes('サイノ')) {
+        if (this.debugMode) {
+          console.log('[QueryClassifier] Explicit Saino Cafe query, treating as saino-cafe');
+        }
+        return {
+          needsClarification: false,
+          category: 'saino-cafe',
+          confidence: 1.0
+        };
+      }
 
       // enhanced featuresが有効で、clarificationが不要な場合
       if (conversationContext && !conversationContext.needsClarification) {

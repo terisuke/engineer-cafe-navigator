@@ -4,6 +4,7 @@ import { FacilityAgent } from '@/mastra/agents/facility-agent';
 import { MemoryAgent } from '@/mastra/agents/memory-agent';
 import { EventAgent } from '@/mastra/agents/event-agent';
 import { GeneralKnowledgeAgent } from '@/mastra/agents/general-knowledge-agent';
+import { ClarificationAgent } from '@/mastra/agents/clarification-agent';
 import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
 import { SupportedLanguage } from '@/mastra/types/config';
 import { RAGSearchTool } from '@/mastra/tools/rag-search';
@@ -11,6 +12,7 @@ import { enhancedRagSearchTool } from '@/mastra/tools/enhanced-rag-search';
 import { CalendarServiceTool } from '@/mastra/tools/calendar-service';
 import { GeneralWebSearchTool } from '@/mastra/tools/general-web-search';
 import { contextFilterTool } from '@/mastra/tools/context-filter';
+import { UnifiedAgentResponse } from '@/mastra/types/unified-response';
 
 export interface QAWorkflowConfig {
   llm: {
@@ -20,6 +22,7 @@ export interface QAWorkflowConfig {
 
 export interface QAWorkflowResult {
   answer: string;
+  emotion: string;
   metadata: {
     routedTo: string;
     category: string;
@@ -27,6 +30,13 @@ export interface QAWorkflowResult {
     language: SupportedLanguage;
     confidence: number;
     processingTime: number;
+    agentName: string;
+    sources?: string[];
+    processingInfo?: {
+      filtered?: boolean;
+      contextInherited?: boolean;
+      enhancedRag?: boolean;
+    };
   };
 }
 
@@ -37,6 +47,7 @@ export class MainQAWorkflow {
   private memoryAgent: MemoryAgent;
   private eventAgent: EventAgent;
   private generalKnowledgeAgent: GeneralKnowledgeAgent;
+  private clarificationAgent: ClarificationAgent;
   private memorySystem: SimplifiedMemorySystem;
   private tools: Map<string, any> = new Map();
 
@@ -48,6 +59,7 @@ export class MainQAWorkflow {
     this.memoryAgent = new MemoryAgent(config);
     this.eventAgent = new EventAgent(config);
     this.generalKnowledgeAgent = new GeneralKnowledgeAgent(config);
+    this.clarificationAgent = new ClarificationAgent(config);
     this.memorySystem = new SimplifiedMemorySystem('shared');
     
     // Initialize tools
@@ -114,12 +126,12 @@ export class MainQAWorkflow {
       console.log('[MainQAWorkflow] Routing result:', routingResult);
 
       // Step 2: Process with the selected agent
-      let answer: string;
+      let agentResponse: UnifiedAgentResponse;
       const language = requestLanguage || routingResult.language;
 
       switch (routingResult.agent) {
         case 'BusinessInfoAgent':
-          answer = await this.businessInfoAgent.answerBusinessQuery(
+          agentResponse = await this.businessInfoAgent.answerBusinessQuery(
             question,
             routingResult.category,
             routingResult.requestType,
@@ -129,7 +141,7 @@ export class MainQAWorkflow {
           break;
 
         case 'FacilityAgent':
-          answer = await this.facilityAgent.answerFacilityQuery(
+          agentResponse = await this.facilityAgent.answerFacilityQuery(
             question,
             routingResult.requestType,
             language
@@ -137,7 +149,7 @@ export class MainQAWorkflow {
           break;
 
         case 'MemoryAgent':
-          answer = await this.memoryAgent.handleMemoryQuery(
+          agentResponse = await this.memoryAgent.handleMemoryQuery(
             question,
             sessionId,
             language
@@ -145,15 +157,23 @@ export class MainQAWorkflow {
           break;
 
         case 'EventAgent':
-          answer = await this.eventAgent.answerEventQuery(
+          agentResponse = await this.eventAgent.answerEventQuery(
             question,
+            language
+          );
+          break;
+
+        case 'ClarificationAgent':
+          agentResponse = await this.clarificationAgent.handleClarification(
+            question,
+            routingResult.category,
             language
           );
           break;
 
         case 'GeneralKnowledgeAgent':
         default:
-          answer = await this.generalKnowledgeAgent.answerGeneralQuery(
+          agentResponse = await this.generalKnowledgeAgent.answerGeneralQuery(
             question,
             language
           );
@@ -161,19 +181,23 @@ export class MainQAWorkflow {
       }
 
       // Step 3: Store in memory
-      await this.storeConversation(question, answer, sessionId, routingResult.category);
+      await this.storeConversation(question, agentResponse.text, sessionId, routingResult.category, routingResult.requestType);
 
       const processingTime = Date.now() - startTime;
 
       return {
-        answer,
+        answer: agentResponse.text,
+        emotion: agentResponse.emotion,
         metadata: {
           routedTo: routingResult.agent,
           category: routingResult.category,
           requestType: routingResult.requestType,
           language,
-          confidence: routingResult.confidence,
-          processingTime
+          confidence: agentResponse.metadata.confidence,
+          processingTime,
+          agentName: agentResponse.metadata.agentName,
+          sources: agentResponse.metadata.sources,
+          processingInfo: agentResponse.metadata.processingInfo
         }
       };
 
@@ -186,13 +210,16 @@ export class MainQAWorkflow {
 
       return {
         answer: fallbackAnswer,
+        emotion: 'apologetic',
         metadata: {
           routedTo: 'error',
           category: 'error',
           requestType: null,
           language: requestLanguage || 'ja',
           confidence: 0,
-          processingTime: Date.now() - startTime
+          processingTime: Date.now() - startTime,
+          agentName: 'ErrorHandler',
+          sources: ['fallback']
         }
       };
     }
@@ -202,18 +229,29 @@ export class MainQAWorkflow {
     question: string,
     answer: string,
     sessionId: string,
-    category: string
+    category: string,
+    requestType?: string | null
   ): Promise<void> {
     try {
-      // Store user question
+      // Store user question with requestType
       await this.memorySystem.addMessage('user', question, {
-        sessionId
+        sessionId,
+        requestType
       });
 
-      // Store assistant answer
-      await this.memorySystem.addMessage('assistant', answer, {
-        sessionId
-      });
+      // Store assistant answer with clarification metadata if applicable
+      const metadata: any = { sessionId, requestType };
+      
+      // If this was a clarification, store what options were presented
+      if (category === 'cafe-clarification-needed') {
+        metadata.clarificationType = 'cafe';
+        metadata.clarificationOptions = ['Engineer Cafe', 'Saino Cafe'];
+      } else if (category === 'meeting-room-clarification-needed') {
+        metadata.clarificationType = 'meeting-room';
+        metadata.clarificationOptions = ['Paid Meeting Rooms (2F)', 'Basement Meeting Spaces (B1)'];
+      }
+      
+      await this.memorySystem.addMessage('assistant', answer, metadata);
 
       console.log('[MainQAWorkflow] Conversation stored in memory');
     } catch (error) {

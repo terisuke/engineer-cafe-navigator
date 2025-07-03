@@ -42,6 +42,9 @@ export default function Home() {
   // Loading state
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingMessage, setProcessingMessage] = useState('');
+  
+  // Persistent session ID for the entire conversation
+  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`);
 
   // ボイスウェーブの高さ（scaleY）を一度だけ生成して保持
   const voiceWaveScales = useMemo(() =>
@@ -178,7 +181,7 @@ export default function Home() {
             action: 'text_to_speech',
             text: cleanText,
             language: language,
-            sessionId: `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+            sessionId: sessionId
           })
         });
         
@@ -319,29 +322,22 @@ export default function Home() {
           const emotionToUse = quickResponse.emotion || emotionAnalysis.emotion;
           // Setting enhanced emotion
           
-          // Apply expressions directly with simple mapping
-          // Processing cached response emotion
-          
-          if (setExpressionFunction) {
-            // Simple direct emotion to expression mapping
-            const expressionName = EmotionMapping.mapToVRMEmotion(emotionToUse);
-            // Setting character expression
-            
-            try {
-              setExpressionFunction(expressionName, 0.8);
-              // Expression function called successfully
-            } catch (error) {
-              // Error calling expression function
-            }
-          } else {
-            // Expression function not available
-          }
+          // Apply character control for quick response
+          const quickCharacterData = {
+            emotion: emotionToUse,
+            expression: EmotionMapping.mapToVRMEmotion(emotionToUse),
+            emotionIntensity: 0.8
+          };
+          await handleCharacterControl(quickCharacterData);
           
           // If we have cached audio, use it; otherwise generate TTS
           if (quickResponse.audioBase64) {
+            // 音声再生を開始してすぐにモーダルを閉じる
+            playAudioWithLipSync(quickResponse.audioBase64).catch(error => {
+              console.error('[processVoiceInput] Quick response audio playback error:', error);
+            });
             setIsProcessing(false);
             setProcessingMessage('');
-            await playAudioWithLipSync(quickResponse.audioBase64);
           } else {
             setProcessingMessage(currentLanguage === 'ja' ? '音声を生成中...' : 'Generating voice...');
             // Generate TTS for the quick response
@@ -353,7 +349,8 @@ export default function Home() {
                 text: preprocessTTS(quickResponse.text, currentLanguage),
                 language: currentLanguage,
                 emotion: emotionToUse,
-                intensity: emotionAnalysis.intensity
+                intensity: emotionAnalysis.intensity,
+                sessionId: sessionId
               })
             });
             
@@ -369,9 +366,16 @@ export default function Home() {
                 category: 'common'
               });
               
+              // 音声再生を開始してすぐにモーダルを閉じる
+              playAudioWithLipSync(ttsResult.audioResponse).catch(error => {
+                console.error('[processVoiceInput] Generated audio playback error:', error);
+              });
               setIsProcessing(false);
               setProcessingMessage('');
-              await playAudioWithLipSync(ttsResult.audioResponse);
+            } else {
+              // TTSに失敗した場合もモーダルを閉じる
+              setIsProcessing(false);
+              setProcessingMessage('');
             }
           }
           
@@ -398,7 +402,7 @@ export default function Home() {
           action: 'process_voice',
           audioData: audioBase64,
           language: currentLanguage,
-          sessionId: `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+          sessionId: sessionId
         })
       });
       
@@ -416,27 +420,41 @@ export default function Home() {
           const emotionManager = new EnhancedEmotionManager();
           const emotionAnalysis = emotionManager.analyzeTextEmotion(result.responseText, currentLanguage);
           
-          const emotionToUse = result.primaryEmotion || result.emotion || emotionAnalysis.emotion;
+          // 安全なemotion抽出
+          let emotionToUse = 'neutral';
+          if (typeof result.primaryEmotion === 'string' && result.primaryEmotion) {
+            emotionToUse = result.primaryEmotion;
+          } else if (typeof result.emotion === 'string' && result.emotion) {
+            emotionToUse = result.emotion;
+          } else if (typeof emotionAnalysis.emotion === 'string' && emotionAnalysis.emotion) {
+            emotionToUse = emotionAnalysis.emotion;
+          }
+          
+          console.log('[processVoiceInput] Selected emotion:', emotionToUse, 'from:', {
+            primaryEmotion: result.primaryEmotion,
+            emotion: result.emotion,
+            analysisEmotion: emotionAnalysis.emotion
+          });
           const intensity = emotionAnalysis.intensity;
           
           // Enhanced emotion analysis complete
           
-          // Apply expressions directly with simple mapping
-          // Processing voice result emotion
-          
-          if (setExpressionFunction) {
-            // Simple direct emotion to expression mapping
-            const expressionName = EmotionMapping.mapToVRMEmotion(emotionToUse);
-            // Setting character expression
-            
-            try {
-              setExpressionFunction(expressionName, 0.8);
-              // Expression function called successfully
-            } catch (error) {
-              // Error calling expression function
-            }
+          // Handle character control through unified API
+          if (result.characterControlData) {
+            await handleCharacterControl(result.characterControlData);
           } else {
-            // Expression function not available
+            // Fallback: Apply expressions directly
+            if (setExpressionFunction) {
+              try {
+                // Always use neutral expression for Q&A to avoid distracting face changes
+                console.log('[processVoiceInput] Setting neutral expression (face expression disabled for Q&A)');
+                setExpressionFunction('neutral', 0.8);
+              } catch (error) {
+                console.error('[Character Control] Fallback expression error:', error);
+                // 完全なフォールバック
+                setExpressionFunction('neutral', 0.8);
+              }
+            }
           }
           
           // Cache the response for future use
@@ -452,13 +470,13 @@ export default function Home() {
           }
           
           // Save conversation to memory
-          if (result.responseText && speechResult.transcript) {
+          if (result.responseText && (result.transcript || speechResult?.transcript)) {
             ConversationMemory.saveConversation({
-              userInput: speechResult.transcript,
+              userInput: result.transcript || speechResult?.transcript || '',
               aiResponse: preprocessTTS(result.responseText, currentLanguage),
               emotion: emotionToUse,
               language: currentLanguage,
-              responseTime: Date.now() - (speechResult.startTime || Date.now()),
+              responseTime: Date.now() - (speechResult?.startTime || Date.now()),
               cached: false
             });
           }
@@ -466,45 +484,40 @@ export default function Home() {
         
         // Play response audio with lip-sync
         if (result.audioResponse) {
-          setProcessingMessage(currentLanguage === 'ja' ? '音声を準備中...' : 'Preparing audio...');
+          // 音声再生を開始（awaitしない）
+          playAudioWithLipSync(result.audioResponse).catch(error => {
+            console.error('[processVoiceInput] Audio playback error:', error);
+          });
+          // すぐにモーダルを閉じる
           setIsProcessing(false);
           setProcessingMessage('');
-          await playAudioWithLipSync(result.audioResponse);
+        } else {
+          console.warn('[processVoiceInput] No audio response from API');
         }
+      } else {
+        console.error('[processVoiceInput] API call was not successful:', result);
       }
-      setIsProcessing(false);
-      setProcessingMessage('');
     } catch (error) {
       // Error processing voice input
+      console.error('[processVoiceInput] Error details:', error);
+      console.error('[processVoiceInput] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       
-      // Fallback error response
-      const { ResponseCache } = await import('@/lib/response-cache');
-      const errorResponse = ResponseCache.getPredefinedResponse('confusion', currentLanguage, 'apologetic');
+      // エラー時は静かに失敗させ、「ごめんなさい」メッセージを表示しない
+      console.warn('[processVoiceInput] Voice processing failed silently, no error message to user');
       
-      if (errorResponse && setExpressionFunction) {
-        setExpressionFunction('sorry', 0.8);
-        
-        // Generate TTS for error response
-        try {
-          const ttsResponse = await fetch('/api/voice', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'text_to_speech',
-              text: preprocessTTS(errorResponse.text, currentLanguage),
-              language: currentLanguage,
-              emotion: errorResponse.emotion
-            })
-          });
-          
-          const ttsResult = await ttsResponse.json();
-          if (ttsResult.success && ttsResult.audioResponse) {
-            await playAudioWithLipSync(ttsResult.audioResponse);
-          }
-        } catch (ttsError) {
-          // Error generating TTS response
-        }
+      // 必要に応じて表情だけリセット
+      try {
+        const errorCharacterData = {
+          emotion: 'neutral',
+          expression: 'neutral', 
+          emotionIntensity: 0.5
+        };
+        await handleCharacterControl(errorCharacterData);
+      } catch (characterError) {
+        console.error('[processVoiceInput] Character reset failed:', characterError);
       }
+      
+      // エラー時もモーダルを確実に閉じる
       setIsProcessing(false);
       setProcessingMessage('');
     }
@@ -588,25 +601,64 @@ export default function Home() {
     }
   };
 
-  // Play audio with lip-sync
-  const playAudioWithLipSync = async (audioBase64: string) => {
+  // Handle character control through unified API
+  const handleCharacterControl = async (characterControlData: any) => {
+    try {
+      if (characterControlData.expression && setExpressionFunction) {
+        // Always use neutral expression for Q&A to avoid distracting face changes
+        console.log('[handleCharacterControl] Setting neutral expression (face expression disabled for Q&A)');
+        setExpressionFunction('neutral', 0.8);
+      }
+      
+      if (characterControlData.lipSyncData && setVisemeFunction) {
+        // Apply lip sync data frame by frame
+        characterControlData.lipSyncData.forEach((frame: any) => {
+          setTimeout(() => {
+            setVisemeFunction(frame.viseme, frame.intensity);
+          }, frame.time);
+        });
+      }
+      
+      // Handle animations if needed
+      if (characterControlData.animation) {
+        await fetch('/api/character', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'playAnimation',
+            animation: characterControlData.animation,
+            transition: true
+          })
+        });
+      }
+    } catch (error) {
+      console.error('[Character Control] Error applying character control:', error);
+    }
+  };
+
+  // Play audio with unified character control
+  const playAudioWithLipSync = async (audioBase64: string, characterControlData?: any) => {
     try {
       const { AudioPlaybackService } = await import('@/lib/audio/audio-playback-service');
       
+      // Apply character control if provided
+      if (characterControlData) {
+        await handleCharacterControl(characterControlData);
+      }
+      
       await AudioPlaybackService.playAudioWithLipSync(audioBase64, {
         volume: volume / 100,
-        enableLipSync: !!setVisemeFunction,
+        enableLipSync: !!setVisemeFunction && !characterControlData?.lipSyncData, // Skip if already handled
         onVisemeUpdate: setVisemeFunction || undefined,
         onError: (error) => {
           // Audio playback failed
-          // Fallback message for permission errors
           if (error.message?.includes('not allowed') || error.message?.includes('permission')) {
-            // Playing audio only
+            console.warn('[Audio] Permission denied, playing audio only');
           }
         }
       });
     } catch (error) {
-      // Audio playback with lip-sync failed
+      console.error('[Audio] Playback with lip-sync failed:', error);
     }
   };
 

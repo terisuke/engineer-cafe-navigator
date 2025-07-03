@@ -3,7 +3,7 @@
  * This ensures all components use the same emotion mappings
  */
 
-export type SupportedEmotion = 'neutral' | 'happy' | 'sad' | 'angry' | 'curious' | 'relaxed';
+export type SupportedEmotion = 'neutral' | 'happy' | 'sad' | 'angry' | 'surprised' | 'relaxed';
 
 export interface EmotionMappingConfig {
   vrm: Record<string, SupportedEmotion>;
@@ -36,6 +36,7 @@ export class EmotionMapping {
     'proud': 'happy',
     'grateful': 'happy',
     'warm': 'happy',
+    'helpful': 'happy',
     
     'sad': 'sad',
     'disappointed': 'sad',
@@ -63,14 +64,14 @@ export class EmotionMapping {
     'supportive': 'relaxed',
     'gentle': 'relaxed',
     
-    // Curiosity and questioning
-    'curious': 'curious',
-    'surprised': 'curious',
-    'shocked': 'curious',
-    'amazed': 'curious',
-    'astonished': 'curious',
-    'questioning': 'curious',
-    'inquisitive': 'curious',
+    // Surprise and questioning
+    'curious': 'surprised',
+    'surprised': 'surprised',
+    'shocked': 'surprised',
+    'amazed': 'surprised',
+    'astonished': 'surprised',
+    'questioning': 'surprised',
+    'inquisitive': 'surprised',
   };
 
   /**
@@ -81,7 +82,7 @@ export class EmotionMapping {
     'happy': 'greeting',
     'sad': 'thinking',
     'angry': 'explaining',
-    'curious': 'greeting',
+    'surprised': 'greeting',
     'relaxed': 'thinking',
   };
 
@@ -93,14 +94,20 @@ export class EmotionMapping {
     'happy': 0.8,
     'sad': 0.7,
     'angry': 0.9,
-    'curious': 0.8,
+    'surprised': 0.8,
     'relaxed': 0.6,
   };
 
   /**
    * Map any emotion string to a supported VRM emotion
    */
-  static mapToVRMEmotion(emotion: string): SupportedEmotion {
+  static mapToVRMEmotion(emotion: string | any): SupportedEmotion {
+    // 安全性チェック: emotionがstring以外の場合はneutralを返す
+    if (!emotion || typeof emotion !== 'string') {
+      console.warn('[EmotionMapping] Invalid emotion value:', emotion, 'type:', typeof emotion);
+      return 'neutral';
+    }
+    
     const normalizedEmotion = emotion.toLowerCase().trim();
     return this.VRM_EMOTION_MAP[normalizedEmotion] || 'neutral';
   }
@@ -132,7 +139,7 @@ export class EmotionMapping {
    * Get all supported emotions
    */
   static getSupportedEmotions(): SupportedEmotion[] {
-    return ['neutral', 'happy', 'sad', 'angry', 'curious', 'relaxed'];
+    return ['neutral', 'happy', 'sad', 'angry', 'surprised', 'relaxed'];
   }
 
   /**

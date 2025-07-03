@@ -4,25 +4,41 @@ import { SupportedLanguage } from '@/mastra/types/config';
 const contextFilterSchema = z.object({
   context: z.string().describe('The context to filter'),
   requestType: z.string().describe('The type of information requested'),
-  language: z.enum(['ja', 'en']).describe('Language for filtering')
+  language: z.enum(['ja', 'en']).describe('Language for filtering'),
+  query: z.string().optional().describe('The original query to help with filtering decisions')
 });
 
 /**
  * Filter context content based on the request type to ensure only relevant information is returned
  */
-function filterByRequestType(context: string, requestType: string, language: SupportedLanguage): string {
+function filterByRequestType(context: string, requestType: string, language: SupportedLanguage, query?: string): string {
   if (!context || !requestType) {
     console.log(`[ContextFilterTool] Early return - context empty: ${!context}, requestType empty: ${!requestType}`);
     return context;
   }
   
+  // Check if query is specifically about paid meeting room pricing (2F)
+  const isPaidMeetingRoomPricing = query && requestType === 'price' && (
+    (query.includes('会議室') || query.includes('meeting room') || query.includes('ミーティング')) &&
+    (query.includes('2階') || query.includes('有料') || query.includes('paid') || query.includes('2F'))
+  );
+  
+  // Check if query is about basement/free facilities (should exclude paid facility info)
+  const isBasementFacilityQuery = query && (
+    query.includes('地下') || query.includes('basement') || query.includes('無料') ||
+    query.includes('ちか') || query.includes('B1') || query.includes('free')
+  );
+
   console.log(`[ContextFilterTool] filterByRequestType START:`, {
     requestType,
     language,
+    query,
     contextLength: context.length,
-    contextPreview: context.substring(0, 100) + '...'
+    contextPreview: context.substring(0, 100) + '...',
+    isPaidMeetingRoomPricing,
+    isBasementFacilityQuery
   });
-  
+
   // Define keywords for each request type
   const requestTypeKeywords: Record<string, { include: string[], exclude: string[] }> = {
     'hours': {
@@ -35,11 +51,18 @@ function filterByRequestType(context: string, requestType: string, language: Sup
     },
     'price': {
       include: language === 'ja'
-        ? ['料金', '価格', '円', '無料', 'メニュー', 'ドリンク', 'フード', 'コース', 'セット', '値段', '費用', 'チャージ']
-        : ['price', 'cost', 'fee', 'charge', 'yen', 'free', 'menu', 'drink', 'food', 'course', 'set'],
+        ? ['料金', '価格', '円', '無料', 'メニュー', 'ドリンク', 'フード', 'コース', 'セット', '値段', '費用', 'チャージ', 
+           ...(isPaidMeetingRoomPricing ? ['会議室', 'ミーティング', '有料', '2階', 'meeting', 'room'] : [])]
+        : ['price', 'cost', 'fee', 'charge', 'yen', 'free', 'menu', 'drink', 'food', 'course', 'set',
+           ...(isPaidMeetingRoomPricing ? ['meeting', 'room', 'paid', '2F'] : [])],
       exclude: language === 'ja'
-        ? ['営業時間', '時間', '定休日', '席数', '設備', '電話', '住所', 'アクセス', '予約方法', '有料会議室', '2階会議室', '会議室料金', '有料スペース', '会議室利用料金', '1室あたり', '有料', '990円', '1,980円', '平日', '土日祝']
-        : ['hours', 'time', 'closed', 'seats', 'facilities', 'phone', 'address', 'access', 'how to book', 'paid meeting room', '2f meeting room', 'meeting room fee', 'paid space', 'meeting room usage fee', 'per room', 'paid', '990 yen', '1,980 yen']
+        ? ['営業時間', '時間', '定休日', '席数', '設備', '電話', '住所', 'アクセス', '予約方法', 
+           ...(isPaidMeetingRoomPricing ? [] : ['有料会議室', '2階会議室', '会議室料金', '有料スペース', '会議室利用料金', '1室あたり', '有料', '990円', '1,980円']),
+           ...(isBasementFacilityQuery ? ['2階', '有料', 'paid', '2F', '貸し出し', 'rental'] : []),
+           '平日', '土日祝']
+        : ['hours', 'time', 'closed', 'seats', 'facilities', 'phone', 'address', 'access', 'how to book', 
+           ...(isPaidMeetingRoomPricing ? [] : ['paid meeting room', '2f meeting room', 'meeting room fee', 'paid space', 'meeting room usage fee', 'per room', 'paid', '990 yen', '1,980 yen']),
+           ...(isBasementFacilityQuery ? ['2F', 'paid', 'rental', 'second floor'] : [])]
     },
     'location': {
       include: language === 'ja'
@@ -59,11 +82,15 @@ function filterByRequestType(context: string, requestType: string, language: Sup
     },
     'facility': {
       include: language === 'ja'
-        ? ['設備', '施設', 'Wi-Fi', 'WiFi', '電源', 'コンセント', '席', 'スペース', '会議室', 'テーブル', 'カウンター', '個室', '利用できる', '完備']
-        : ['facility', 'facilities', 'equipment', 'wifi', 'power', 'outlet', 'seats', 'space', 'room', 'table', 'counter', 'private', 'available'],
+        ? ['設備', '施設', 'Wi-Fi', 'WiFi', '電源', 'コンセント', '席', 'スペース', '会議室', 'テーブル', 'カウンター', '個室', '利用できる', '完備',
+           ...(isBasementFacilityQuery ? ['無料', '地下', 'B1'] : [])]
+        : ['facility', 'facilities', 'equipment', 'wifi', 'power', 'outlet', 'seats', 'space', 'room', 'table', 'counter', 'private', 'available',
+           ...(isBasementFacilityQuery ? ['free', 'basement', 'B1'] : [])],
       exclude: language === 'ja'
-        ? ['営業時間', '料金表', '予約手順', '住所']
-        : ['hours', 'price list', 'booking process', 'address']
+        ? ['営業時間', '料金表', '予約手順', '住所',
+           ...(isBasementFacilityQuery ? ['2階', '有料', '貸し出し料金', 'プロジェクター料金'] : [])]
+        : ['hours', 'price list', 'booking process', 'address',
+           ...(isBasementFacilityQuery ? ['2F', 'paid', 'rental fee', 'projector fee'] : [])]
     },
     'access': {
       include: language === 'ja'
@@ -80,6 +107,14 @@ function filterByRequestType(context: string, requestType: string, language: Sup
       exclude: language === 'ja'
         ? ['営業時間', '料金表', 'メニュー', '予約', '場所', '住所', '席数', '定休日']
         : ['hours', 'price list', 'menu', 'reservation', 'location', 'address', 'seats', 'closed days']
+    },
+    'basement': {
+      include: language === 'ja'
+        ? ['地下', 'B1', 'B1F', '地下1階', 'MTGスペース', '集中スペース', 'アンダースペース', 'Makersスペース', 'ミーティング', '打ち合わせ', '無料スペース', '無料']
+        : ['basement', 'B1', 'underground', 'meeting space', 'focus space', 'under space', 'makers space', 'free space', 'free'],
+      exclude: language === 'ja'
+        ? ['2階', '有料会議室', '営業時間', 'カフェメニュー', '有料', '料金', '貸し出し', 'レンタル', 'プロジェクター料金', '機材料金']
+        : ['2F', 'paid meeting room', 'business hours', 'cafe menu', 'paid', 'pricing', 'rental', 'equipment fee', 'projector fee']
     }
   };
   
@@ -166,8 +201,8 @@ export const contextFilterTool = {
   description: 'Filters context based on specific request types',
   schema: contextFilterSchema,
   
-  execute: async ({ context, requestType, language }: z.infer<typeof contextFilterSchema>) => {
-    const filteredContext = filterByRequestType(context, requestType, language);
+  execute: async ({ context, requestType, language, query }: z.infer<typeof contextFilterSchema>) => {
+    const filteredContext = filterByRequestType(context, requestType, language, query);
     
     return {
       success: true,

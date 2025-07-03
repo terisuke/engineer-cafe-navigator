@@ -1,6 +1,7 @@
 import { Agent } from '@mastra/core/agent';
 import { SimplifiedMemorySystem } from '@/lib/simplified-memory';
 import { SupportedLanguage } from '@/mastra/types/config';
+import { UnifiedAgentResponse, createUnifiedResponse } from '@/mastra/types/unified-response';
 
 export interface BusinessInfoAgentConfig {
   llm: {
@@ -25,10 +26,23 @@ export class BusinessInfoAgent extends Agent {
         - Pricing and fees
         - Location and access
         - Basic facility information
+        
+        IMPORTANT: Always start your response with an emotion tag.
+        Available emotions: [happy], [sad], [angry], [relaxed], [surprised]
+        
+        Use [relaxed] for informational responses
+        Use [happy] for positive information (available facilities, good news)
+        Use [sad] for unavailable services or apologetic responses
+        
+        Example responses:
+        - "[relaxed]営業時間は9:00〜22:00です。"
+        - "[happy]The facility is open and available!"
+        - "[sad]申し訳ございません、その施設は現在利用できません。"
+        
         Answer concisely with only the requested information.
         Always respond in the same language as the question.`,
     });
-    this.memory = new SimplifiedMemorySystem('BusinessInfoAgent');
+    this.memory = new SimplifiedMemorySystem('shared');
   }
 
   async answerBusinessQuery(
@@ -37,7 +51,7 @@ export class BusinessInfoAgent extends Agent {
     requestType: string | null,
     language: SupportedLanguage,
     sessionId?: string
-  ): Promise<string> {
+  ): Promise<UnifiedAgentResponse> {
     console.log('[BusinessInfoAgent] Processing query:', {
       query,
       category,
@@ -48,6 +62,8 @@ export class BusinessInfoAgent extends Agent {
 
     // Check for context inheritance for short queries
     let effectiveRequestType = requestType;
+    let contextEntity: string | null = null;
+    
     if (sessionId && this.isShortContextQuery(query)) {
       const memoryContext = await this.memory.getContext(query, {
         includeKnowledgeBase: false,
@@ -59,12 +75,29 @@ export class BusinessInfoAgent extends Agent {
         effectiveRequestType = memoryContext.inheritedRequestType;
         console.log(`[BusinessInfoAgent] Inherited request type: ${effectiveRequestType} for query: ${query}`);
       }
+      
+      // 前の会話から文脈のエンティティを特定
+      console.log(`[BusinessInfoAgent] Memory context:`, {
+        hasContextString: !!memoryContext.contextString,
+        contextLength: memoryContext.contextString?.length || 0,
+        contextPreview: memoryContext.contextString?.substring(0, 200)
+      });
+      
+      if (memoryContext.contextString) {
+        if (memoryContext.contextString.includes('サイノカフェ') || memoryContext.contextString.includes('saino')) {
+          contextEntity = 'saino';
+          console.log(`[BusinessInfoAgent] Context entity detected: saino`);
+        } else if (memoryContext.contextString.includes('エンジニアカフェ')) {
+          contextEntity = 'engineer';
+          console.log(`[BusinessInfoAgent] Context entity detected: engineer`);
+        }
+      }
     }
 
     // Enhance query for context-dependent cases
     let searchQuery = query;
-    if (this.isShortContextQuery(query)) {
-      searchQuery = this.enhanceContextQuery(query, effectiveRequestType, language);
+    if (this.isShortContextQuery(query) || contextEntity) {
+      searchQuery = this.enhanceContextQuery(query, effectiveRequestType, language, contextEntity);
       console.log(`[BusinessInfoAgent] Enhanced context query: ${searchQuery}`);
     }
 
@@ -75,7 +108,7 @@ export class BusinessInfoAgent extends Agent {
     
     if (!searchTool) {
       console.error('[BusinessInfoAgent] No RAG search tool available');
-      return this.getDefaultResponse(language);
+      return this.getDefaultResponse(language, category, requestType);
     }
 
     let searchResult;
@@ -102,11 +135,11 @@ export class BusinessInfoAgent extends Agent {
       }
     } catch (error) {
       console.error('[BusinessInfoAgent] RAG search error:', error);
-      return this.getDefaultResponse(language);
+      return this.getDefaultResponse(language, category, requestType);
     }
     
     if (!searchResult.success) {
-      return this.getDefaultResponse(language);
+      return this.getDefaultResponse(language, category, requestType);
     }
     
     // RAG検索結果からコンテキストを構築
@@ -122,7 +155,7 @@ export class BusinessInfoAgent extends Agent {
     }
 
     if (!context) {
-      return this.getDefaultResponse(language);
+      return this.getDefaultResponse(language, category, requestType);
     }
     if (requestType) {
       const contextFilterTool = this._tools.get('contextFilter');
@@ -131,7 +164,8 @@ export class BusinessInfoAgent extends Agent {
           const filterResult = await contextFilterTool.execute({
             context,
             requestType,
-            language
+            language,
+            query
           });
           
           if (filterResult.success) {
@@ -157,7 +191,39 @@ export class BusinessInfoAgent extends Agent {
       { role: 'user', content: prompt }
     ]);
     
-    return response.text;
+    // Determine sources used
+    const sources = [];
+    if (searchTool === enhancedRagTool) {
+      sources.push('enhanced_rag');
+    } else {
+      sources.push('knowledge_base');
+    }
+    
+    // Determine emotion based on request type and content
+    let emotion = 'helpful';
+    if (requestType === 'hours' || requestType === 'price') {
+      emotion = 'informative';
+    } else if (requestType === 'location') {
+      emotion = 'guiding';
+    }
+    
+    return createUnifiedResponse(
+      response.text,
+      emotion,
+      'BusinessInfoAgent',
+      language,
+      {
+        confidence: 0.85,
+        category,
+        requestType,
+        sources,
+        processingInfo: {
+          filtered: !!requestType,
+          contextInherited: effectiveRequestType !== requestType,
+          enhancedRag: searchTool === enhancedRagTool
+        }
+      }
+    );
   }
 
   private isShortContextQuery(query: string): boolean {
@@ -178,10 +244,21 @@ export class BusinessInfoAgent extends Agent {
     return contextPatterns.some(pattern => pattern.test(trimmed)) || trimmed.length < 10;
   }
 
-  private enhanceContextQuery(query: string, requestType: string | null, language: SupportedLanguage): string {
+  private enhanceContextQuery(query: string, requestType: string | null, language: SupportedLanguage, contextEntity?: string | null): string {
     const lowerQuery = query.toLowerCase();
     
-    // Entity mapping
+    // Context entity takes precedence
+    if (contextEntity === 'saino') {
+      if (requestType === 'hours') {
+        return language === 'en' ? 'saino cafe operating hours' : 'sainoカフェの営業時間';
+      }
+      if (requestType === 'price') {
+        return language === 'en' ? 'saino cafe prices menu' : 'sainoカフェの料金 メニュー';
+      }
+      return language === 'en' ? 'saino cafe information' : 'sainoカフェ 情報';
+    }
+    
+    // Entity mapping from query
     if (lowerQuery.includes('saino')) {
       if (requestType === 'hours') {
         return language === 'en' ? 'saino cafe operating hours' : 'sainoカフェの営業時間';
@@ -199,12 +276,27 @@ export class BusinessInfoAgent extends Agent {
     
     // Default enhancement based on request type
     if (requestType === 'hours') {
+      // 短いクエリで文脈エンティティがある場合
+      if (query.length < 10 && contextEntity) {
+        const entityName = contextEntity === 'saino' ? 'sainoカフェ' : 'エンジニアカフェ';
+        return language === 'en' ? `${entityName} operating hours` : `${entityName}の営業時間`;
+      }
       return language === 'en' ? `${query} operating hours` : `${query} 営業時間`;
     }
     if (requestType === 'price') {
+      // 短いクエリで文脈エンティティがある場合
+      if (query.length < 10 && contextEntity) {
+        const entityName = contextEntity === 'saino' ? 'sainoカフェ' : 'エンジニアカフェ';
+        return language === 'en' ? `${entityName} price cost` : `${entityName}の料金 価格`;
+      }
       return language === 'en' ? `${query} price cost` : `${query} 料金 価格`;
     }
     if (requestType === 'location') {
+      // 短いクエリで文脈エンティティがある場合
+      if (query.length < 10 && contextEntity) {
+        const entityName = contextEntity === 'saino' ? 'sainoカフェ' : 'エンジニアカフェ';
+        return language === 'en' ? `${entityName} location access` : `${entityName}の場所 アクセス`;
+      }
       return language === 'en' ? `${query} location access` : `${query} 場所 アクセス`;
     }
     
@@ -232,13 +324,15 @@ export class BusinessInfoAgent extends Agent {
 Question: ${query}
 Information: ${context}
 
-Answer with ONLY the ${requestTypePrompt}. Maximum 1-2 sentences. Do not include any other information.`
+Answer with ONLY the ${requestTypePrompt}. Maximum 1-2 sentences. Do not include any other information.
+IMPORTANT: Start your response with [relaxed] for information or [happy] for positive news.`
         : `次の情報から${requestTypePrompt}のみを抽出して質問に答えてください。
 
 質問: ${query}
 情報: ${context}
 
-${requestTypePrompt}のみを答えてください。最大1-2文。他の情報は含めないでください。`;
+${requestTypePrompt}のみを答えてください。最大1-2文。他の情報は含めないでください。
+重要: 情報提供の場合は[relaxed]、良いニュースの場合は[happy]で回答を始めてください。`;
     } else {
       return language === 'en'
         ? `Answer the question using the provided information. Be concise and direct.
@@ -246,13 +340,15 @@ ${requestTypePrompt}のみを答えてください。最大1-2文。他の情報
 Question: ${query}
 Information: ${context}
 
-Answer briefly (1-2 sentences) with only the relevant information.`
+Answer briefly (1-2 sentences) with only the relevant information.
+IMPORTANT: Start your response with an emotion tag: [relaxed] for information, [happy] for positive news, [sad] for unavailable services.`
         : `提供された情報を使って質問に答えてください。簡潔で直接的に答えてください。
 
 質問: ${query}
 情報: ${context}
 
-関連する情報のみを簡潔に（1-2文）答えてください。`;
+関連する情報のみを簡潔に（1-2文）答えてください。
+重要: 感情タグで回答を始めてください: 情報提供は[relaxed]、良いニュースは[happy]、利用できないサービスは[sad]。`;
     }
   }
 
@@ -284,9 +380,22 @@ Answer briefly (1-2 sentences) with only the relevant information.`
     return prompt ? prompt[language] : (language === 'en' ? 'requested information' : '要求された情報');
   }
 
-  private getDefaultResponse(language: SupportedLanguage): string {
-    return language === 'en'
-      ? "I'm sorry, I couldn't find the specific information you're looking for. Please try rephrasing your question or contact the staff for assistance."
-      : "申し訳ございません。お探しの情報が見つかりませんでした。質問を言い換えていただくか、スタッフにお問い合わせください。";
+  private getDefaultResponse(language: SupportedLanguage, category?: string, requestType?: string | null): UnifiedAgentResponse {
+    const text = language === 'en'
+      ? "[sad]I'm sorry, I couldn't find the specific information you're looking for. Please try rephrasing your question or contact the staff for assistance."
+      : "[sad]申し訳ございません。お探しの情報が見つかりませんでした。質問を言い換えていただくか、スタッフにお問い合わせください。";
+    
+    return createUnifiedResponse(
+      text,
+      'apologetic',
+      'BusinessInfoAgent',
+      language,
+      {
+        confidence: 0.3,
+        category,
+        requestType,
+        sources: ['fallback']
+      }
+    );
   }
 }

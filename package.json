@@ -20,6 +20,8 @@
     "test:integrated": "cd scripts/tests && tsx run-tests.ts integrated",
     "test:router": "cd scripts/tests && tsx run-tests.ts router",
     "test:calendar": "cd scripts/tests && tsx run-tests.ts calendar",
+    "test:context": "tsx scripts/tests/context-inheritance-test.ts",
+    "test:emotion": "tsx scripts/tests/emotion-tag-test.ts",
     "vercel-build": "pnpm build"
   },
   "engines": {

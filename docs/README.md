@@ -81,6 +81,10 @@
 | **多言語対応** | 日本語・英語切り替え | ✅ 完了 | [README.md](../README.md#主要機能) |
 | **背景制御** | 動的背景変更 | ✅ 完了 | [README.md](../README.md#背景画像の配置) |
 | **セキュリティ** | XSS対策・Origin検証 | ✅ 完了 | [SECURITY.md](SECURITY.md#実装済みセキュリティ対策) |
+| **8エージェント体制** | マルチエージェントアーキテクチャ | ✅ 完了 | [README.md](../README.md#8エージェント体制への完全移行) |
+| **あいまいさ解消** | カフェ・会議室の明確化 | ✅ 完了 | [README.md](../README.md#あいまいさ解消機能) |
+| **会話記憶** | 3分間の短期記憶 | ✅ 完了 | [memory-rag-integration.md](memory-rag-integration.md) |
+| **Enhanced RAG** | エンティティ認識・優先度スコアリング | ✅ 完了 | [RAG-SYSTEM-COMPLETION-REPORT.md](RAG-SYSTEM-COMPLETION-REPORT.md) |
 
 ### 🔄 実装予定機能
 
@@ -104,12 +108,31 @@ graph TB
     
     subgraph "API Layer"
         API[Next.js 15 API Routes]
-        Mastra[Mastra 0.10.5 Agents]
+    end
+    
+    subgraph "8-Agent Architecture (Mastra 0.10.5)"
+        MainQA[MainQAWorkflow<br/>統合コーディネーター]
+        Router[RouterAgent<br/>クエリルーティング]
+        Business[BusinessInfoAgent<br/>営業時間・料金]
+        Facility[FacilityAgent<br/>設備・地下施設]
+        Memory[MemoryAgent<br/>会話履歴管理]
+        Event[EventAgent<br/>カレンダー・イベント]
+        General[GeneralKnowledgeAgent<br/>Web検索]
+        Clarify[ClarificationAgent<br/>あいまいさ解消]
+        
+        MainQA --> Router
+        Router --> Business
+        Router --> Facility
+        Router --> Memory
+        Router --> Event
+        Router --> General
+        Router --> Clarify
     end
     
     subgraph "External Services"
         Google[Google Cloud AI]
-        Supabase[Supabase Database]
+        OpenAI[OpenAI Embeddings]
+        Supabase[(Supabase Database<br/>+ pgvector)]
     end
     
     subgraph "Security Layer"
@@ -123,9 +146,19 @@ graph TB
     Slides --> API
     Character --> API
     
-    API --> Mastra
-    Mastra --> Google
-    Mastra --> Supabase
+    API --> MainQA
+    Business --> Google
+    Facility --> Google
+    Memory --> Google
+    Event --> Google
+    General --> Google
+    Clarify --> Google
+    
+    Business --> OpenAI
+    Facility --> OpenAI
+    Memory --> Supabase
+    Business --> Supabase
+    Facility --> Supabase
     
     API --> XSS
     API --> Origin
@@ -205,6 +238,13 @@ pnpm run dev
 ドキュメントの改善提案や誤字脱字の報告も歓迎します！
 
 ## 📝 更新履歴
+
+### v1.3.0 (2025-07-03)
+- ✅ 8エージェント体制への完全移行
+- ✅ ClarificationAgent実装（あいまいさ解消機能）
+- ✅ メモリベースのフォローアップ対応
+- ✅ レガシーコード削除（EnhancedQAAgent 2,342行）
+- ✅ ドキュメント全面更新
 
 ### v1.2.0 (2024-01-30)
 - ✅ セキュリティ強化（XSS対策、Origin検証）

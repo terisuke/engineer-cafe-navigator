@@ -2,11 +2,12 @@
 
 > Current implementation status and roadmap for Engineer Cafe Navigator
 
-Last Updated: 2025-06-30
+Last Updated: 2025-07-03
 
 ## 🟢 Implemented Features
 
 ### Core Features
+- ✅ **8-Agent Architecture** - MainQAWorkflow coordinating specialized agents
 - ✅ **Voice Processing API** - Speech recognition, AI response generation, and text-to-speech using Google Cloud
 - ✅ **Google Cloud Service Account Authentication** - Secure authentication without API keys
 - ✅ **Multi-language Support** - Japanese and English voice interactions
@@ -17,6 +18,8 @@ Last Updated: 2025-06-30
 - ✅ **Q&A System** - RAG-based question answering with knowledge base
 - ✅ **Background Management** - Dynamic background image selection
 - ✅ **External System Integration** - WebSocket support for reception system
+- ✅ **Ambiguity Resolution** - ClarificationAgent for cafe/meeting room disambiguation
+- ✅ **Memory-based Follow-ups** - Support for "What about the other one?" queries
 
 ### API Endpoints (Implemented)
 - ✅ **POST /api/voice** - Voice processing with multiple actions
@@ -42,6 +45,16 @@ Last Updated: 2025-06-30
 - ✅ **Mobile Audio Compatibility** - Web Audio API with fallbacks
 - ✅ **Lip-sync System** - Optimized with intelligent caching
 - ✅ **Production Monitoring** - Real-time metrics and alerting
+
+### 8-Agent Architecture (NEW - 2025/07/03)
+- ✅ **MainQAWorkflow** - Central coordinator for all specialized agents
+- ✅ **RouterAgent** - Context-dependent query routing and classification
+- ✅ **BusinessInfoAgent** - Hours, pricing, location with Enhanced RAG
+- ✅ **FacilityAgent** - Equipment, basement facilities with Enhanced RAG
+- ✅ **MemoryAgent** - Conversation history and context management
+- ✅ **EventAgent** - Calendar and event information
+- ✅ **GeneralKnowledgeAgent** - Out-of-scope queries via web search
+- ✅ **ClarificationAgent** - Ambiguous query clarification
 
 ## 🔴 Features NOT Implemented (Despite Being Referenced)
 
@@ -164,7 +177,13 @@ pnpm check:deployment       # Check deployment readiness
 
 ## 🔄 Migration Notes
 
-### Recent Changes (2025-06-30)
+### Recent Changes (2025-07-03)
+1. **8-Agent Architecture** - Complete migration to multi-agent system with MainQAWorkflow
+2. **ClarificationAgent Implementation** - Ambiguity resolution for cafe/meeting room queries
+3. **Legacy Code Removal** - Deleted old EnhancedQAAgent (2,342 lines)
+4. **Memory-based Follow-ups** - Support for contextual follow-up questions
+
+### Previous Changes (2025-06-30)
 1. **Service Account Authentication** - Migrated from API keys to Service Account
 2. **Supabase Integration** - Added persistent memory and session management
 3. **Enhanced Emotion System** - Text-based emotion detection for character control

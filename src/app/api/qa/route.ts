@@ -96,12 +96,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           answer: result.answer,
+          emotion: result.emotion,
           category: result.metadata.category,
           requestType: result.metadata.requestType,
           confidence: result.metadata.confidence,
           processingTime: result.metadata.processingTime,
+          agentName: result.metadata.agentName,
+          sources: result.metadata.sources,
           audioResponse,
           hasAudio: !!audioResponse,
+          metadata: result.metadata, // Include full metadata for debugging
         });
 
       case 'escalate_to_staff':

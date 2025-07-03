@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
             success: true,
             transcript: text,
             response: result.response,
+            responseText: result.response, // Add for compatibility with page.tsx
             audioResponse: audioResponseBase64,
             shouldUpdateCharacter: result.shouldUpdateCharacter,
             characterAction: result.characterAction,
