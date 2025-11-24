@@ -6,7 +6,6 @@ import { WelcomeAgent } from './agents/welcome-agent';
 import { RealtimeAgent } from './agents/realtime-agent';
 import { SlideNarrator } from './agents/slide-narrator';
 import { MainQAWorkflow } from './workflows/main-qa-workflow';
-import { LangGraphWorkflow } from './langgraph/langgraph-workflow';
 import { SupabaseMemoryAdapter } from '@/lib/supabase-memory';
 import { getSharedMemoryService } from '@/lib/shared-memory-service';
 import { VoiceOutputAgent } from './agents/voice-output-agent';
@@ -33,7 +32,6 @@ export class EngineerCafeNavigator {
   private agents: Map<string, any> = new Map();
   private tools: Map<string, any> = new Map();
   private voiceService!: GoogleCloudVoiceSimple;
-  private langGraphWorkflow?: LangGraphWorkflow;
 
   constructor(config: Config) {
     this.config = config;
@@ -74,14 +72,7 @@ export class EngineerCafeNavigator {
     const realtimeAgent = new RealtimeAgent(modelConfig, this.voiceService);
     const slideNarrator = new SlideNarrator(modelConfig);
     const mainQAWorkflow = new MainQAWorkflow(modelConfig);
-    
-    // Initialize LangGraph workflow
-    try {
-      this.langGraphWorkflow = new LangGraphWorkflow(modelConfig);
-    } catch (error) {
-      console.warn('[EngineerCafeNavigator] Failed to initialize LangGraph workflow:', error);
-    }
-    
+
     // Voice output agent with voice service
     const voiceOutputAgent = new VoiceOutputAgent({
       ...modelConfig,
@@ -175,10 +166,6 @@ export class EngineerCafeNavigator {
 
   public getVoiceService() {
     return this.voiceService;
-  }
-
-  public getLangGraphWorkflow() {
-    return this.langGraphWorkflow;
   }
 }
 
